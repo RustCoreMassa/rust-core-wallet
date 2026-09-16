@@ -154,14 +154,14 @@ button {
 }
 
 .avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  background: linear-gradient(155deg, var(--red) 0%, #8f0f1e 100%);
+  width: 54px;
+  height: 54px;
+//   border-radius: 5px;
+//   background: linear-gradient(155deg, var(--red) 0%, #8f0f1e 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+//   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
@@ -1047,15 +1047,15 @@ button {
 }
 
 .lock-logo {
-  width: 60px;
-  height: 60px;
-  border-radius: 20px;
-  background: linear-gradient(155deg, var(--red), #7a0f1c);
+  width: 70px;
+  height: 70px;
+//   border-radius: 5px;
+//   background: linear-gradient(155deg, var(--red), #7a0f1c);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 22px;
-  box-shadow: 0 10px 26px -8px rgba(255, 45, 66, 0.55);
+//   box-shadow: 0 10px 26px -8px rgba(255, 45, 66, 0.55);
 }
 
 .lock-title {

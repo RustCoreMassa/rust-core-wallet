@@ -1,4 +1,4 @@
-import { CurrencyPipe, DecimalPipe, KeyValuePipe } from '@angular/common';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { TokenSymbol } from '../../../core/models/token.model';
 import { Modal } from '../../../core/services/modal';
@@ -10,7 +10,7 @@ type HomeTab = 'tokens' | 'history';
 
 @Component({
   selector: 'app-home-page',
-  imports: [CurrencyPipe, DecimalPipe, KeyValuePipe, TokenRow, HistoryRow],
+  imports: [CurrencyPipe, DecimalPipe, TokenRow, HistoryRow],
   templateUrl: './home-page.html',
   styleUrl: './home-page.scss',
 })
