@@ -1,1 +1,33 @@
-<p>sell-roll-modal works!</p>
+<div class="modal-head">
+  <div class="modal-title">Sell roll</div>
+  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+</div>
+
+<label class="field-label" for="sell-roll-count">
+  Number of rolls
+  <span style="float:right;color:var(--gray-500);">max {{ maxRolls() }}</span>
+</label>
+<div class="field-row">
+  <input
+    id="sell-roll-count"
+    class="num-input"
+    type="number"
+    min="1"
+    [ngModel]="count()"
+    (ngModelChange)="count.set($event)"
+  />
+</div>
+<div class="hint">You'll receive: {{ proceeds() }} MAS (after unstake delay)</div>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+
+<button class="btn btn-ghost" type="button" [disabled]="isSelling()" (click)="submit()">
+  @if (isSelling()) {
+  <div class="spinner"></div>
+  <span>Selling…</span>
+  } @else {
+  <span>Sell roll</span>
+  }
+</button>

@@ -1,1 +1,33 @@
-<p>buy-roll-modal works!</p>
+<div class="modal-head">
+  <div class="modal-title">Buy roll</div>
+  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+</div>
+
+<label class="field-label" for="buy-roll-count">
+  Number of rolls
+  <span style="float:right;color:var(--gray-500);">{{ rollPrice }} MAS / roll</span>
+</label>
+<div class="field-row">
+  <input
+    id="buy-roll-count"
+    class="num-input"
+    type="number"
+    min="1"
+    [ngModel]="count()"
+    (ngModelChange)="count.set($event)"
+  />
+</div>
+<div class="hint">Cost: {{ cost() }} MAS</div>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+
+<button class="btn btn-red" type="button" [disabled]="isBuying()" (click)="submit()">
+  @if (isBuying()) {
+  <div class="spinner"></div>
+  <span>Buying…</span>
+  } @else {
+  <span>Buy roll</span>
+  }
+</button>

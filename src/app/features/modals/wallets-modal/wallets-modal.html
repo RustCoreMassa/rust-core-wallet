@@ -1,1 +1,36 @@
-<p>wallets-modal works!</p>
+<div class="modal-head">
+  <div class="modal-title">Your wallets</div>
+  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+</div>
+
+@for (wallet of store.walletList(); track wallet.id; let i = $index) {
+<button
+  class="wallet-row"
+  type="button"
+  [class.active]="wallet.id === store.activeWalletId()"
+  (click)="select(wallet.id)"
+>
+  <div class="wallet-avatar" [style.background]="'linear-gradient(155deg, ' + avatarColors(i)[0] + ', ' + avatarColors(i)[1] + ')'">
+    {{ initials(wallet.name) }}
+  </div>
+  <div class="wallet-main">
+    <div class="wallet-name">{{ wallet.name }}</div>
+    <div class="wallet-addr">{{ wallet.address | shortAddress }}</div>
+  </div>
+  <div class="wallet-balance">{{ wallet.balances.MAS }} MAS</div>
+  @if (wallet.id === store.activeWalletId()) {
+  <svg class="wallet-check" width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+  }
+</button>
+}
+
+<button class="btn btn-ghost" type="button" [disabled]="isAdding()" (click)="addWallet()">
+  @if (isAdding()) {
+  <div class="spinner"></div>
+  <span>Creating…</span>
+  } @else {
+  <span>+ Add wallet</span>
+  }
+</button>
