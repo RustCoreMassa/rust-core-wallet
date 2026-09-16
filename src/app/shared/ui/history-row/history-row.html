@@ -1,0 +1,11 @@
+<div class="row">
+  <div class="row-icon" [class]="view().icon">{{ view().glyph }}</div>
+  <div class="row-main">
+    <div class="row-name">{{ view().title }}</div>
+    <div class="row-sub">{{ view().subtitle }}</div>
+  </div>
+  <div class="row-values">
+    <div class="row-usd" [class.pos]="view().amountPositive">{{ view().amountText }}</div>
+    <div class="row-amount">{{ timeLabel() }}</div>
+  </div>
+</div>

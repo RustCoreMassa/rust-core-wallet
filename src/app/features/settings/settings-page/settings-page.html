@@ -1,0 +1,60 @@
+<div class="view-header">Settings</div>
+
+<div class="settings-list">
+  <button class="settings-row" type="button" (click)="modal.open('wallets')">
+    <div>
+      <div class="label">Wallets</div>
+      <div class="sub">{{ walletsCountLabel() }}</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+
+  <button class="settings-row" type="button" (click)="store.toggleNetwork()">
+    <div>
+      <div class="label">Network</div>
+      <div class="sub">{{ isTestnet() ? 'Testnet' : 'Mainnet' }}</div>
+    </div>
+    <div class="switch" [class.on]="isTestnet()"></div>
+  </button>
+
+  <div class="settings-row">
+    <div>
+      <div class="label">Currency</div>
+      <div class="sub">USD</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </div>
+
+  <button class="settings-row" type="button" (click)="backupPhrase()">
+    <div>
+      <div class="label">Backup phrase</div>
+      <div class="sub">Keep it offline and private</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+
+  <button class="settings-row" type="button" (click)="lockWallet()">
+    <div>
+      <div class="label">Lock wallet</div>
+      <div class="sub">Requires your 6-digit PIN</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+
+  <button class="settings-row" type="button" (click)="logOut()">
+    <div>
+      <div class="label">Log out</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+</div>

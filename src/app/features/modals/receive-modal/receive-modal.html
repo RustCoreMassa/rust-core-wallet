@@ -1,0 +1,17 @@
+<div class="modal-head">
+  <div class="modal-title">Receive</div>
+  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+</div>
+
+<div class="qr-wrap">
+  <canvas #qrCanvas width="160" height="160"></canvas>
+</div>
+
+<div class="field-label">Your address</div>
+<div class="addr-box">{{ store.activeWallet().address }}</div>
+
+<div class="copy-row">
+  <button class="btn btn-red" type="button" (click)="copyAddress()">Copy address</button>
+</div>
+
+<div class="hint">Only send MAS and Massa-standard tokens to this address.</div>

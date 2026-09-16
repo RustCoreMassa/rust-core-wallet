@@ -1,0 +1,17 @@
+<div class="view-header">NFTs</div>
+
+<div class="nft-grid">
+  @if (nfts().length === 0) {
+  <div class="empty-state">No NFTs in this wallet</div>
+  } @else {
+  @for (nft of nfts(); track nft.id) {
+  <div class="nft-card">
+    <div class="nft-art" [style.background]="'linear-gradient(155deg, ' + nft.gradientFrom + ', ' + nft.gradientTo + ')'"></div>
+    <div class="nft-info">
+      <div class="nft-name">{{ nft.name }}</div>
+      <div class="nft-collection">{{ nft.collection }}</div>
+    </div>
+  </div>
+  }
+  }
+</div>

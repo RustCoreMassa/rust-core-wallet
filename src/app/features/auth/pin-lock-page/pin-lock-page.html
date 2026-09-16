@@ -1,0 +1,21 @@
+<div class="lock-screen">
+  <div class="lock-logo">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2 L21 8 L21 16 L12 22 L3 16 L3 8 Z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" />
+      <path d="M12 2 L12 22 M3 8 L21 16 M21 8 L3 16" stroke="#fff" stroke-width="1" opacity="0.5" />
+    </svg>
+  </div>
+
+  <div class="lock-title">{{ title() }}</div>
+  <div class="lock-sub">{{ subtitle() }}</div>
+
+  <div class="pin-dots">
+    @for (filled of dots(); track $index) {
+    <div class="pin-dot" [class.filled]="filled"></div>
+    }
+  </div>
+
+  <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
+
+  <button class="lock-switch" type="button" (click)="toggleMode()">{{ switchLabel() }}</button>
+</div>

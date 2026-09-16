@@ -1,0 +1,93 @@
+<div class="modal-head">
+  <div class="modal-title">Send</div>
+  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+</div>
+
+<label class="field-label" for="send-token">Asset</label>
+<div class="select-fake">
+  <select id="send-token" [ngModel]="token()" (ngModelChange)="token.set($event)">
+    @for (t of tokens; track t) {
+    <option [value]="t">{{ t }}</option>
+    }
+  </select>
+</div>
+
+<div class="field-label">Your wallets</div>
+<div class="chip-row">
+  @if (otherWallets().length === 0) {
+  <div class="chip-empty-hint">No other wallets yet</div>
+  } @else {
+  @for (w of otherWallets(); track w.id) {
+  <button class="chip" type="button" (click)="pickAddress(w.address)">{{ w.name }}</button>
+  }
+  }
+</div>
+
+<div class="field-label">Saved addresses</div>
+<div class="chip-row">
+  @if (savedAddresses().length === 0) {
+  <div class="chip-empty-hint">No saved addresses yet</div>
+  } @else {
+  @for (entry of savedAddresses(); track entry.address) {
+  <button class="chip chip-saved" type="button" (click)="pickAddress(entry.address)">{{ entry.name }}</button>
+  }
+  }
+</div>
+
+<label class="field-label" for="send-address">Recipient address</label>
+<div class="select-fake">
+  <input
+    id="send-address"
+    class="num-input"
+    style="background:none;border:none;padding:0;"
+    type="text"
+    placeholder="AU..."
+    [ngModel]="address()"
+    (ngModelChange)="address.set($event)"
+  />
+</div>
+
+@if (showSaveOption()) {
+<label class="save-row">
+  <input type="checkbox" [ngModel]="saveChecked()" (ngModelChange)="saveChecked.set($event)" />
+  <span>Save this address for future use</span>
+</label>
+@if (saveChecked()) {
+<input
+  class="num-input"
+  style="margin-top:8px;"
+  placeholder="Label (e.g. Exchange, Friend)"
+  [ngModel]="saveName()"
+  (ngModelChange)="saveName.set($event)"
+/>
+}
+}
+
+<label class="field-label" for="send-amount">Amount</label>
+<div class="field-row">
+  <input
+    id="send-amount"
+    class="num-input"
+    type="number"
+    placeholder="0.00"
+    [ngModel]="amount()"
+    (ngModelChange)="amount.set($event)"
+  />
+  <button class="max-btn" type="button" (click)="setMax()">Max</button>
+</div>
+<div class="balance-hint">
+  <span>Available: {{ availableBalance() }} {{ token() }}</span>
+</div>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+
+<button class="btn btn-red" type="button" [disabled]="isSending()" (click)="submit()">
+  @if (isSending()) {
+  <div class="spinner"></div>
+  <span>Sending…</span>
+  } @else {
+  <span>Send</span>
+  }
+</button>

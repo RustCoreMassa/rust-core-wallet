@@ -1,0 +1,13 @@
+<div class="keypad">
+  @for (key of ['1', '2', '3', '4', '5', '6', '7', '8', '9']; track key) {
+  <button class="key" type="button" (click)="press(key)">{{ key }}</button>
+  }
+  <div class="key key-empty"></div>
+  <button class="key" type="button" (click)="press('0')">0</button>
+  <button class="key key-back" type="button" (click)="pressBackspace()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M21 4H8l-6 8 6 8h13a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+      <path d="M14 9l4 6M18 9l-4 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+    </svg>
+  </button>
+</div>

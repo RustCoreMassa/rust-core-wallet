@@ -1,0 +1,53 @@
+<div class="view-header">Staking</div>
+
+<div class="staking-card">
+  <div class="staking-row">
+    <div class="staking-stat">
+      <div class="stat-num">{{ wallet().rolls.active }}</div>
+      <div class="stat-label">final roll</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ wallet().rolls.candidate }}</div>
+      <div class="stat-label">candidate roll</div>
+    </div>
+  </div>
+
+  <div class="staking-divider"></div>
+
+  <div class="staking-row">
+    <div class="staking-stat">
+      <div class="stat-num">{{ finalMas() | number: '1.2-2' }}</div>
+      <div class="stat-label">final MAS balance</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ stakedMas() | number: '1.0-0' }}</div>
+      <div class="stat-label">staked MAS balance</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ totalMas() | number: '1.2-2' }}</div>
+      <div class="stat-label">total MAS balance</div>
+    </div>
+  </div>
+
+  <div class="staking-row">
+    <div class="staking-stat">
+      <div class="stat-num">{{ finalMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+      <div class="stat-label">final USD balance</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ stakedMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+      <div class="stat-label">staked USD balance</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ totalMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+      <div class="stat-label">total USD balance</div>
+    </div>
+  </div>
+
+  <div class="staking-divider"></div>
+
+  <div class="staking-buttons">
+    <button class="pill-btn" type="button" (click)="modal.open('buy-roll')">Buy roll</button>
+    <button class="pill-btn" type="button" (click)="modal.open('sell-roll')">Sell roll</button>
+  </div>
+</div>

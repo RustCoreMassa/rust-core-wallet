@@ -1,0 +1,100 @@
+<header class="top-header">
+  <div class="account">
+    <div class="avatar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2 L21 8 L21 16 L12 22 L3 16 L3 8 Z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M12 2 L12 22 M3 8 L21 16 M21 8 L3 16" stroke="#fff" stroke-width="1" opacity="0.5" />
+      </svg>
+    </div>
+    <div class="account-info">
+      <button class="account-name" type="button" (click)="modal.open('wallets')">
+        <span>{{ wallet().name }}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+          <path d="M6 9l6 6 6-6" stroke="#c7c7cd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <button class="network-pill" type="button" [class.testnet]="store.network() === 'testnet'" (click)="store.toggleNetwork()">
+        {{ store.network() === 'mainnet' ? 'Mainnet' : 'Testnet' }}
+      </button>
+    </div>
+  </div>
+  <button class="header-icon" type="button" (click)="modal.open('receive')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 4h4v4H4zM16 4h4v4h-4zM4 16h4v4H4zM16 16h4v1.5M20 16v4h-4M14 4v2M14 18v2M4 14h2M18 14h2"
+        stroke="#f6f6f8"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </button>
+</header>
+
+<section class="balance">
+  <div class="balance-label">Total balance</div>
+  <div class="balance-amount">
+    <span>{{ wallet().balances.MAS | number: '1.2-2' }}</span>
+    <span class="unit">MAS</span>
+  </div>
+  <div class="balance-sub">
+    <span>{{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+    <span class="change" [class.up]="changePct() >= 0" [class.down]="changePct() < 0">
+      {{ changePct() >= 0 ? '+' : '' }}{{ changePct() | number: '1.2-2' }}%
+    </span>
+  </div>
+</section>
+
+<div class="actions">
+  <button class="action" type="button" (click)="modal.open('receive')">
+    <div class="action-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 4v14M6 12l6 6 6-6" stroke="#f6f6f8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+    <div class="action-label">Receive</div>
+  </button>
+  <button class="action" type="button" (click)="modal.open('send')">
+    <div class="action-btn primary">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M12 19V5M6 11l6-6 6 6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+    <div class="action-label">Send</div>
+  </button>
+  <button class="action" type="button" (click)="modal.open('swap')">
+    <div class="action-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M6 8h11l-3-3M18 16H7l3 3" stroke="#f6f6f8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+    <div class="action-label">Swap</div>
+  </button>
+</div>
+
+<div class="tabs">
+  <button class="tab" [class.active]="activeTab() === 'tokens'" type="button" (click)="setTab('tokens')">Tokens</button>
+  <button class="tab" [class.active]="activeTab() === 'history'" type="button" (click)="setTab('history')">History</button>
+  <div class="tab-meta">{{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+</div>
+
+<div class="token-list">
+  @if (activeTab() === 'tokens') {
+  @for (symbol of tokenSymbols(); track symbol) {
+  <app-token-row
+    [symbol]="symbol"
+    [balance]="wallet().balances[symbol]"
+    [price]="store.prices()[symbol]"
+    [changePct]="store.dayChangePct()[symbol]"
+  />
+  }
+  } @else {
+  @if (wallet().history.length === 0) {
+  <div class="empty-state">No transactions yet</div>
+  } @else {
+  @for (tx of wallet().history; track tx.id) {
+  <app-history-row [tx]="tx" />
+  }
+  }
+  }
+</div>

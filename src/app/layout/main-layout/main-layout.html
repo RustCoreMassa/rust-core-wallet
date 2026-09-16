@@ -1,0 +1,35 @@
+<div class="app-screen">
+  <div class="app-glow"></div>
+  <div class="app-content">
+    <app-toast-host />
+
+    <div class="view-area">
+      <router-outlet />
+    </div>
+
+    <app-bottom-nav />
+
+    <div class="modal-overlay" [class.open]="modal.active() !== null" (click)="onOverlayClick($event)">
+      @switch (modal.active()) {
+      @case ('receive') {
+      <app-receive-modal />
+      }
+      @case ('send') {
+      <app-send-modal />
+      }
+      @case ('swap') {
+      <app-swap-modal />
+      }
+      @case ('buy-roll') {
+      <app-buy-roll-modal />
+      }
+      @case ('sell-roll') {
+      <app-sell-roll-modal />
+      }
+      @case ('wallets') {
+      <app-wallets-modal />
+      }
+      }
+    </div>
+  </div>
+</div>
