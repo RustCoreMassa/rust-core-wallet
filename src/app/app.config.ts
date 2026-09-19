@@ -1,4 +1,4 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
@@ -13,5 +13,6 @@ export const appConfig: ApplicationConfig = {
     // `@massalabs/massa-web3`) to go from mock data to a live chain —
     // nothing else in the app depends on the concrete implementation.
     { provide: MASSA_PROVIDER, useClass: MockMassaProvider },
+    // provideZonelessChangeDetection()
   ],
 };

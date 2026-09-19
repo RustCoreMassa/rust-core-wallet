@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { TokenSymbol } from '../models/token.model';
 import {
+  GeneratedAccount,
   MassaProvider,
   OperationResult,
   RollCounts,
@@ -11,11 +12,43 @@ import {
 
 export const ROLL_PRICE_MAS = 100;
 const NETWORK_LATENCY_MS = 650;
+const ADDRESS_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// Real Massa secret keys are versioned/base58check-encoded and start
+// with "S1"; the mock only checks the shape, not real cryptography.
+const PRIVATE_KEY_PATTERN = /^S1[A-Za-z0-9]{40,60}$/;
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const randomOperationId = () =>
   'O' + Array.from({ length: 44 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+
+const randomAddressBody = () =>
+  Array.from(
+    { length: 42 },
+    () => ADDRESS_ALPHABET[Math.floor(Math.random() * ADDRESS_ALPHABET.length)],
+  ).join('');
+
+const randomPrivateKey = () =>
+  'S1' +
+  Array.from(
+    { length: 48 },
+    () => ADDRESS_ALPHABET[Math.floor(Math.random() * ADDRESS_ALPHABET.length)],
+  ).join('');
+
+/** Deterministic (same key → same address) so re-importing a key is stable. */
+function deriveAddressFromKey(privateKey: string): string {
+  let seed = 0;
+  for (let i = 0; i < privateKey.length; i++) seed += privateKey.charCodeAt(i) * (i * 7 + 3);
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  const body = Array.from(
+    { length: 42 },
+    () => ADDRESS_ALPHABET[Math.floor(rand() * ADDRESS_ALPHABET.length)],
+  ).join('');
+  return 'AU' + body;
+}
 
 /**
  * In-memory stand-in for a real `@massalabs/massa-web3` backed provider.
@@ -75,11 +108,18 @@ export class MockMassaProvider implements MassaProvider {
 
   async generateWalletAddress(): Promise<string> {
     await wait(200);
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const body = Array.from(
-      { length: 42 },
-      () => alphabet[Math.floor(Math.random() * alphabet.length)],
-    ).join('');
-    return 'AU' + body;
+    return 'AU' + randomAddressBody();
+  }
+
+  async generateAccount(): Promise<GeneratedAccount> {
+    await wait(300);
+    const privateKey = randomPrivateKey();
+    return { privateKey, address: deriveAddressFromKey(privateKey) };
+  }
+
+  async resolveAddress(privateKey: string): Promise<string | null> {
+    await wait(NETWORK_LATENCY_MS);
+    if (!PRIVATE_KEY_PATTERN.test(privateKey.trim())) return null;
+    return deriveAddressFromKey(privateKey.trim());
   }
 }

@@ -6,6 +6,11 @@
   <div class="lock-title">{{ title() }}</div>
   <div class="lock-sub">{{ subtitle() }}</div>
 
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:16px;">{{ error() }}</div>
+  }
+
+  @if (showPinPad()) {
   <div class="pin-dots">
     @for (filled of dots(); track $index) {
     <div class="pin-dot" [class.filled]="filled"></div>
@@ -13,6 +18,39 @@
   </div>
 
   <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
+  }
 
-  <button class="lock-switch" type="button" (click)="toggleMode()">{{ switchLabel() }}</button>
+  @if (step() === 'key-choice') {
+  <div style="width:100%;max-width:320px;">
+    <button class="btn btn-red" type="button" (click)="generateNewWallet()">Generate a new wallet</button>
+    <button class="btn btn-ghost" type="button" (click)="startImportFlow()">Import a private key</button>
+  </div>
+  }
+
+  @if (step() === 'import-key') {
+  <div style="width:100%;max-width:320px;">
+    <label class="field-label" for="import-key-input" style="text-align:left;">Private key</label>
+    <input
+      id="import-key-input"
+      class="num-input"
+      type="text"
+      placeholder="S1..."
+      [ngModel]="importKeyValue()"
+      (ngModelChange)="importKeyValue.set($event)"
+    />
+    <button class="btn btn-red" type="button" [disabled]="isBusy()" (click)="submitImportedKey()">
+      @if (isBusy()) {
+      <div class="spinner"></div>
+      <span>Checking…</span>
+      } @else {
+      <span>Import</span>
+      }
+    </button>
+    <button class="btn btn-ghost" type="button" (click)="backToKeyChoice()">Back</button>
+  </div>
+  }
+
+  @if (step() === 'generating') {
+  <div class="spinner"></div>
+  }
 </div>

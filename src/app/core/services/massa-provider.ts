@@ -49,6 +49,22 @@ export interface MassaProvider {
   buyRolls(params: RollOperationParams): Promise<OperationResult>;
   sellRolls(params: RollOperationParams): Promise<OperationResult>;
   generateWalletAddress(): Promise<string>;
+  /** Fresh keypair for "create a new wallet" during registration. */
+  generateAccount(): Promise<GeneratedAccount>;
+  /**
+   * Resolves the address for an imported private key, or `null` if the
+   * key is not a valid Massa secret key. A real implementation derives
+   * this locally from the key material (no network round trip needed
+   * for that part) — kept on the provider boundary because it's still
+   * "ask the SDK", and to keep components from ever touching raw key
+   * material directly.
+   */
+  resolveAddress(privateKey: string): Promise<string | null>;
+}
+
+export interface GeneratedAccount {
+  readonly privateKey: string;
+  readonly address: string;
 }
 
 export const MASSA_PROVIDER = new InjectionToken<MassaProvider>('MASSA_PROVIDER');

@@ -1,13 +1,13 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { WalletStore } from '../state/wallet-store';
+import { AuthStore } from './auth-store';
 
 /**
- * Blocks the main app shell until the PIN screen has unlocked the
- * session; redirects to /login otherwise.
+ * Blocks the main app shell until the PIN vault has been unlocked;
+ * redirects to /login otherwise.
  */
 export const authGuard: CanActivateFn = () => {
-  const store = inject(WalletStore);
+  const auth = inject(AuthStore);
   const router = inject(Router);
-  return store.isUnlocked() ? true : router.createUrlTree(['/login']);
+  return auth.isUnlocked() ? true : router.createUrlTree(['/login']);
 };
