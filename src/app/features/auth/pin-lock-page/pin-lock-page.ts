@@ -102,7 +102,8 @@ export class PinLockPage {
       this.isBusy.set(false);
 
       if (ok) {
-        this.router.navigateByUrl('/home');
+        await this.router.navigateByUrl('/home');
+        return;
       } else {
         this.error.set('Incorrect PIN');
         this.pin.set('');
@@ -170,6 +171,6 @@ export class PinLockPage {
 
   private async completeRegistration(account: VaultAccount): Promise<void> {
     await this.authStore.register(this.firstPin, [account]);
-    this.router.navigateByUrl('/home');
+    await this.router.navigateByUrl('/home');
   }
 }

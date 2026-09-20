@@ -1,5 +1,7 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+import {
+  RouterOutlet,
+} from '@angular/router';
 
 @Component({
   imports: [RouterOutlet],
@@ -8,4 +10,6 @@ import { RouterOutlet } from '@angular/router';
   templateUrl: './app.html',
 })
 export class App {
+  constructor() {
+  }
 }

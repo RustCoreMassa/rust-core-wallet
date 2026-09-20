@@ -9,5 +9,6 @@ import { AuthStore } from './auth-store';
 export const authGuard: CanActivateFn = () => {
   const auth = inject(AuthStore);
   const router = inject(Router);
-  return auth.isUnlocked() ? true : router.createUrlTree(['/login']);
+  const unlocked = auth.isUnlocked();
+  return unlocked ? true : router.createUrlTree(['/login']);
 };
