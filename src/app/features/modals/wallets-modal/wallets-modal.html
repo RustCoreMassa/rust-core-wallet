@@ -1,38 +1,88 @@
 <div class="modal">
-<div class="modal-head">
-  <div class="modal-title">Your wallets</div>
-  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
-</div>
-
-@for (wallet of store.walletList(); track wallet.id; let i = $index) {
-<button
-  class="wallet-row"
-  type="button"
-  [class.active]="wallet.id === store.activeWalletId()"
-  (click)="select(wallet.id)"
->
-  <div class="wallet-avatar" [style.background]="'linear-gradient(155deg, ' + avatarColors(i)[0] + ', ' + avatarColors(i)[1] + ')'">
-    {{ initials(wallet.name) }}
+  <div class="modal-head">
+    <div class="modal-title">
+      @switch (step()) {
+      @case ('list') { Your wallets }
+      @case ('choice') { Add a wallet }
+      @case ('import') { Import a private key }
+      @case ('generating') { Creating your wallet }
+      }
+    </div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
   </div>
-  <div class="wallet-main">
-    <div class="wallet-name">{{ wallet.name }}</div>
-    <div class="wallet-addr">{{ wallet.address | shortAddress }}</div>
-  </div>
-  <div class="wallet-balance">{{ wallet.balances.MAS }} MAS</div>
-  @if (wallet.id === store.activeWalletId()) {
-  <svg class="wallet-check" width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-  </svg>
-  }
-</button>
-}
 
-<button class="btn btn-ghost" type="button" [disabled]="isAdding()" (click)="addWallet()">
-  @if (isAdding()) {
-  <div class="spinner"></div>
-  <span>Creating…</span>
-  } @else {
-  <span>+ Add wallet</span>
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
   }
-</button>
+
+  @if (step() === 'list') {
+  @for (account of authStore.accounts(); track account.id; let i = $index) {
+  <button
+    class="wallet-row"
+    type="button"
+    [class.active]="account.id === store.activeWalletId()"
+    (click)="select(account.id)"
+  >
+    <div class="wallet-avatar" [style.background]="'linear-gradient(155deg, ' + avatarColors(i)[0] + ', ' + avatarColors(i)[1] + ')'">
+      {{ initials(account.name) }}
+    </div>
+    <div class="wallet-main">
+      <div class="wallet-name">{{ account.name }}</div>
+      <div class="wallet-addr">{{ account.address | shortAddress }}</div>
+    </div>
+    <div class="wallet-balance">{{ balanceFor(account.id) }} MAS</div>
+    @if (account.id === store.activeWalletId()) {
+    <svg class="wallet-check" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+    }
+  </button>
+  }
+
+  <button class="btn btn-ghost" type="button" (click)="startAddFlow()">+ Add wallet</button>
+  }
+
+  @if (step() === 'choice') {
+  <button class="btn btn-red" type="button" (click)="generateNewWallet()">Generate a new wallet</button>
+  <button class="btn btn-ghost" type="button" (click)="startImportFlow()">Import a private key</button>
+  <button class="btn btn-ghost" type="button" (click)="backToList()">Cancel</button>
+  }
+
+  @if (step() === 'import') {
+  <label class="field-label" for="wallets-import-name">Wallet name</label>
+  <input
+    id="wallets-import-name"
+    class="num-input"
+    type="text"
+    placeholder="wallet_2"
+    [ngModel]="importName()"
+    (ngModelChange)="importName.set($event)"
+  />
+
+  <label class="field-label" for="wallets-import-key">Private key</label>
+  <input
+    id="wallets-import-key"
+    class="num-input"
+    type="text"
+    placeholder="S1..."
+    [ngModel]="importKey()"
+    (ngModelChange)="importKey.set($event)"
+  />
+
+  <button class="btn btn-red" type="button" [disabled]="isBusy()" (click)="submitImportedKey()">
+    @if (isBusy()) {
+    <div class="spinner"></div>
+    <span>Checking…</span>
+    } @else {
+    <span>Import</span>
+    }
+  </button>
+  <button class="btn btn-ghost" type="button" (click)="startAddFlow()">Back</button>
+  }
+
+  @if (step() === 'generating') {
+  <div style="display:flex;justify-content:center;padding:20px 0;">
+    <div class="spinner"></div>
+  </div>
+  }
 </div>

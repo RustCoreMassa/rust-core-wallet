@@ -1,0 +1,51 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">Backup phrase</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (step() === 'confirm-pin') {
+  <div class="hint" style="margin-bottom:16px;">Confirm your PIN before we show this — it's sensitive.</div>
+
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
+  }
+
+  <div class="pin-dots" style="justify-content:center;margin-bottom:24px;">
+    @for (filled of dots(); track $index) {
+    <div class="pin-dot" [class.filled]="filled"></div>
+    }
+  </div>
+
+  <div style="display:flex;justify-content:center;">
+    <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
+  </div>
+  }
+
+  @if (step() === 'reveal') {
+  @if (accounts().length > 1) {
+  <label class="field-label" for="backup-account-select">Wallet</label>
+  <div class="select-fake">
+    <select id="backup-account-select" [ngModel]="selectedAccountId()" (ngModelChange)="selectAccount($event)">
+      @for (account of accounts(); track account.id) {
+      <option [value]="account.id">{{ account.name }}</option>
+      }
+    </select>
+  </div>
+  }
+
+  <div class="error-text" style="display:block;margin-top:14px;">
+    Never share this key. Anyone who has it can access this wallet's funds.
+  </div>
+
+  @if (selectedAccount(); as account) {
+  <div class="field-label">Address</div>
+  <div class="addr-box">{{ account.address | shortAddress }}</div>
+
+  <div class="field-label">Private key</div>
+  <div class="addr-box">{{ account.privateKey }}</div>
+  }
+
+  <button class="btn btn-red" type="button" (click)="copyPrivateKey()">Copy private key</button>
+  }
+</div>

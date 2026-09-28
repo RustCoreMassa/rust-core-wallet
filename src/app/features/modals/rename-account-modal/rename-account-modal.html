@@ -1,0 +1,35 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">Rename wallet</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (account(); as account) {
+  <div class="field-label">Address</div>
+  <div class="addr-box">{{ account.address | shortAddress }}</div>
+
+  <label class="field-label" for="rename-input">Name</label>
+  <input
+    id="rename-input"
+    class="num-input"
+    type="text"
+    [ngModel]="name()"
+    (ngModelChange)="name.set($event)"
+  />
+
+  @if (error()) {
+  <div class="error-text">{{ error() }}</div>
+  }
+
+  <button class="btn btn-red" type="button" [disabled]="isSaving()" (click)="save()">
+    @if (isSaving()) {
+    <div class="spinner"></div>
+    <span>Saving…</span>
+    } @else {
+    <span>Save</span>
+    }
+  </button>
+
+  <button class="btn btn-ghost" type="button" (click)="copyPrivateKey()">Copy private key</button>
+  }
+</div>

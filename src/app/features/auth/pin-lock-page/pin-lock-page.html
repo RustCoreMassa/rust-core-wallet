@@ -29,6 +29,15 @@
 
   @if (step() === 'import-key') {
   <div style="width:100%;max-width:320px;">
+    <label class="field-label" for="import-name-input" style="text-align:left;">Wallet name</label>
+    <input
+      id="import-name-input"
+      class="num-input"
+      type="text"
+      placeholder="wallet_1"
+      [ngModel]="importNameValue()"
+      (ngModelChange)="importNameValue.set($event)"
+    />
     <label class="field-label" for="import-key-input" style="text-align:left;">Private key</label>
     <input
       id="import-key-input"

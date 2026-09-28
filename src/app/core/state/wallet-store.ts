@@ -187,12 +187,18 @@ export class WalletStore {
     if (this._wallets()[id]) this._activeWalletId.set(id);
   }
 
-  async addWallet(): Promise<void> {
-    const address = await this.provider.generateWalletAddress();
-    const id = `wallet-${Date.now()}`;
+  /**
+   * Ensures a demo economy entry (zero balances) exists for a real
+   * account from AuthStore, keyed by the same id — idempotent, safe to
+   * call for accounts that already have one. Real identity (name,
+   * address, private key) lives in AuthStore; this is just the mock
+   * balances/rolls/history/nfts this demo renders for that account.
+   */
+  ensureWallet(id: string, name: string, address: string): void {
+    if (this._wallets()[id]) return;
     const wallet: WalletState = {
       id,
-      name: `Wallet ${this.walletList().length + 1}`,
+      name,
       address,
       balances: { MAS: 0, USDC: 0, WETH: 0 },
       rolls: { active: 0, candidate: 0, deferred: 0 },
@@ -200,7 +206,6 @@ export class WalletStore {
       nfts: [],
     };
     this._wallets.update((all) => ({ ...all, [id]: wallet }));
-    this._activeWalletId.set(id);
   }
 
   saveAddress(name: string, address: string): void {

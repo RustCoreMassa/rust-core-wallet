@@ -35,6 +35,7 @@ export class PinLockPage {
   protected readonly error = signal<string | null>(null);
   protected readonly importKeyValue = signal('');
   protected readonly isBusy = signal(false);
+  protected readonly importNameValue = signal('');
 
   private firstPin = '';
 
@@ -132,45 +133,70 @@ export class PinLockPage {
   }
 
   protected async generateNewWallet(): Promise<void> {
+    this.error.set(null);
     this.step.set('generating');
-    const { privateKey, address } = await this.provider.generateAccount();
-    await this.completeRegistration({ id: 'main', name: 'Main Wallet', address, privateKey });
+    try {
+      const { privateKey, address } = await this.provider.generateAccount();
+      const name = this.authStore.suggestWalletName();
+      await this.completeRegistration({ id: 'main', name, address, privateKey });
+    } catch (err) {
+      this.error.set(errorMessage(err));
+      this.step.set('key-choice');
+    }
   }
 
   protected startImportFlow(): void {
     this.error.set(null);
+    this.importNameValue.set(this.authStore.suggestWalletName());
     this.step.set('import-key');
   }
 
   protected backToKeyChoice(): void {
     this.error.set(null);
     this.importKeyValue.set('');
+    this.importNameValue.set('');
     this.step.set('key-choice');
   }
 
   protected async submitImportedKey(): Promise<void> {
     const privateKey = this.importKeyValue().trim();
+    const name = this.importNameValue().trim();
     this.error.set(null);
 
     if (!privateKey) {
       this.error.set('Paste a private key first');
       return;
     }
-
-    this.isBusy.set(true);
-    const address = await this.provider.resolveAddress(privateKey);
-    this.isBusy.set(false);
-
-    if (!address) {
-      this.error.set('That private key looks invalid');
+    if (!name) {
+      this.error.set('Give this wallet a name');
+      return;
+    }
+    if (this.authStore.isNameTaken(name)) {
+      this.error.set('That name is already used by another wallet');
       return;
     }
 
-    await this.completeRegistration({ id: 'main', name: 'Main Wallet', address, privateKey });
+    this.isBusy.set(true);
+    try {
+      const address = await this.provider.resolveAddress(privateKey);
+      if (!address) {
+        this.error.set('That private key looks invalid');
+        return;
+      }
+      await this.completeRegistration({ id: 'main', name, address, privateKey });
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    } finally {
+      this.isBusy.set(false);
+    }
   }
 
   private async completeRegistration(account: VaultAccount): Promise<void> {
     await this.authStore.register(this.firstPin, [account]);
-    await this.router.navigateByUrl('/home');
+    this.router.navigateByUrl('/home');
   }
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'Something went wrong — please try again';
 }

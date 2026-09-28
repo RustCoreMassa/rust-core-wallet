@@ -1,5 +1,23 @@
 <div class="view-header">Settings</div>
 
+<div class="field-label" style="padding:0 20px;">Wallet</div>
+<div class="settings-list" style="padding-top:0;">
+  @if (activeAccount(); as account) {
+  <button class="wallet-row" type="button" style="padding:12px 4px;" (click)="openRename(account)">
+    <div class="wallet-avatar" [style.background]="'linear-gradient(155deg, ' + avatarColors(0)[0] + ', ' + avatarColors(0)[1] + ')'">
+      {{ initials(account.name) }}
+    </div>
+    <div class="wallet-main">
+      <div class="wallet-name">{{ account.name }}</div>
+      <div class="wallet-addr">{{ account.address | shortAddress }}</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+  }
+</div>
+
 <div class="settings-list">
   <button class="settings-row" type="button" (click)="modal.open('wallets')">
     <div>
