@@ -1,5 +1,6 @@
 <div class="dropdown">
   <button
+    #trigger
     class="select-fake dropdown-trigger"
     type="button"
     aria-haspopup="listbox"
@@ -14,8 +15,17 @@
     <span class="dropdown-chevron" [class.open]="open()"></span>
   </button>
 
-  @if (open()) {
-  <div class="dropdown-menu" role="listbox">
+  @if (open() && position(); as pos) {
+  <div
+    class="dropdown-menu"
+    role="listbox"
+    [class.above]="pos.bottom !== null"
+    [style.left.px]="pos.left"
+    [style.width.px]="pos.width"
+    [style.top.px]="pos.top"
+    [style.bottom.px]="pos.bottom"
+    [style.max-height.px]="pos.maxHeight"
+  >
     @for (option of options(); track option.value) {
     <button
       class="dropdown-option"

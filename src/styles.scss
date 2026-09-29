@@ -7,15 +7,16 @@
  * host-level layout rules) on purpose.
  */
 
-@font-face {
-  font-family: 'Space Grotesk';
-  src: local('Space Grotesk');
-}
+/* Fonts (Inter, Space Grotesk) are bundled with the app from npm
+   @fontsource-variable/* via angular.json "styles" — never loaded from a CDN,
+   so the wallet makes no network calls beyond the Massa ones. */
 
 :root {
-  --bg: #08080a;
-  --bg-elevated: #111114;
-  --bg-elevated-2: #1a1a1f;
+  color-scheme: dark;
+
+  --bg: #07070a;
+  --bg-elevated: #111116;
+  --bg-elevated-2: #1b1b22;
   --red: #ff2d42;
   --red-glow: rgba(255, 45, 66, 0.35);
   --blue: #4361ff;
@@ -27,9 +28,26 @@
   --gray-500: #8a8a91;
   --gray-700: #4c4c52;
   --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --surface-glass: rgba(20, 20, 26, 0.62);
 
-  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-body: 'Inter Variable', system-ui, sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 10px 30px -12px rgba(0, 0, 0, 0.65);
+  --shadow-red: 0 10px 24px -10px rgba(255, 45, 66, 0.7);
+  --ring: 0 0 0 3px rgba(255, 45, 66, 0.35);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Phone-width column: the wallet is a mobile UI, centered on desktop. */
+  --app-width: 460px;
 }
 
 * {
@@ -43,10 +61,52 @@ body {
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(255, 45, 66, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 90% 110%, rgba(67, 97, 255, 0.06), transparent 60%),
+    #040406;
   color: var(--white);
   font-family: var(--font-body);
+  font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(255, 45, 66, 0.35);
+}
+
+/* Keyboard focus is always visible; mouse/touch clicks don't show it. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Numbers keep a fixed width so balances don't jitter as they update. */
+.balance-amount,
+.row-usd,
+.row-amount,
+.stat-num,
+.wallet-balance,
+.tab-meta,
+.num-input {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 button,
@@ -80,9 +140,22 @@ input[type='number']::-webkit-inner-spin-button {
      browser toolbars; the vh line is the fallback. */
   height: 100vh;
   height: 100dvh;
+  width: 100%;
+  max-width: var(--app-width);
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--bg);
+}
+
+/* On a desktop screen the phone-width column reads as a device. */
+@media (min-width: 560px) {
+  .app-screen {
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 80px -20px rgba(0, 0, 0, 0.9);
+  }
 }
 
 .app-glow {
@@ -123,22 +196,25 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .toast {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  background: rgba(27, 27, 34, 0.85);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--border-strong);
   color: var(--white);
   font-size: 12.5px;
   font-weight: 500;
-  padding: 9px 16px;
-  border-radius: 20px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
   opacity: 0;
-  transform: translateY(-8px);
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transform: translateY(-10px) scale(0.98);
+  transition:
+    opacity 0.3s var(--ease-out),
+    transform 0.3s var(--ease-out);
 }
 
 .toast.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 /* ---------- view area ---------- */
@@ -151,10 +227,11 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .view-header {
-  padding: 24px 20px 6px;
+  padding: 26px 20px 6px;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 /* ---------- loading placeholder (value not read from chain yet) ---------- */
@@ -163,9 +240,24 @@ input[type='number']::-webkit-inner-spin-button {
   width: 4em;
   height: 0.9em;
   border-radius: 6px;
-  background: var(--bg-elevated-2);
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated-2) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    var(--bg-elevated-2) 100%
+  );
+  background-size: 200% 100%;
   vertical-align: middle;
-  animation: skeleton-pulse 1.2s ease-in-out infinite;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 
 .skeleton-lg {
@@ -193,14 +285,11 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .avatar {
-  width: 54px;
-  height: 54px;
-//   border-radius: 5px;
-//   background: linear-gradient(155deg, var(--red) 0%, #8f0f1e 100%);
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-//   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
@@ -226,14 +315,18 @@ input[type='number']::-webkit-inner-spin-button {
 .network-pill {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--green);
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  padding: 0;
+  gap: 6px;
+  margin-top: 3px;
+  padding: 2px 8px 2px 7px;
+  border-radius: 999px;
+  background: rgba(51, 209, 122, 0.1);
+  border: 1px solid rgba(51, 209, 122, 0.2);
+  width: fit-content;
 }
 
 .network-pill::before {
@@ -247,17 +340,32 @@ input[type='number']::-webkit-inner-spin-button {
 
 .network-pill.buildnet {
   color: var(--orange);
+  background: rgba(255, 138, 61, 0.1);
+  border-color: rgba(255, 138, 61, 0.22);
 }
 
 .header-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.header-icon:hover {
+  background: var(--bg-elevated-2);
+  border-color: var(--border-strong);
+}
+
+.header-icon:active {
+  transform: scale(0.94);
 }
 
 /* ---------- balance ---------- */
@@ -266,25 +374,34 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .balance-label {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--gray-500);
   font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .balance-amount {
   font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: 600;
-  margin-top: 6px;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-top: 8px;
   display: flex;
   align-items: baseline;
   gap: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #c9c9d2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .balance-amount .unit {
   font-size: 18px;
-  color: var(--gray-500);
   font-weight: 500;
+  letter-spacing: 0;
+  -webkit-text-fill-color: var(--gray-500);
+  color: var(--gray-500);
 }
 
 .balance-sub {
@@ -327,73 +444,90 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .action-btn {
-  width: 46px;
-  height: 46px;
-  border-radius: 15px;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  transition: transform 0.12s ease;
+  background: linear-gradient(180deg, var(--bg-elevated-2) 0%, var(--bg-elevated) 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    var(--shadow-sm);
+  transition:
+    transform 0.15s var(--ease-out),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.action:hover .action-btn {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .action:active .action-btn {
-  transform: scale(0.92);
+  transform: scale(0.93);
 }
 
 .action-btn.primary {
-  background: linear-gradient(155deg, var(--red) 0%, #b5192a 100%);
+  background: linear-gradient(155deg, #ff4658 0%, #c81a2e 100%);
   border: none;
-  box-shadow: 0 6px 16px -4px rgba(255, 45, 66, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    var(--shadow-red);
 }
 
 .action-label {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--gray-300);
   font-weight: 500;
 }
 
 /* ---------- tabs ---------- */
+/* Segmented control: the active tab is a raised pill. */
 .tabs {
   display: flex;
   align-items: center;
-  gap: 22px;
-  padding: 20px 22px 0;
-  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  margin: 22px 20px 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
 }
 
 .tab {
   font-family: var(--font-display);
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--gray-500);
-  padding-bottom: 12px;
-  position: relative;
+  padding: 8px 16px;
+  border-radius: 10px;
   background: none;
   border: none;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.tab:hover {
+  color: var(--gray-300);
 }
 
 .tab.active {
   color: var(--white);
-}
-
-.tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--red);
-  border-radius: 2px;
+  background: var(--bg-elevated-2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    var(--shadow-sm);
 }
 
 .tab-meta {
   margin-left: auto;
+  padding-right: 10px;
   font-size: 12px;
   color: var(--gray-500);
-  padding-bottom: 12px;
 }
 
 /* ---------- token / tx rows ---------- */
@@ -405,14 +539,19 @@ input[type='number']::-webkit-inner-spin-button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 8px;
-  border-radius: 14px;
+  padding: 11px 10px;
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .row-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -463,6 +602,7 @@ input[type='number']::-webkit-inner-spin-button {
 .row-name {
   font-size: 14.5px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .row-sub {
@@ -506,10 +646,11 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .empty-state {
-  padding: 40px 20px;
+  padding: 44px 20px;
   text-align: center;
   color: var(--gray-500);
   font-size: 13px;
+  line-height: 1.5;
 }
 
 /* ---------- bottom nav ---------- */
@@ -517,10 +658,10 @@ input[type='number']::-webkit-inner-spin-button {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 12px 10px calc(10px + env(safe-area-inset-bottom));
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
-  background: rgba(8, 8, 10, 0.85);
-  backdrop-filter: blur(12px);
+  background: rgba(10, 10, 14, 0.78);
+  backdrop-filter: blur(18px) saturate(140%);
   position: sticky;
   bottom: 0;
   z-index: 10;
@@ -531,18 +672,29 @@ input[type='number']::-webkit-inner-spin-button {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  min-width: 64px;
   color: var(--gray-500);
   background: none;
   border: none;
-  padding: 2px 6px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.nav-item:hover {
+  color: var(--gray-300);
 }
 
 .nav-item.active {
   color: var(--white);
+  background: rgba(255, 45, 66, 0.1);
 }
 
 .nav-item.active svg {
   stroke: var(--red);
+  filter: drop-shadow(0 0 6px rgba(255, 45, 66, 0.55));
 }
 
 .nav-item svg {
@@ -558,11 +710,14 @@ input[type='number']::-webkit-inner-spin-button {
 /* ---------- staking ---------- */
 .staking-card {
   margin: 22px 18px 0;
-  background: rgba(17, 17, 20, 0.55);
-  border: 1px solid var(--border);
-  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(27, 27, 34, 0.7) 0%, var(--surface-glass) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
   padding: 20px 6px;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    var(--shadow-md);
 }
 
 .staking-row {
@@ -588,8 +743,9 @@ input[type='number']::-webkit-inner-spin-button {
 
 .stat-num {
   font-family: var(--font-display);
-  font-size: 16.5px;
+  font-size: 17px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .stat-label {
@@ -613,24 +769,34 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .pill-btn {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-strong);
   color: var(--white);
-  padding: 10px 24px;
+  padding: 11px 26px;
   border-radius: 999px;
   font-size: 13.5px;
   font-weight: 600;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .pill-btn:active {
-  background: rgba(255, 255, 255, 0.08);
+  transform: scale(0.97);
 }
 
 /* ---------- forms / buttons ---------- */
 .field-label {
   font-size: 12px;
+  font-weight: 500;
   color: var(--gray-500);
-  margin: 12px 0 6px;
+  margin: 14px 0 7px;
   display: block;
 }
 
@@ -642,17 +808,26 @@ input[type='number']::-webkit-inner-spin-button {
 
 .num-input {
   flex: 1;
+  min-width: 0;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   color: var(--white);
-  border-radius: 12px;
-  padding: 11px 12px;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
   font-size: 15px;
   outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.num-input::placeholder {
+  color: var(--gray-700);
 }
 
 .num-input:focus {
-  border-color: var(--red);
+  border-color: rgba(255, 45, 66, 0.7);
+  box-shadow: var(--ring);
 }
 
 .hint {
@@ -663,10 +838,11 @@ input[type='number']::-webkit-inner-spin-button {
 
 .btn {
   border: none;
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 14px;
+  border-radius: var(--radius-md);
+  padding: 13px 16px;
+  font-size: 14.5px;
   font-weight: 600;
+  letter-spacing: -0.005em;
   color: #fff;
   width: 100%;
   margin-top: 10px;
@@ -674,26 +850,43 @@ input[type='number']::-webkit-inner-spin-button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: opacity 0.15s ease;
+  transition:
+    filter 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s var(--ease-out),
+    opacity 0.2s ease;
 }
 
-.btn:active {
-  opacity: 0.85;
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
 .btn-red {
-  background: linear-gradient(155deg, var(--red), #b5192a);
+  background: linear-gradient(155deg, #ff4658 0%, #c81a2e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    var(--shadow-red);
+}
+
+.btn-red:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 .btn-ghost {
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   color: var(--white);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: #22222a;
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .spinner {
@@ -714,11 +907,23 @@ input[type='number']::-webkit-inner-spin-button {
 .select-fake {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.select-fake:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.select-fake:focus-within {
+  border-color: rgba(255, 45, 66, 0.7);
+  box-shadow: var(--ring);
 }
 
 /* The select spans the whole box (not just its text), so the full field is
@@ -755,10 +960,19 @@ input[type='number']::-webkit-inner-spin-button {
 
 .max-btn {
   color: var(--red);
-  font-weight: 600;
-  background: none;
-  border: none;
-  font-size: 11.5px;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 45, 66, 0.1);
+  border: 1px solid rgba(255, 45, 66, 0.22);
+  border-radius: 999px;
+  padding: 6px 11px;
+  transition: background 0.2s ease;
+}
+
+.max-btn:hover {
+  background: rgba(255, 45, 66, 0.18);
 }
 
 .error-text {
@@ -774,15 +988,21 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .swap-dir button {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--white);
+  font-size: 16px;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.swap-dir button:hover {
+  transform: rotate(180deg);
 }
 
 .rate-line {
@@ -800,15 +1020,18 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .qr-wrap canvas {
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  padding: 4px;
+  background: #f6f6f8;
+  box-shadow: 0 16px 40px -16px rgba(255, 45, 66, 0.45);
 }
 
 .addr-box {
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  font-family: monospace;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12px;
   color: var(--gray-300);
   word-break: break-all;
@@ -830,12 +1053,21 @@ input[type='number']::-webkit-inner-spin-button {
 
 .chip {
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
-  color: var(--white);
+  border: 1px solid var(--border-strong);
+  color: var(--gray-300);
   font-size: 12px;
   font-weight: 600;
-  padding: 7px 13px;
+  padding: 7px 14px;
   border-radius: 999px;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.chip:hover {
+  color: var(--white);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .chip.chip-saved {
@@ -868,8 +1100,9 @@ input[type='number']::-webkit-inner-spin-button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 6px;
-  border-radius: 14px;
+  padding: 12px 10px;
+  border-radius: var(--radius-md);
+  transition: background 0.15s ease;
   cursor: pointer;
   background: none;
   border: none;
@@ -878,14 +1111,19 @@ input[type='number']::-webkit-inner-spin-button {
   color: inherit;
 }
 
+.wallet-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .wallet-row.active {
   background: rgba(255, 45, 66, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 45, 66, 0.25);
 }
 
 .wallet-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -960,15 +1198,20 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 /* ---------- settings ---------- */
+/* Grouped list: rows sit on one rounded card, iOS-settings style. */
 .settings-list {
-  padding: 8px 20px 20px;
+  margin: 8px 18px 16px;
+  padding: 2px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 4px;
+  padding: 15px 2px;
   border-bottom: 1px solid var(--border);
   background: none;
   border-left: none;
@@ -995,13 +1238,16 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .switch {
-  width: 42px;
-  height: 24px;
+  width: 44px;
+  height: 26px;
   border-radius: 14px;
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   position: relative;
   flex-shrink: 0;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .switch::after {
@@ -1009,11 +1255,14 @@ input[type='number']::-webkit-inner-spin-button {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--gray-300);
-  transition: transform 0.18s ease, background 0.18s ease;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.25s var(--ease-out),
+    background 0.2s ease;
 }
 
 .switch.on {
@@ -1034,8 +1283,8 @@ input[type='number']::-webkit-inner-spin-button {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(3px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
   display: none;
   align-items: flex-end;
   justify-content: center;
@@ -1044,18 +1293,51 @@ input[type='number']::-webkit-inner-spin-button {
 
 .modal-overlay.open {
   display: flex;
+  animation: overlay-in 0.25s ease;
 }
 
+/* Bottom sheet: slides up, capped to the app column's width on desktop. */
 .modal {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: var(--app-width);
   max-height: 88vh;
   overflow-y: auto;
-  background: var(--bg-elevated);
-  border-radius: 24px 24px 0 0;
-  padding: 18px 20px 26px;
-  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, #16161c 0%, var(--bg-elevated) 120px);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 26px 20px calc(26px + env(safe-area-inset-bottom));
+  border: 1px solid var(--border-strong);
+  border-bottom: none;
+  box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, 0.8);
+  animation: sheet-in 0.35s var(--ease-out);
+}
+
+/* Grab handle. */
+.modal::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 38px;
+  height: 4px;
+  margin-left: -19px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+@keyframes overlay-in {
+  from {
+    background: rgba(0, 0, 0, 0);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
 }
 
 .modal-head {
@@ -1067,19 +1349,29 @@ input[type='number']::-webkit-inner-spin-button {
 
 .modal-title {
   font-family: var(--font-display);
-  font-size: 16.5px;
+  font-size: 18px;
   font-weight: 700;
+  letter-spacing: -0.015em;
 }
 
 .modal-close {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: var(--bg-elevated-2);
-  border: none;
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--gray-300);
+  font-size: 12px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.modal-close:hover {
+  background: #26262e;
   color: var(--white);
 }
 
@@ -1088,7 +1380,9 @@ input[type='number']::-webkit-inner-spin-button {
   position: fixed;
   inset: 0;
   z-index: 30;
-  background: var(--bg);
+  background:
+    radial-gradient(600px 400px at 50% 0%, rgba(255, 45, 66, 0.12), transparent 70%),
+    var(--bg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1098,21 +1392,20 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .lock-logo {
-  width: 70px;
-  height: 70px;
-//   border-radius: 5px;
-//   background: linear-gradient(155deg, var(--red), #7a0f1c);
+  width: 76px;
+  height: 76px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 22px;
-//   box-shadow: 0 10px 26px -8px rgba(255, 45, 66, 0.55);
+  margin-bottom: 24px;
+  filter: drop-shadow(0 12px 28px rgba(255, 45, 66, 0.35));
 }
 
 .lock-title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .lock-sub {
@@ -1141,32 +1434,42 @@ input[type='number']::-webkit-inner-spin-button {
   background: var(--red);
   border-color: var(--red);
   transform: scale(1.1);
+  box-shadow: 0 0 10px rgba(255, 45, 66, 0.6);
 }
 
 .keypad {
   display: grid;
-  grid-template-columns: repeat(3, 62px);
-  gap: 16px;
+  grid-template-columns: repeat(3, 66px);
+  gap: 18px;
   justify-content: center;
 }
 
 .key {
-  width: 62px;
-  height: 62px;
+  width: 66px;
+  height: 66px;
   border-radius: 50%;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--bg-elevated-2) 0%, var(--bg-elevated) 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   color: var(--white);
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 600;
   font-family: var(--font-display);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.key:hover {
+  background: #22222a;
 }
 
 .key:active {
-  background: var(--bg-elevated-2);
+  transform: scale(0.94);
+  background: #2a2a33;
 }
 
 .key-empty {

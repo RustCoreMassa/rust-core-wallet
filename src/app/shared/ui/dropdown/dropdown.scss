@@ -58,14 +58,14 @@
 }
 
 /* Same width as the field, anchored right under it. */
+/* Fixed at the field's on-screen position (set inline by the component),
+   so it floats above the modal instead of growing its scroll area. */
 .dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 5;
-  max-height: 260px;
+  position: fixed;
+  z-index: 100;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: menu-in 0.16s ease-out;
   padding: 6px;
   background: var(--bg-elevated-2);
   border: 1px solid var(--border);
@@ -106,4 +106,22 @@
 .dropdown-trailing {
   font-size: 12.5px;
   color: var(--gray-300);
+}
+
+.dropdown-menu.above {
+  animation-name: menu-in-above;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes menu-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
