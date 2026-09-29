@@ -1,6 +1,6 @@
 import { NftItem } from './nft.model';
 import { TokenBalances } from './token.model';
-import { TransactionRecord } from './transaction.model';
+import { HistoryPaging, TransactionRecord } from './transaction.model';
 
 export interface RollsState {
   readonly active: number;
@@ -15,5 +15,7 @@ export interface WalletState {
   readonly balances: TokenBalances;
   readonly rolls: RollsState;
   readonly history: readonly TransactionRecord[];
+  /** Explorer pagination; `null` until the first page is loaded (always, on buildnet). */
+  readonly historyPaging: HistoryPaging | null;
   readonly nfts: readonly NftItem[];
 }

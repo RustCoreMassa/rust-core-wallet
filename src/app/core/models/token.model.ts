@@ -32,7 +32,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     decimals: 18,
     contract: 'AS133eqPPaPttJ6hJnk3sfoG5cjFFqBDi1VGxdo2wzWkq8AfZnan',
     isErc20: true,
-    asset: 'assets/charlie.webp',
+    asset: 'assets/PUR.png',
   },
   DUSA: {
     symbol: 'DUSA',
@@ -44,7 +44,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
   'USDC.e': {
     symbol: 'USDC.e',
-    name: 'USD Coin (bridged)',
+    name: 'USD Coin',
     decimals: 18,
     contract: 'AS1hCJXjndR4c9vekLWsXGnrdigp4AaZ7uYG3UKFzzKnWVsrNLPJ',
     isErc20: true,
@@ -52,7 +52,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
   'WETH.e': {
     symbol: 'WETH.e',
-    name: 'Wrapped ETH (Etherscan bridge)',
+    name: 'Wrapped Ether',
     decimals: 18,
     contract: 'AS124vf3YfAJCSCQVYKczzuWWpXrximFpbTmX4rheLs5uNSftiiRY',
     isErc20: true,
@@ -60,7 +60,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
   'DAI.e': {
     symbol: 'DAI.e',
-    name: 'Dai (bridged)',
+    name: 'Dai',
     decimals: 18,
     contract: 'AS1ZGF1upwp9kPRvDKLxFAKRebgg7b3RWDnhgV7VvdZkZsUL7Nuv',
     isErc20: true,
@@ -68,7 +68,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
   'WBTC.e': {
     symbol: 'WBTC.e',
-    name: 'Wrapped BTC (bridged)',
+    name: 'Wrapped BTC',
     decimals: 18,
     contract: 'AS12fr54YtBY575Dfhtt7yftpT8KXgXb1ia5Pn1LofoLFLf9WcjGL',
     isErc20: true,
@@ -76,7 +76,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
   'WETH.b': {
     symbol: 'WETH.b',
-    name: 'Wrapped ETH (Base bridge)',
+    name: 'Wrapped Ether',
     decimals: 18,
     contract: 'AS125oPLYRTtfVjpWisPZVTLjBhCFfQ1jDsi75XNtRm1NZux54eCj',
     isErc20: true,
@@ -84,7 +84,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
   'USDT.b': {
     symbol: 'USDT.b',
-    name: 'Tether USD (Base bridge)',
+    name: 'Tether USD',
     decimals: 18,
     contract: 'AS12LKs9txoSSy8JgFJgV96m8k5z9pgzjYMYSshwN67mFVuj3bdUV',
     isErc20: true,

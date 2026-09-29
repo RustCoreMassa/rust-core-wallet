@@ -7,8 +7,9 @@ import {
   TokenPrices,
   TokenSymbol,
 } from '../models/token.model';
-import { TransactionRecord } from '../models/transaction.model';
+import { HistoryPaging, HistoryStream, TransactionRecord } from '../models/transaction.model';
 import { WalletState } from '../models/wallet.model';
+import { ExplorerApi, HistoryPage } from '../services/explorer-api';
 import { MASSA_PROVIDER, ROLL_PRICE_MAS } from '../services/massa-provider';
 import { fromUnits, toUnits } from '../utils/token-amount';
 import { AuthStore } from './auth-store';
@@ -27,6 +28,11 @@ const TOKENS_BY_NETWORK: Readonly<Record<Network, typeof MRC20_TOKENS>> = {
 /** How long auto-refresh leaves a wallet alone after a write (see `autoRefresh`). */
 const WRITE_SETTLE_MS = 8000;
 
+/** The newest history page is re-read at most this often, not on every balance poll. */
+const HISTORY_REFRESH_MS = 30_000;
+/** A local pending record the explorer never confirms (e.g. expired op) is dropped after this. */
+const PENDING_TTL_MS = 10 * 60_000;
+
 type WalletsByNetwork = Record<Network, Record<string, WalletState>>;
 
 const emptyWallets = (): WalletsByNetwork => ({ mainnet: {}, buildnet: {} });
@@ -39,6 +45,7 @@ function newWallet(id: string, name: string, address: string): WalletState {
     balances: { MAS: 0 },
     rolls: { active: 0, candidate: 0, deferred: 0 },
     history: [],
+    historyPaging: null,
     nfts: [],
   };
 }
@@ -70,6 +77,76 @@ function shortAddress(address: string): string {
   return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
 }
 
+/**
+ * Merges an explorer page into the history already held: records are
+ * keyed by id, so re-reading the newest page (polling) or appending an
+ * older one (load more) both just upsert.
+ *
+ * Local records (sent from this app) are dropped once the explorer
+ * reports their operation, or after PENDING_TTL_MS if it never does.
+ * MRC-20 transfers reach the explorer as a bare `CallSC` (no token, no
+ * amount), so when a send we know about matches one by operation id, the
+ * known token/amount is kept and only status/time/fee come from chain.
+ */
+function mergeHistory(
+  existing: readonly TransactionRecord[],
+  incoming: readonly TransactionRecord[],
+): TransactionRecord[] {
+  // Sends only: a contract call's payouts share its operation id and
+  // would otherwise shadow the send record in this map.
+  const knownSends = new Map(
+    existing.filter((r) => r.type === 'send').map((r) => [r.operationId, r]),
+  );
+  const incomingOps = new Set(incoming.map((r) => r.operationId));
+
+  const byId = new Map<string, TransactionRecord>();
+  for (const r of existing) {
+    const settled = incomingOps.has(r.operationId) || Date.now() - r.timestamp > PENDING_TTL_MS;
+    if (!(r.local && settled)) byId.set(r.id, r);
+  }
+  for (const r of incoming) {
+    const mine = knownSends.get(r.operationId);
+    byId.set(
+      r.id,
+      mine && r.type === 'contract_call'
+        ? { ...mine, id: r.id, local: false, status: r.status, timestamp: r.timestamp, fee: r.fee }
+        : r,
+    );
+  }
+  return [...byId.values()].sort((a, b) => b.timestamp - a.timestamp);
+}
+
+const HISTORY_STREAMS: readonly HistoryStream[] = ['created', 'received'];
+
+const EMPTY_PAGING: HistoryPaging = {
+  created: { cursor: null, oldest: Infinity },
+  received: { cursor: null, oldest: Infinity },
+};
+
+/**
+ * Oldest timestamp the loaded history is complete down to. A stream with
+ * more pages only covers down to its oldest loaded record; anything older
+ * from the other stream could have gaps before it, so it stays hidden
+ * until that stream catches up. 0 = everything loaded, show it all.
+ */
+function historyCutoff(paging: HistoryPaging | null): number {
+  if (!paging) return 0;
+  return HISTORY_STREAMS.reduce(
+    (cutoff, s) => (paging[s].cursor ? Math.max(cutoff, paging[s].oldest) : cutoff),
+    0,
+  );
+}
+
+function advancePaging(paging: HistoryPaging, page: HistoryPage): HistoryPaging {
+  const next = { ...paging };
+  for (const s of HISTORY_STREAMS) {
+    const fetched = page.streams[s];
+    if (fetched)
+      next[s] = { cursor: fetched.cursor, oldest: Math.min(paging[s].oldest, fetched.oldest) };
+  }
+  return next;
+}
+
 /** Adds `delta` (may be negative) to one token, clamped at 0. */
 function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): TokenBalances {
   return { ...balances, [token]: Math.max(0, (balances[token] ?? 0) + delta) };
@@ -90,8 +167,11 @@ function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): Tok
  * Balances and rolls come from the chain (`refresh`). After a write the
  * store applies the expected change optimistically — the chain only
  * reflects it once the operation is final, so a later `refresh`
- * reconciles. History is local: it only lists operations sent from
- * this app. NFTs and prices are not wired to any source yet.
+ * reconciles. History comes from the Massa explorer API (mainnet only),
+ * paged by cursor (`loadMoreHistory`) and merged with operations just
+ * sent from this app that it hasn't indexed yet (see `mergeHistory`);
+ * on buildnet it is local only. NFTs and
+ * prices are not wired to any source yet.
  *
  * State is kept per network (NetworkStore), so mainnet and buildnet
  * balances/history never mix; `wallets` always shows the current one.
@@ -103,6 +183,7 @@ export class WalletStore {
   private readonly provider = inject(MASSA_PROVIDER);
   private readonly auth = inject(AuthStore);
   private readonly networkStore = inject(NetworkStore);
+  private readonly explorer = inject(ExplorerApi);
 
   private readonly _walletsByNetwork = signal<WalletsByNetwork>(emptyWallets());
   private readonly _activeWalletId = signal<string>('');
@@ -110,8 +191,11 @@ export class WalletStore {
   private readonly _prices = signal<TokenPrices>(DEMO_PRICES);
   private readonly _dayChangePct = signal<TokenPrices>(DEMO_DAY_CHANGE_PCT);
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
+  private readonly _loadingHistory = signal(false);
   /** Per wallet id: auto-refresh is skipped until this timestamp. */
   private readonly settleUntil = new Map<string, number>();
+  /** Per `${network}:${id}`: when history was last read from the explorer. */
+  private readonly historyFetchedAt = new Map<string, number>();
 
   readonly network = this.networkStore.network;
   readonly wallets = computed(() => this._walletsByNetwork()[this.network()]);
@@ -133,6 +217,20 @@ export class WalletStore {
     'MAS',
     ...TOKENS_BY_NETWORK[this.network()].map((t) => t.symbol),
   ]);
+
+  /** Active wallet's history, cut where it's still incomplete (see `historyCutoff`). */
+  readonly visibleHistory = computed(() => {
+    const { history, historyPaging } = this.activeWallet();
+    const cutoff = historyCutoff(historyPaging);
+    return cutoff ? history.filter((r) => r.timestamp >= cutoff) : history;
+  });
+
+  readonly hasMoreHistory = computed(() => {
+    const paging = this.activeWallet().historyPaging;
+    return !!paging && HISTORY_STREAMS.some((s) => paging[s].cursor);
+  });
+
+  readonly isLoadingHistory = this._loadingHistory.asReadonly();
 
   readonly isRefreshing = computed(() => this._refreshingIds().has(this._activeWalletId()));
 
@@ -167,6 +265,7 @@ export class WalletStore {
     this._addressBook.set([]);
     this._refreshingIds.set(new Set());
     this.settleUntil.clear();
+    this.historyFetchedAt.clear();
   }
 
   // ---- wallets -------------------------------------------------------------
@@ -217,9 +316,11 @@ export class WalletStore {
   }
 
   /**
-   * Re-reads MAS, every MRC-20 balance and roll counts from the chain.
+   * Re-reads MAS, every MRC-20 balance and roll counts from the chain,
+   * and the history from the explorer (at most every HISTORY_REFRESH_MS).
    * Each read is independent: one that fails (RPC hiccup, bad token
-   * contract) keeps its previous value instead of failing the rest.
+   * contract, explorer down) keeps its previous value instead of failing
+   * the rest.
    */
   async refresh(id: string = this._activeWalletId()): Promise<void> {
     const network = this.network();
@@ -227,10 +328,14 @@ export class WalletStore {
     if (!wallet) return;
     const privateKey = this.privateKeyFor(id);
     const tokenList = TOKENS_BY_NETWORK[network];
+    const historyKey = `${network}:${id}`;
+    const readHistory =
+      network === 'mainnet' &&
+      Date.now() - (this.historyFetchedAt.get(historyKey) ?? 0) >= HISTORY_REFRESH_MS;
 
     this._refreshingIds.update((ids) => new Set(ids).add(id));
     try {
-      const [[mas, rolls], tokens] = await Promise.all([
+      const [[mas, rolls], tokens, [history]] = await Promise.all([
         Promise.allSettled([
           // Candidate (not final) balance: already includes operations
           // that are executed but not yet final, so sends show up in
@@ -241,9 +346,13 @@ export class WalletStore {
         Promise.allSettled(
           tokenList.map((t) => this.provider.getTokenBalance(privateKey, t.contract)),
         ),
+        Promise.allSettled([readHistory ? this.explorer.getHistory(wallet.address) : null]),
       ]);
+      if (history.status === 'fulfilled' && history.value) {
+        this.historyFetchedAt.set(historyKey, Date.now());
+      }
 
-      const failures = [mas, rolls, ...tokens].filter((r) => r.status === 'rejected');
+      const failures = [mas, rolls, ...tokens, history].filter((r) => r.status === 'rejected');
       if (failures.length)
         console.warn(`Wallet refresh: ${failures.length} read(s) failed`, failures);
 
@@ -264,6 +373,14 @@ export class WalletStore {
             ...w,
             balances,
             rolls: rolls.status === 'fulfilled' ? rolls.value : w.rolls,
+            ...(history.status === 'fulfilled' && history.value
+              ? {
+                  history: mergeHistory(w.history, history.value.records),
+                  // Polling re-reads only the newest page; once paging
+                  // exists, older pages already loaded stay as they are.
+                  historyPaging: w.historyPaging ?? advancePaging(EMPTY_PAGING, history.value),
+                }
+              : {}),
           };
         },
         network,
@@ -304,13 +421,16 @@ export class WalletStore {
         ...w,
         balances: adjust(w.balances, token, -amount),
         history: [
-          this.record({
-            type: 'send',
-            token,
-            amount,
-            counterparty: shortAddress(toAddress),
-            operationId,
-          }),
+          this.record(
+            {
+              type: 'send',
+              token,
+              amount,
+              counterparty: shortAddress(toAddress),
+              operationId,
+            },
+            network,
+          ),
           ...w.history,
         ],
       }),
@@ -330,13 +450,16 @@ export class WalletStore {
           ...w,
           balances: adjust(w.balances, token, amount),
           history: [
-            this.record({
-              type: 'receive',
-              token,
-              amount,
-              counterparty: shortAddress(wallet.address),
-              operationId,
-            }),
+            this.record(
+              {
+                type: 'receive',
+                token,
+                amount,
+                counterparty: shortAddress(wallet.address),
+                operationId,
+              },
+              network,
+            ),
             ...w.history,
           ],
         }),
@@ -369,7 +492,10 @@ export class WalletStore {
         balances: adjust(w.balances, 'MAS', -cost),
         rolls: { ...w.rolls, candidate: w.rolls.candidate + rollCount },
         history: [
-          this.record({ type: 'buy_rolls', token: 'MAS', amount: cost, rollCount, operationId }),
+          this.record(
+            { type: 'buy_rolls', token: 'MAS', amount: cost, rollCount, operationId },
+            network,
+          ),
           ...w.history,
         ],
       }),
@@ -403,7 +529,10 @@ export class WalletStore {
           deferred: w.rolls.deferred + rollCount,
         },
         history: [
-          this.record({ type: 'sell_rolls', token: 'MAS', amount: refund, rollCount, operationId }),
+          this.record(
+            { type: 'sell_rolls', token: 'MAS', amount: refund, rollCount, operationId },
+            network,
+          ),
           ...w.history,
         ],
       }),
@@ -418,8 +547,45 @@ export class WalletStore {
     this.refresh(id).catch((err) => console.warn(`Wallet refresh failed for "${id}"`, err));
   }
 
+  /**
+   * Loads the next explorer page — only for the stream(s) currently
+   * limiting `visibleHistory`; the other one already reaches further back.
+   */
+  async loadMoreHistory(): Promise<void> {
+    const network = this.network();
+    const wallet = this.activeWallet();
+    const paging = wallet.historyPaging;
+    if (!paging || this._loadingHistory()) return;
+
+    const cutoff = historyCutoff(paging);
+    const cursors: Partial<Record<HistoryStream, string>> = {};
+    for (const s of HISTORY_STREAMS) {
+      const { cursor, oldest } = paging[s];
+      if (cursor && oldest >= cutoff) cursors[s] = cursor;
+    }
+    if (!Object.keys(cursors).length) return;
+
+    this._loadingHistory.set(true);
+    try {
+      const page = await this.explorer.getHistory(wallet.address, cursors);
+      this.updateWallet(
+        wallet.id,
+        (w) => ({
+          ...w,
+          history: mergeHistory(w.history, page.records),
+          historyPaging: w.historyPaging && advancePaging(w.historyPaging, page),
+        }),
+        network,
+      );
+    } finally {
+      this._loadingHistory.set(false);
+    }
+  }
+
+  /** Holds off auto-refresh briefly, then forces a fresh history read. */
   private markWritten(id: string): void {
     this.settleUntil.set(id, Date.now() + WRITE_SETTLE_MS);
+    this.historyFetchedAt.delete(`${this.network()}:${id}`);
   }
 
   /** Throws while the vault is locked — keys only exist in AuthStore when unlocked. */
@@ -441,10 +607,20 @@ export class WalletStore {
     });
   }
 
-  private record(partial: Omit<TransactionRecord, 'id' | 'timestamp'>): TransactionRecord {
+  /**
+   * A record for an operation just sent from this app. On mainnet it
+   * shows as pending until the explorer reports it; buildnet has no
+   * explorer, so there it carries no status at all.
+   */
+  private record(
+    partial: Omit<TransactionRecord, 'id' | 'timestamp'>,
+    network: Network,
+  ): TransactionRecord {
     return {
       id: `t${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
       timestamp: Date.now(),
+      local: true,
+      status: network === 'mainnet' ? 'pending' : undefined,
       ...partial,
     };
   }

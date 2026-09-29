@@ -1,5 +1,5 @@
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, signal } from '@angular/core';
 import { TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
 
 /** MRC-20s carry 18 decimals on-chain — far more than a list row can usefully show. */
@@ -19,6 +19,8 @@ export class TokenRow {
   readonly changePct = input<number>(0);
 
   protected readonly meta = computed(() => TOKEN_REGISTRY[this.symbol()]);
+  /** Set when the icon image fails to load — the row falls back to a symbol badge. */
+  protected readonly iconFailed = signal(false);
   protected readonly hasPrice = computed(() => this.price() > 0);
   protected readonly usdValue = computed(() => this.balance() * this.price());
   protected readonly amountFormat = computed(

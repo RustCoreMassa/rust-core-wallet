@@ -10,6 +10,8 @@ type HomeTab = 'tokens' | 'history';
 /** Tokens worth less than this (USD) count as "low balance" and are hidden by default. */
 const LOW_BALANCE_USD = 1;
 const SHOW_ALL_KEY = 'massa-wallet:show-all-tokens';
+/** Distance from the bottom of the list (px) at which the next history page loads. */
+const NEAR_BOTTOM_PX = 120;
 
 function loadShowAll(): boolean {
   try {
@@ -63,6 +65,17 @@ export class HomePage {
 
   protected setTab(tab: HomeTab): void {
     this.activeTab.set(tab);
+  }
+
+  protected loadMoreHistory(): void {
+    this.store.loadMoreHistory().catch((err) => console.warn('Loading more history failed', err));
+  }
+
+  /** Infinite scroll for History: fetch the next page near the bottom. */
+  protected onListScroll(event: Event): void {
+    if (this.activeTab() !== 'history' || !this.store.hasMoreHistory()) return;
+    const el = event.target as HTMLElement;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX) this.loadMoreHistory();
   }
 
   protected toggleShowAllTokens(): void {

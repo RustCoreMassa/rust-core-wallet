@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { TransactionRecord } from '../../../core/models/transaction.model';
+import { TransactionRecord, TransactionStatus } from '../../../core/models/transaction.model';
 
 interface HistoryRowView {
   icon: 'up' | 'down' | 'swap' | 'rolls';
@@ -8,6 +8,15 @@ interface HistoryRowView {
   subtitle: string;
   amountText: string;
   amountPositive: boolean;
+}
+
+const STATUS_LABEL: Partial<Record<TransactionStatus, string>> = {
+  pending: 'Pending',
+  failed: 'Failed',
+};
+
+function formatAmount(amount: number): string {
+  return amount.toLocaleString('en-US', { maximumFractionDigits: 4 });
 }
 
 function timeAgo(timestamp: number): string {
@@ -29,8 +38,14 @@ export class HistoryRow {
 
   protected readonly timeLabel = computed(() => timeAgo(this.tx().timestamp));
 
+  /** Only shown when it's not the normal, final state. */
+  protected readonly statusLabel = computed(
+    () => STATUS_LABEL[this.tx().status ?? 'final'] ?? null,
+  );
+
   protected readonly view = computed<HistoryRowView>(() => {
     const tx = this.tx();
+    const amount = formatAmount(tx.amount);
     switch (tx.type) {
       case 'send':
         return {
@@ -38,7 +53,7 @@ export class HistoryRow {
           glyph: '↑',
           title: `Sent ${tx.token}`,
           subtitle: `to ${tx.counterparty ?? ''}`,
-          amountText: `-${tx.amount} ${tx.token}`,
+          amountText: `-${amount} ${tx.token}`,
           amountPositive: false,
         };
       case 'receive':
@@ -47,7 +62,7 @@ export class HistoryRow {
           glyph: '↓',
           title: `Received ${tx.token}`,
           subtitle: `from ${tx.counterparty ?? ''}`,
-          amountText: `+${tx.amount} ${tx.token}`,
+          amountText: `+${amount} ${tx.token}`,
           amountPositive: true,
         };
       case 'swap':
@@ -56,7 +71,7 @@ export class HistoryRow {
           glyph: '⇄',
           title: `Swap ${tx.token} → ${tx.toToken}`,
           subtitle: 'rate applied at execution',
-          amountText: `-${tx.amount} ${tx.token}`,
+          amountText: `-${amount} ${tx.token}`,
           amountPositive: false,
         };
       case 'buy_rolls':
@@ -65,7 +80,7 @@ export class HistoryRow {
           glyph: '●',
           title: `Bought ${tx.rollCount} roll${(tx.rollCount ?? 0) > 1 ? 's' : ''}`,
           subtitle: 'Node staking',
-          amountText: `-${tx.amount} MAS`,
+          amountText: `-${amount} MAS`,
           amountPositive: false,
         };
       case 'sell_rolls':
@@ -74,8 +89,18 @@ export class HistoryRow {
           glyph: '●',
           title: `Sold ${tx.rollCount} roll${(tx.rollCount ?? 0) > 1 ? 's' : ''}`,
           subtitle: 'Unstaking (deferred)',
-          amountText: `+${tx.amount} MAS`,
+          amountText: `+${amount} MAS`,
           amountPositive: true,
+        };
+      case 'contract_call':
+        return {
+          icon: 'swap',
+          glyph: '⌘',
+          title: 'Contract call',
+          subtitle: `to ${tx.counterparty ?? ''}`,
+          // Coins attached to the call; most calls send none.
+          amountText: tx.amount > 0 ? `-${amount} MAS` : '—',
+          amountPositive: false,
         };
       case 'reward':
       default:
@@ -84,7 +109,7 @@ export class HistoryRow {
           glyph: '↓',
           title: 'Staking reward',
           subtitle: 'Auto-credited',
-          amountText: `+${tx.amount} MAS`,
+          amountText: `+${amount} MAS`,
           amountPositive: true,
         };
     }

@@ -75,7 +75,7 @@
   <div class="tab-meta">{{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
 </div>
 
-<div class="token-list">
+<div class="token-list" (scroll)="onListScroll($event)">
   @if (activeTab() === 'tokens') {
   @for (symbol of tokenSymbols(); track symbol) {
   <app-token-row
@@ -95,11 +95,16 @@
   </button>
   }
   } @else {
-  @if (wallet().history.length === 0) {
+  @if (store.visibleHistory().length === 0 && !store.hasMoreHistory()) {
   <div class="empty-state">No transactions yet</div>
   } @else {
-  @for (tx of wallet().history; track tx.id) {
+  @for (tx of store.visibleHistory(); track tx.id) {
   <app-history-row [tx]="tx" />
+  }
+  @if (store.hasMoreHistory()) {
+  <button class="token-toggle" type="button" [disabled]="store.isLoadingHistory()" (click)="loadMoreHistory()">
+    {{ store.isLoadingHistory() ? 'Loading…' : 'Load more' }}
+  </button>
   }
   }
   }

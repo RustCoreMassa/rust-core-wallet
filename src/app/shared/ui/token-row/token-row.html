@@ -1,5 +1,9 @@
 <div class="row">
-  <img class="row-icon" [src]="meta().asset" [alt]="symbol()" />
+  @if (iconFailed()) {
+  <div class="row-icon mas">{{ symbol().slice(0, 4) }}</div>
+  } @else {
+  <img class="row-icon" [src]="meta().asset" [alt]="symbol()" (error)="iconFailed.set(true)" />
+  }
   <div class="row-main">
     <div class="row-name">{{ meta().name }}</div>
     <div class="row-sub">

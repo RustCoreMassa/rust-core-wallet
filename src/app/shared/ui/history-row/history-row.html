@@ -2,7 +2,12 @@
   <div class="row-icon" [class]="view().icon">{{ view().glyph }}</div>
   <div class="row-main">
     <div class="row-name">{{ view().title }}</div>
-    <div class="row-sub">{{ view().subtitle }}</div>
+    <div class="row-sub">
+      @if (statusLabel(); as status) {
+      <span [class.neg]="tx().status === 'failed'">{{ status }} · </span>
+      }
+      {{ view().subtitle }}
+    </div>
   </div>
   <div class="row-values">
     <div class="row-usd" [class.pos]="view().amountPositive">{{ view().amountText }}</div>
