@@ -190,7 +190,8 @@ git tag v1.1.0
 git push origin master v1.1.0
 ```
 
-The workflow refuses a tag that doesn't match `package.json` or has no changelog section.
+The workflow refuses a tag that doesn't match `package.json`, has no changelog section, was
+already released, or isn't higher than the latest release — so a version can only move forward.
 
 ### Deploying to DeWeb
 

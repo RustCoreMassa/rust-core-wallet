@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Check out the tagged commit
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # all tags, to compare with earlier releases
 
       - name: Set up Node.js (version pinned in .nvmrc)
         uses: actions/setup-node@v4
@@ -50,6 +52,32 @@ jobs:
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Release must not exist yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::A release for $TAG already exists. Bump the version for a new release."
+            exit 1
+          fi
+
+      - name: Version must be higher than every earlier release
+        run: |
+          # Numeric semver comparison (as text, v1.10.0 would sort below v1.9.0).
+          git tag --list 'v*' | node -e '
+            const current = process.env.TAG;
+            const parse = (t) => t.slice(1).split(".").map(Number);
+            const newer = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+            const earlier = require("fs").readFileSync(0, "utf8").split("\n")
+              .filter((t) => /^v\d+\.\d+\.\d+$/.test(t) && t !== current);
+            const latest = earlier.sort((a, b) => newer(parse(a), parse(b))).at(-1);
+            if (latest && newer(parse(current), parse(latest)) <= 0) {
+              console.log(`::error::${current} is not higher than the latest release ${latest}.`);
+              process.exit(1);
+            }
+            console.log(`${current} > ${latest ?? "(first release)"} — ok`);
+          '
 
       - name: Release notes must exist in CHANGELOG.md
         run: |
