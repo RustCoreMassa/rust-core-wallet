@@ -46,7 +46,6 @@ function newWallet(id: string, name: string, address: string): WalletState {
     rolls: { active: 0, candidate: 0, deferred: 0 },
     history: [],
     historyPaging: null,
-    nfts: [],
   };
 }
 
@@ -170,8 +169,7 @@ function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): Tok
  * reconciles. History comes from the Massa explorer API (mainnet only),
  * paged by cursor (`loadMoreHistory`) and merged with operations just
  * sent from this app that it hasn't indexed yet (see `mergeHistory`);
- * on buildnet it is local only. NFTs and
- * prices are not wired to any source yet.
+ * on buildnet it is local only. Prices are not wired to any source yet.
  *
  * State is kept per network (NetworkStore), so mainnet and buildnet
  * balances/history never mix; `wallets` always shows the current one.

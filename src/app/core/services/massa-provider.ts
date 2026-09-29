@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { MnsDomain } from '../models/nft.model';
 
 /** Fixed by the Massa network config — one roll always costs 100 MAS. */
 export const ROLL_PRICE_MAS = 100;
@@ -63,6 +64,10 @@ export interface MassaProvider {
   getRolls(address: string): Promise<RollCounts>;
   buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
   sellRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
+
+  // ---- Massa Name System ----------------------------------------------------
+  /** Domains owned by `address`, each with the address it resolves to. */
+  getOwnedDomains(address: string): Promise<MnsDomain[]>;
 }
 
 export const MASSA_PROVIDER = new InjectionToken<MassaProvider>('MASSA_PROVIDER');

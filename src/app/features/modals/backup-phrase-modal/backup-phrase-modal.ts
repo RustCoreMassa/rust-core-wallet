@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthStore } from '../../../core/state/auth-store';
+import { WalletStore } from '../../../core/state/wallet-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { PinPad } from '../../../shared/ui/pin-pad/pin-pad';
@@ -18,6 +19,7 @@ const PIN_LENGTH = 6;
 export class BackupPhraseModal {
   protected readonly modal = inject(Modal);
   private readonly authStore = inject(AuthStore);
+  private readonly walletStore = inject(WalletStore);
   private readonly toast = inject(Toast);
 
   protected readonly accounts = this.authStore.accounts;
@@ -25,7 +27,8 @@ export class BackupPhraseModal {
   protected readonly pin = signal('');
   protected readonly error = signal<string | null>(null);
   protected readonly isBusy = signal(false);
-  protected readonly selectedAccountId = signal(this.authStore.accounts()[0]?.id ?? '');
+  /** Starts on the wallet currently in use; the picker can still switch to another. */
+  protected readonly selectedAccountId = signal(this.walletStore.activeWalletId());
 
   protected readonly dots = computed(() =>
     Array.from({ length: PIN_LENGTH }, (_, i) => i < this.pin().length),

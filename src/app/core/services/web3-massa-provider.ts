@@ -2,11 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import {
   Account,
   JsonRpcPublicProvider,
+  MNS,
   MRC20,
   Mas,
   Web3Provider,
   rpcTypes,
 } from '@massalabs/massa-web3';
+import { MnsDomain } from '../models/nft.model';
 import { NetworkStore } from '../state/network-store';
 import {
   GeneratedAccount,
@@ -112,6 +114,20 @@ export class Web3MassaProvider implements MassaProvider {
     const provider = await this.providerFor(privateKey);
     const operation = await provider.sellRolls(rollCount);
     return { operationId: operation.id };
+  }
+
+  async getOwnedDomains(address: string): Promise<MnsDomain[]> {
+    const publicProvider = this.publicProvider();
+    const mns =
+      this.networkStore.network() === 'buildnet'
+        ? MNS.buildnet(publicProvider)
+        : MNS.mainnet(publicProvider);
+    const names = await mns.getOwnedDomains(address);
+    if (!names.length) return [];
+    const targets = await mns.getTargets(names);
+    return names
+      .map((name, i) => ({ name, target: targets[i] || null }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   private async providerFor(privateKey: string) {

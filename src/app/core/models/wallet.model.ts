@@ -1,4 +1,3 @@
-import { NftItem } from './nft.model';
 import { TokenBalances } from './token.model';
 import { HistoryPaging, TransactionRecord } from './transaction.model';
 
@@ -17,5 +16,4 @@ export interface WalletState {
   readonly history: readonly TransactionRecord[];
   /** Explorer pagination; `null` until the first page is loaded (always, on buildnet). */
   readonly historyPaging: HistoryPaging | null;
-  readonly nfts: readonly NftItem[];
 }
