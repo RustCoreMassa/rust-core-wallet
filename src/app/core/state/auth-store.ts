@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { VaultAccount, VaultPayload } from '../models/vault.model';
-import { CryptoVault } from '../services/crypto-vault';
+import { Ciphertext, CryptoVault } from '../services/crypto-vault';
 import { VaultStorage } from '../services/vault-storage';
 
 /**
@@ -121,6 +121,21 @@ export class AuthStore {
 
     this.vaultStorage.save({ salt: envelope.salt, iv, ciphertext });
     this._accounts.set(accounts);
+  }
+
+  /**
+   * Encrypts arbitrary app data (e.g. the wallet cache) under the same
+   * session key as the vault, without ever handing the key out.
+   */
+  async encryptForSession(plaintext: string): Promise<Ciphertext> {
+    if (!this.sessionKey) throw new Error('Vault is locked');
+    return this.cryptoVault.encrypt(plaintext, this.sessionKey);
+  }
+
+  /** Throws when locked, or when `payload` wasn't encrypted under this vault's key. */
+  async decryptForSession(payload: Ciphertext): Promise<string> {
+    if (!this.sessionKey) throw new Error('Vault is locked');
+    return this.cryptoVault.decrypt(payload, this.sessionKey);
   }
 
   // ---- naming ------------------------------------------------------------

@@ -162,6 +162,9 @@ export class ExplorerApi {
   private base(op: ExplorerOperation) {
     return {
       id: op.hash,
+      from: op.from,
+      // Roll operations have no recipient ("-").
+      to: op.to === '-' ? undefined : op.to,
       operationId: op.hash.split('_')[0],
       token: 'MAS' as const,
       timestamp: Number(op.block_time),

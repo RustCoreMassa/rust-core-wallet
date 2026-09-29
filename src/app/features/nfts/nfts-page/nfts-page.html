@@ -2,18 +2,20 @@
 
 <div class="field-label section-label">Domains (MNS)</div>
 <div class="settings-list">
-  @if (domains.isLoading() && !domains.hasValue()) {
-  <div class="empty-state">Loading domains…</div>
-  } @else if (domains.error()) {
-  <div class="empty-state">Couldn't load domains</div>
-  } @else if (domains.hasValue() && domains.value().length > 0) {
-  @for (domain of domains.value(); track domain.name) {
+  @if (domains(); as domains) {
+  @if (domains.length > 0) {
+  @for (domain of domains; track domain.name) {
   <div class="settings-row">
     <div class="label">{{ domain.name }}.massa</div>
   </div>
   }
   } @else {
   <div class="empty-state">No domains owned by this wallet</div>
+  }
+  } @else if (hasError()) {
+  <div class="empty-state">Couldn't load domains</div>
+  } @else {
+  <div class="empty-state">Loading domains…</div>
   }
 </div>
 

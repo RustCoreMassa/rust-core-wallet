@@ -1,0 +1,52 @@
+:host {
+  display: contents;
+}
+
+.tx-summary {
+  margin: -4px -8px 8px;
+}
+
+.tx-fields {
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.tx-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.tx-field dt {
+  color: var(--gray-500);
+}
+
+.tx-field dd {
+  margin: 0;
+  text-align: right;
+}
+
+.tx-field dd.neg {
+  color: var(--red);
+}
+
+.tx-field dd.pending {
+  color: var(--orange);
+}
+
+.tx-copy {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: copy;
+}
+
+.tx-explorer {
+  display: block;
+  margin-top: 18px;
+  text-align: center;
+  text-decoration: none;
+}

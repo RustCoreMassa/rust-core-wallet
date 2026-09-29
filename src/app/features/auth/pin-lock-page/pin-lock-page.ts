@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { MASSA_PROVIDER } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
+import { WalletStore } from '../../../core/state/wallet-store';
 import { PinPad } from '../../../shared/ui/pin-pad/pin-pad';
 
 type Step = 'unlock' | 'set-pin' | 'confirm-pin' | 'key-choice' | 'import-key' | 'generating';
@@ -27,6 +28,7 @@ const PIN_LENGTH = 6;
 })
 export class PinLockPage {
   private readonly authStore = inject(AuthStore);
+  private readonly walletStore = inject(WalletStore);
   private readonly provider = inject(MASSA_PROVIDER);
   private readonly router = inject(Router);
 
@@ -103,6 +105,8 @@ export class PinLockPage {
       this.isBusy.set(false);
 
       if (ok) {
+        // Paint last-known balances/history instantly; the shell refreshes them.
+        await this.walletStore.restoreCache();
         await this.router.navigateByUrl('/home');
         return;
       } else {

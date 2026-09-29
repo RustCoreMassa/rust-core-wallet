@@ -70,14 +70,19 @@
     id="send-amount"
     class="num-input"
     type="number"
+    inputmode="decimal"
+    [min]="minAmount"
+    step="any"
     placeholder="0.00"
     [ngModel]="amount()"
     (ngModelChange)="amount.set($event)"
+    (keydown)="blockNonDecimalKeys($event)"
   />
   <button class="max-btn" type="button" (click)="setMax()">Max</button>
 </div>
 <div class="balance-hint">
   <span>Available: {{ availableBalance() }} {{ token() }}</span>
+  <span>Fee: {{ networkFee }} MAS</span>
 </div>
 
 @if (error()) {

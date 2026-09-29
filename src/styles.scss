@@ -144,6 +144,27 @@ button {
   font-weight: 700;
 }
 
+/* ---------- loading placeholder (value not read from chain yet) ---------- */
+.skeleton {
+  display: inline-block;
+  width: 4em;
+  height: 0.9em;
+  border-radius: 6px;
+  background: var(--bg-elevated-2);
+  vertical-align: middle;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.skeleton-lg {
+  width: 5.5em;
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 /* ---------- home header ---------- */
 .top-header {
   display: flex;

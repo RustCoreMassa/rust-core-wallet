@@ -31,6 +31,9 @@ export interface TransactionRecord {
   readonly received?: number;
   /** Truncated counterparty address (or a token name for known contracts). */
   readonly counterparty?: string;
+  /** Full sender / recipient addresses, for the details view. */
+  readonly from?: string;
+  readonly to?: string;
   /** Number of rolls, for buy_rolls/sell_rolls. */
   readonly rollCount?: number;
   /**

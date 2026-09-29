@@ -34,3 +34,18 @@
 .token-toggle:hover {
   color: var(--white);
 }
+
+.tx-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 14px;
+  color: inherit;
+  text-align: left;
+}
+
+.tx-button:hover {
+  background: var(--bg-elevated);
+}

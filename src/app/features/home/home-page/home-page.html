@@ -31,7 +31,11 @@
 <section class="balance">
   <div class="balance-label">Total balance</div>
   <div class="balance-amount">
+    @if (wallet().loaded) {
     <span>{{ wallet().balances.MAS | number: '1.2-2' }}</span>
+    } @else {
+    <span class="skeleton skeleton-lg"></span>
+    }
     <span class="unit">MAS</span>
   </div>
   <div class="balance-sub">
@@ -77,6 +81,9 @@
 
 <div class="token-list" (scroll)="onListScroll($event)">
   @if (activeTab() === 'tokens') {
+  @if (!wallet().loaded) {
+  <div class="empty-state">Loading balances…</div>
+  } @else {
   @for (symbol of tokenSymbols(); track symbol) {
   <app-token-row
     [symbol]="symbol"
@@ -94,12 +101,17 @@
     }
   </button>
   }
+  }
+  } @else if (!store.isHistoryLoaded()) {
+  <div class="empty-state">Loading history…</div>
   } @else {
   @if (store.visibleHistory().length === 0 && !store.hasMoreHistory()) {
   <div class="empty-state">No transactions yet</div>
   } @else {
   @for (tx of store.visibleHistory(); track tx.id) {
-  <app-history-row [tx]="tx" />
+  <button class="tx-button" type="button" (click)="modal.open('tx-details', tx)">
+    <app-history-row [tx]="tx" />
+  </button>
   }
   @if (store.hasMoreHistory()) {
   <button class="token-toggle" type="button" [disabled]="store.isLoadingHistory()" (click)="loadMoreHistory()">

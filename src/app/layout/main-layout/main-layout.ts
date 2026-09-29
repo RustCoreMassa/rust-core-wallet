@@ -12,6 +12,7 @@ import { WalletsModal } from '../../features/modals/wallets-modal/wallets-modal'
 import { RenameAccountModal } from '../../features/modals/rename-account-modal/rename-account-modal';
 import { BackupPhraseModal } from '../../features/modals/backup-phrase-modal/backup-phrase-modal';
 import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
+import { TxDetailsModal } from '../../features/modals/tx-details-modal/tx-details-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 
@@ -33,6 +34,7 @@ const AUTO_REFRESH_MS = 10_000;
     RenameAccountModal,
     BackupPhraseModal,
     LogoutModal,
+    TxDetailsModal,
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',
@@ -48,6 +50,10 @@ export class MainLayout {
     for (const account of authStore.accounts()) {
       walletStore.ensureWallet(account.id, account.name, account.address);
     }
+    // Cached values (if any) are already on screen; bring them up to date.
+    // MNS is prefetched too, so the NFT page opens with data already there.
+    walletStore.refreshAll();
+    walletStore.loadDomains().catch((err) => console.warn('Prefetching MNS domains failed', err));
 
     // Live balances for as long as the unlocked shell is on screen —
     // paused while the tab is hidden, caught up as soon as it's back.

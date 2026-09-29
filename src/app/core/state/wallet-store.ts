@@ -1,4 +1,5 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { MnsDomain } from '../models/nft.model';
 import { SavedAddress } from '../models/saved-address.model';
 import {
   TOKEN_LIST,
@@ -10,7 +11,8 @@ import {
 import { HistoryPaging, HistoryStream, TransactionRecord } from '../models/transaction.model';
 import { WalletState } from '../models/wallet.model';
 import { ExplorerApi, HistoryPage } from '../services/explorer-api';
-import { MASSA_PROVIDER, ROLL_PRICE_MAS } from '../services/massa-provider';
+import { MASSA_PROVIDER, NETWORK_FEE_MAS, ROLL_PRICE_MAS } from '../services/massa-provider';
+import { WalletCache } from '../services/wallet-cache';
 import { fromUnits, toUnits } from '../utils/token-amount';
 import { AuthStore } from './auth-store';
 import { Network, NetworkStore } from './network-store';
@@ -28,6 +30,11 @@ const TOKENS_BY_NETWORK: Readonly<Record<Network, typeof MRC20_TOKENS>> = {
 /** How long auto-refresh leaves a wallet alone after a write (see `autoRefresh`). */
 const WRITE_SETTLE_MS = 8000;
 
+/** MNS ownership rarely changes — re-read at most this often when the NFT page is opened. */
+const DOMAINS_REFRESH_MS = 60_000;
+/** Coalesces bursts of state changes into one encrypted cache write. */
+const CACHE_SAVE_DEBOUNCE_MS = 1000;
+
 /** The newest history page is re-read at most this often, not on every balance poll. */
 const HISTORY_REFRESH_MS = 30_000;
 /** A local pending record the explorer never confirms (e.g. expired op) is dropped after this. */
@@ -42,10 +49,12 @@ function newWallet(id: string, name: string, address: string): WalletState {
     id,
     name,
     address,
+    loaded: false,
     balances: { MAS: 0 },
     rolls: { active: 0, candidate: 0, deferred: 0 },
     history: [],
     historyPaging: null,
+    domains: null,
   };
 }
 
@@ -146,6 +155,42 @@ function advancePaging(paging: HistoryPaging, page: HistoryPage): HistoryPaging 
   return next;
 }
 
+/** Applies vault names; returns `wallets` itself when nothing changed (no signal churn). */
+function withNames(
+  wallets: Record<string, WalletState>,
+  names: ReadonlyMap<string, string>,
+): Record<string, WalletState> {
+  let changed = false;
+  const next: Record<string, WalletState> = {};
+  for (const [id, wallet] of Object.entries(wallets)) {
+    const name = names.get(id);
+    changed ||= !!name && name !== wallet.name;
+    next[id] = name && name !== wallet.name ? { ...wallet, name } : wallet;
+  }
+  return changed ? next : wallets;
+}
+
+/** Smallest amount the Send flow accepts, in any token. */
+export const MIN_SEND_AMOUNT = 0.01;
+
+const MAS_DECIMALS = TOKEN_REGISTRY.MAS.decimals;
+
+/** `a - b` in MAS, exact to the nanoMAS (no float drift like 3.1 - 0.01). */
+function subtractMas(a: number, b: number): number {
+  const diff = toUnits(a, MAS_DECIMALS) - toUnits(b, MAS_DECIMALS);
+  return diff > 0n ? fromUnits(diff, MAS_DECIMALS) : 0;
+}
+
+/** Throws unless the wallet holds `required` MAS on top of the network fee. */
+function assertMasForFee(held: number, required: number, message: string): void {
+  if (
+    toUnits(required, MAS_DECIMALS) + toUnits(NETWORK_FEE_MAS, MAS_DECIMALS) >
+    toUnits(held, MAS_DECIMALS)
+  ) {
+    throw new Error(message);
+  }
+}
+
 /** Adds `delta` (may be negative) to one token, clamped at 0. */
 function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): TokenBalances {
   return { ...balances, [token]: Math.max(0, (balances[token] ?? 0) + delta) };
@@ -171,6 +216,11 @@ function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): Tok
  * sent from this app that it hasn't indexed yet (see `mergeHistory`);
  * on buildnet it is local only. Prices are not wired to any source yet.
  *
+ * The whole state (minus private keys, which never live here) is cached
+ * encrypted in localStorage via WalletCache: `restoreCache` paints the
+ * last-known values right after unlock, and every change is saved back,
+ * debounced. Names always follow AuthStore (see the constructor).
+ *
  * State is kept per network (NetworkStore), so mainnet and buildnet
  * balances/history never mix; `wallets` always shows the current one.
  * Every async write captures the network it started on and lands its
@@ -182,6 +232,7 @@ export class WalletStore {
   private readonly auth = inject(AuthStore);
   private readonly networkStore = inject(NetworkStore);
   private readonly explorer = inject(ExplorerApi);
+  private readonly cache = inject(WalletCache);
 
   private readonly _walletsByNetwork = signal<WalletsByNetwork>(emptyWallets());
   private readonly _activeWalletId = signal<string>('');
@@ -190,10 +241,14 @@ export class WalletStore {
   private readonly _dayChangePct = signal<TokenPrices>(DEMO_DAY_CHANGE_PCT);
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
   private readonly _loadingHistory = signal(false);
+  private readonly _loadingDomains = signal(false);
   /** Per wallet id: auto-refresh is skipped until this timestamp. */
   private readonly settleUntil = new Map<string, number>();
   /** Per `${network}:${id}`: when history was last read from the explorer. */
   private readonly historyFetchedAt = new Map<string, number>();
+  /** Per `${network}:${id}`: when MNS domains were last read. */
+  private readonly domainsFetchedAt = new Map<string, number>();
+  private cacheSaveTimer: ReturnType<typeof setTimeout> | undefined;
 
   readonly network = this.networkStore.network;
   readonly wallets = computed(() => this._walletsByNetwork()[this.network()]);
@@ -230,6 +285,12 @@ export class WalletStore {
 
   readonly isLoadingHistory = this._loadingHistory.asReadonly();
 
+  /** First explorer page is in (always true on buildnet, where history is local only). */
+  readonly isHistoryLoaded = computed(
+    () => this.network() !== 'mainnet' || this.activeWallet().historyPaging !== null,
+  );
+  readonly isLoadingDomains = this._loadingDomains.asReadonly();
+
   readonly isRefreshing = computed(() => this._refreshingIds().has(this._activeWalletId()));
 
   readonly portfolioValueUsd = computed(() => {
@@ -247,12 +308,71 @@ export class WalletStore {
     return new Set([...walletAddresses, ...savedAddresses]);
   });
 
+  constructor() {
+    // Persist every state change (debounced), but only while unlocked —
+    // the cache is encrypted under the session key.
+    effect(() => {
+      const snapshot = {
+        wallets: this._walletsByNetwork(),
+        activeWalletId: this._activeWalletId(),
+        addressBook: this._addressBook(),
+      };
+      if (!this.auth.isUnlocked() || !snapshot.activeWalletId) return;
+      clearTimeout(this.cacheSaveTimer);
+      this.cacheSaveTimer = setTimeout(() => {
+        this.cache.save(snapshot).catch((err) => console.warn('Wallet cache save failed', err));
+      }, CACHE_SAVE_DEBOUNCE_MS);
+    });
+
+    // Wallet names follow the vault — covers renames and names restored
+    // from an older cache.
+    effect(() => {
+      const names = new Map(this.auth.accounts().map((a) => [a.id, a.name]));
+      untracked(() =>
+        this._walletsByNetwork.update((all) => {
+          const mainnet = withNames(all.mainnet, names);
+          const buildnet = withNames(all.buildnet, names);
+          return mainnet === all.mainnet && buildnet === all.buildnet ? all : { mainnet, buildnet };
+        }),
+      );
+    });
+  }
+
   // ---- network & session ---------------------------------------------------
 
   /** Points every chain call at `network` and reloads all wallets there. */
   setNetwork(network: Network): void {
     if (network === this.network()) return;
     this.networkStore.set(network);
+    this.refreshAll();
+    this.loadDomains().catch((err) => console.warn('Loading MNS domains failed', err));
+  }
+
+  /**
+   * Paints the last-known state from the encrypted cache, right after
+   * unlock and before the shell renders. Skipped when this session already
+   * holds state (a lock → unlock keeps it in memory, and it's newer).
+   * Only accounts still in the vault are restored.
+   */
+  async restoreCache(): Promise<void> {
+    const hasState = Object.keys(this._walletsByNetwork().mainnet).length > 0;
+    if (hasState) return;
+    const snapshot = await this.cache.load();
+    if (!snapshot) return;
+
+    const accountIds = new Set(this.auth.accounts().map((a) => a.id));
+    const keep = (wallets: Record<string, WalletState>) =>
+      Object.fromEntries(Object.entries(wallets).filter(([id]) => accountIds.has(id)));
+    this._walletsByNetwork.set({
+      mainnet: keep(snapshot.wallets.mainnet),
+      buildnet: keep(snapshot.wallets.buildnet),
+    });
+    if (accountIds.has(snapshot.activeWalletId)) this._activeWalletId.set(snapshot.activeWalletId);
+    this._addressBook.set([...snapshot.addressBook]);
+  }
+
+  /** Background refresh of every wallet on the current network. */
+  refreshAll(): void {
     for (const id of Object.keys(this.wallets())) this.refreshInBackground(id);
   }
 
@@ -264,6 +384,9 @@ export class WalletStore {
     this._refreshingIds.set(new Set());
     this.settleUntil.clear();
     this.historyFetchedAt.clear();
+    this.domainsFetchedAt.clear();
+    clearTimeout(this.cacheSaveTimer);
+    this.cache.clear();
   }
 
   // ---- wallets -------------------------------------------------------------
@@ -276,9 +399,9 @@ export class WalletStore {
 
   /**
    * Ensures an entry exists for a real account from AuthStore, keyed by
-   * the same id, and loads its balances from the chain — idempotent,
-   * safe to call for accounts that already have one. The first wallet
-   * registered becomes the active one.
+   * the same id — idempotent, safe to call for accounts that already have
+   * one. The first wallet registered becomes the active one. Loading its
+   * chain data is up to the caller (`switchWallet` / `refreshAll`).
    */
   ensureWallet(id: string, name: string, address: string): void {
     if (this.wallets()[id]) return;
@@ -293,7 +416,37 @@ export class WalletStore {
         : { ...all.buildnet, [id]: newWallet(id, name, address) },
     }));
     if (!this.wallets()[this._activeWalletId()]) this._activeWalletId.set(id);
-    this.refreshInBackground(id);
+  }
+
+  /**
+   * Loads the active wallet's MNS domains. Cached values show immediately;
+   * the chain is re-read only when they're older than DOMAINS_REFRESH_MS.
+   */
+  async loadDomains(): Promise<void> {
+    const network = this.network();
+    const wallet = this.activeWallet();
+    const key = `${network}:${wallet.id}`;
+    const isFresh = Date.now() - (this.domainsFetchedAt.get(key) ?? 0) < DOMAINS_REFRESH_MS;
+    if ((isFresh && wallet.domains) || this._loadingDomains()) return;
+
+    this._loadingDomains.set(true);
+    try {
+      const domains: MnsDomain[] = await this.provider.getOwnedDomains(wallet.address);
+      this.domainsFetchedAt.set(key, Date.now());
+      this.updateWallet(wallet.id, (w) => ({ ...w, domains }), network);
+    } finally {
+      this._loadingDomains.set(false);
+    }
+  }
+
+  /**
+   * Largest amount of `token` the active wallet can send: for MAS the
+   * balance minus the network fee, for MRC-20s the whole token balance
+   * (their fee is paid in MAS).
+   */
+  maxSendable(token: TokenSymbol): number {
+    const held = this.activeWallet().balances[token] ?? 0;
+    return token === 'MAS' ? subtractMas(held, NETWORK_FEE_MAS) : held;
   }
 
   saveAddress(name: string, address: string): void {
@@ -370,6 +523,7 @@ export class WalletStore {
           return {
             ...w,
             balances,
+            loaded: w.loaded || mas.status === 'fulfilled',
             rolls: rolls.status === 'fulfilled' ? rolls.value : w.rolls,
             ...(history.status === 'fulfilled' && history.value
               ? {
@@ -401,8 +555,18 @@ export class WalletStore {
   ): Promise<{ internal: boolean }> {
     const network = this.network();
     const wallet = this.activeWallet();
-    if (!(amount > 0)) throw new Error('Enter a valid amount');
-    if (amount > (wallet.balances[token] ?? 0)) throw new Error('Insufficient balance');
+    if (!(amount >= MIN_SEND_AMOUNT)) throw new Error(`Minimum amount is ${MIN_SEND_AMOUNT}`);
+    const masHeld = wallet.balances.MAS ?? 0;
+    if (token === 'MAS') {
+      assertMasForFee(
+        masHeld,
+        amount,
+        `Insufficient balance — ${NETWORK_FEE_MAS} MAS is kept for the network fee`,
+      );
+    } else {
+      if (amount > (wallet.balances[token] ?? 0)) throw new Error('Insufficient balance');
+      assertMasForFee(masHeld, 0, `You need ${NETWORK_FEE_MAS} MAS for the network fee`);
+    }
 
     const meta = TOKEN_REGISTRY[token];
     const units = toUnits(amount, meta.decimals);
@@ -417,7 +581,7 @@ export class WalletStore {
       wallet.id,
       (w) => ({
         ...w,
-        balances: adjust(w.balances, token, -amount),
+        balances: adjust(adjust(w.balances, token, -amount), 'MAS', -NETWORK_FEE_MAS),
         history: [
           this.record(
             {
@@ -425,6 +589,8 @@ export class WalletStore {
               token,
               amount,
               counterparty: shortAddress(toAddress),
+              from: wallet.address,
+              to: toAddress,
               operationId,
             },
             network,
@@ -454,6 +620,8 @@ export class WalletStore {
                 token,
                 amount,
                 counterparty: shortAddress(wallet.address),
+                from: wallet.address,
+                to: toAddress,
                 operationId,
               },
               network,
@@ -474,7 +642,11 @@ export class WalletStore {
     if (!Number.isInteger(rollCount) || rollCount <= 0)
       throw new Error('Enter a valid amount of rolls');
     const cost = rollCount * ROLL_PRICE_MAS;
-    if (cost > (wallet.balances.MAS ?? 0)) throw new Error('Insufficient MAS');
+    assertMasForFee(
+      wallet.balances.MAS ?? 0,
+      cost,
+      `Insufficient MAS — ${NETWORK_FEE_MAS} MAS is needed for the network fee`,
+    );
 
     const { operationId } = await this.provider.buyRolls(
       this.privateKeyFor(wallet.id),
@@ -487,11 +659,18 @@ export class WalletStore {
       wallet.id,
       (w) => ({
         ...w,
-        balances: adjust(w.balances, 'MAS', -cost),
+        balances: adjust(w.balances, 'MAS', -(cost + NETWORK_FEE_MAS)),
         rolls: { ...w.rolls, candidate: w.rolls.candidate + rollCount },
         history: [
           this.record(
-            { type: 'buy_rolls', token: 'MAS', amount: cost, rollCount, operationId },
+            {
+              type: 'buy_rolls',
+              token: 'MAS',
+              amount: cost,
+              rollCount,
+              operationId,
+              from: wallet.address,
+            },
             network,
           ),
           ...w.history,
@@ -507,6 +686,11 @@ export class WalletStore {
     if (!Number.isInteger(rollCount) || rollCount <= 0)
       throw new Error('Enter a valid amount of rolls');
     if (rollCount > wallet.rolls.active) throw new Error('Not enough active rolls');
+    assertMasForFee(
+      wallet.balances.MAS ?? 0,
+      0,
+      `You need ${NETWORK_FEE_MAS} MAS for the network fee`,
+    );
 
     const { operationId } = await this.provider.sellRolls(
       this.privateKeyFor(wallet.id),
@@ -521,6 +705,7 @@ export class WalletStore {
       wallet.id,
       (w) => ({
         ...w,
+        balances: adjust(w.balances, 'MAS', -NETWORK_FEE_MAS),
         rolls: {
           ...w.rolls,
           active: w.rolls.active - rollCount,
@@ -528,7 +713,14 @@ export class WalletStore {
         },
         history: [
           this.record(
-            { type: 'sell_rolls', token: 'MAS', amount: refund, rollCount, operationId },
+            {
+              type: 'sell_rolls',
+              token: 'MAS',
+              amount: refund,
+              rollCount,
+              operationId,
+              from: wallet.address,
+            },
             network,
           ),
           ...w.history,

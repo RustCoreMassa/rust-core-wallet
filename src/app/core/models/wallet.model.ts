@@ -1,4 +1,5 @@
 import { TokenBalances } from './token.model';
+import { MnsDomain } from './nft.model';
 import { HistoryPaging, TransactionRecord } from './transaction.model';
 
 export interface RollsState {
@@ -11,9 +12,13 @@ export interface WalletState {
   readonly id: string;
   readonly name: string;
   readonly address: string;
+  /** False until balances/rolls have been read from the chain once — the UI shows a placeholder, not 0. */
+  readonly loaded: boolean;
   readonly balances: TokenBalances;
   readonly rolls: RollsState;
   readonly history: readonly TransactionRecord[];
   /** Explorer pagination; `null` until the first page is loaded (always, on buildnet). */
   readonly historyPaging: HistoryPaging | null;
+  /** MNS domains owned by this address; `null` until first loaded. */
+  readonly domains: readonly MnsDomain[] | null;
 }

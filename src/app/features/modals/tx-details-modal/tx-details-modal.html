@@ -1,0 +1,58 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">Transaction details</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (tx(); as tx) {
+  <div class="tx-summary">
+    <app-history-row [tx]="tx" />
+  </div>
+
+  <dl class="tx-fields">
+    @if (statusLabel(); as status) {
+    <div class="tx-field">
+      <dt>Status</dt>
+      <dd [class.neg]="tx.status === 'failed'" [class.pending]="tx.status === 'pending'">{{ status }}</dd>
+    </div>
+    }
+    <div class="tx-field">
+      <dt>Date</dt>
+      <dd>{{ tx.timestamp | date: 'medium' }}</dd>
+    </div>
+    <div class="tx-field">
+      <dt>Amount</dt>
+      <dd>{{ tx.amount | number: '1.0-9' }} {{ tx.token }}</dd>
+    </div>
+    @if (tx.rollCount) {
+    <div class="tx-field">
+      <dt>Rolls</dt>
+      <dd>{{ tx.rollCount }}</dd>
+    </div>
+    }
+    @if (tx.fee !== undefined) {
+    <div class="tx-field">
+      <dt>Network fee</dt>
+      <dd>{{ tx.fee | number: '1.0-9' }} MAS</dd>
+    </div>
+    }
+  </dl>
+
+  @if (tx.from) {
+  <div class="field-label">From</div>
+  <button class="addr-box tx-copy" type="button" (click)="copy(tx.from, 'Address')">{{ tx.from }}</button>
+  }
+  @if (tx.to) {
+  <div class="field-label">To</div>
+  <button class="addr-box tx-copy" type="button" (click)="copy(tx.to, 'Address')">{{ tx.to }}</button>
+  }
+  @if (tx.operationId) {
+  <div class="field-label">Operation ID</div>
+  <button class="addr-box tx-copy" type="button" (click)="copy(tx.operationId, 'Operation ID')">{{ tx.operationId }}</button>
+  }
+
+  @if (explorerUrl(); as url) {
+  <a class="btn btn-red tx-explorer" [href]="url" target="_blank" rel="noopener noreferrer">View on explorer ↗</a>
+  }
+  }
+</div>

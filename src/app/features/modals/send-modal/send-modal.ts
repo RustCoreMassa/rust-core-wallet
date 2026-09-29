@@ -2,9 +2,10 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TOKEN_LIST, TokenSymbol } from '../../../core/models/token.model';
+import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
-import { WalletStore } from '../../../core/state/wallet-store';
+import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
 
 @Component({
   selector: 'app-send-modal',
@@ -54,8 +55,17 @@ export class SendModal {
     this.saveChecked.set(false);
   }
 
+  protected readonly minAmount = MIN_SEND_AMOUNT;
+  protected readonly networkFee = NETWORK_FEE_MAS;
+
+  /** Balance minus the network fee for MAS; the full balance for MRC-20s (fee is paid in MAS). */
   protected setMax(): void {
-    this.amount.set(this.availableBalance());
+    this.amount.set(this.store.maxSendable(this.token()));
+  }
+
+  /** Amounts are positive decimals — block sign and exponent keys. */
+  protected blockNonDecimalKeys(event: KeyboardEvent): void {
+    if (['-', '+', 'e', 'E'].includes(event.key)) event.preventDefault();
   }
 
   protected async submit(): Promise<void> {

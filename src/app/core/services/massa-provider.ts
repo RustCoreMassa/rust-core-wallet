@@ -5,6 +5,12 @@ import { MnsDomain } from '../models/nft.model';
 export const ROLL_PRICE_MAS = 100;
 
 /**
+ * Fee paid (in MAS) by every operation this wallet sends — MAS transfers,
+ * MRC-20 transfers (smart contract calls) and roll buys/sells alike.
+ */
+export const NETWORK_FEE_MAS = 0.01;
+
+/**
  * `active` is the final roll count. `candidate` is only the pending
  * delta on top of it (rolls bought but not yet final), and `deferred`
  * is rolls sold whose MAS refund hasn't been credited yet — so
