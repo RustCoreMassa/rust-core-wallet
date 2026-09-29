@@ -13,7 +13,7 @@
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="Built with Angular" src="https://img.shields.io/badge/built%20with-Angular-dd0031" />
-  <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-orange" />
+  <img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-brightgreen" />
 </p>
 
 ---
@@ -30,9 +30,9 @@ built on three principles:
 - **What you see is what's on-chain.** Balances, rolls and history come from the blockchain. The
   wallet never shows a transaction as done before the network has actually executed it.
 
-> **Status: beta.** RustCore Wallet works on Massa **mainnet with real funds**. It has not yet had
-> an independent security audit. Start with small amounts and always keep a backup of your
-> private keys.
+> **Version 1.0.0 — first production release** ([changelog](CHANGELOG.md)). RustCore Wallet
+> works on Massa **mainnet with real funds**. It has not yet had an independent security audit:
+> start with small amounts and always keep a backup of your private keys.
 
 ## Features
 
@@ -127,7 +127,7 @@ Key design rules:
 **Requirements:** [Node.js](https://nodejs.org) `^22.22.3`, `^24.15.0` or `>=26` and npm.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/RustCoreMassa/rust-core-wallet.git
 cd rust-core-wallet
 npm install
 npm start            # http://localhost:4200
@@ -149,8 +149,30 @@ The service worker that makes the app installable runs in production builds only
 | `npx tsc -p tsconfig.app.json --noEmit` | Type-check |
 | `npx prettier --write .` | Format the code |
 
-To verify a release yourself, build it from the tagged source and compare it with the
-published build.
+## Releases
+
+Every release is a git tag (`v1.0.0`, …) with a
+[GitHub Release](https://github.com/RustCoreMassa/rust-core-wallet/releases) that contains the
+release notes from the [changelog](CHANGELOG.md), the production build as a zip, and a
+`SHA256SUMS` file.
+
+To check that a build is exactly what the source says, check out the release tag, build it and
+compare the checksums with the release's `SHA256SUMS`:
+
+```bash
+git checkout v1.0.0
+npm ci
+npm run build
+cd dist/rust-core-wallet/browser
+find . -type f ! -name ngsw.json | sort | xargs shasum -a 256
+```
+
+With the same Node.js version (dependencies are pinned by `package-lock.json`) the build is
+reproducible: every file matches except `ngsw.json`, the service worker's manifest, which records
+the build time — it's left out of `SHA256SUMS` for that reason.
+
+Versions follow [Semantic Versioning](https://semver.org): major for breaking changes, minor for
+new features, patch for fixes.
 
 ## Roadmap
 
@@ -177,7 +199,8 @@ published build.
 
 **Later**
 - [ ] Hardware-wallet support
-- [ ] Reproducible builds with published checksums
+- [x] Reproducible builds with published checksums (see [Releases](#releases))
+- [ ] Automated release builds in CI
 
 ## Support the project
 
