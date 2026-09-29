@@ -1,13 +1,14 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TokenSymbol } from '../../../core/models/token.model';
+import { TOKEN_LIST, TokenSymbol } from '../../../core/models/token.model';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { WalletStore } from '../../../core/state/wallet-store';
 
 @Component({
   selector: 'app-send-modal',
-  imports: [FormsModule],
+  imports: [FormsModule, DecimalPipe],
   templateUrl: './send-modal.html',
   styleUrl: './send-modal.scss',
 })
@@ -15,8 +16,6 @@ export class SendModal {
   protected readonly modal = inject(Modal);
   protected readonly store = inject(WalletStore);
   private readonly toast = inject(Toast);
-
-  protected readonly tokens: TokenSymbol[] = ['MAS', 'USDC', 'WETH'];
 
   protected readonly token = signal<TokenSymbol>('MAS');
   protected readonly address = signal('');
@@ -26,6 +25,12 @@ export class SendModal {
   protected readonly error = signal<string | null>(null);
   protected readonly isSending = signal(false);
 
+  /** MAS is always offered; an MRC-20 only when this wallet actually holds some. */
+  protected readonly tokens = computed<TokenSymbol[]>(() => {
+    const balances = this.store.activeWallet().balances;
+    return TOKEN_LIST.map((t) => t.symbol).filter((s) => s === 'MAS' || (balances[s] ?? 0) > 0);
+  });
+
   protected readonly otherWallets = computed(() =>
     this.store.walletList().filter((w) => w.id !== this.store.activeWalletId()),
   );
@@ -33,7 +38,7 @@ export class SendModal {
   protected readonly savedAddresses = this.store.addressBook;
 
   protected readonly availableBalance = computed(
-    () => this.store.activeWallet().balances[this.token()],
+    () => this.store.activeWallet().balances[this.token()] ?? 0,
   );
 
   protected readonly isKnownAddress = computed(() =>

@@ -1,6 +1,14 @@
 import { InjectionToken } from '@angular/core';
-import { TokenSymbol } from '../models/token.model';
 
+/** Fixed by the Massa network config — one roll always costs 100 MAS. */
+export const ROLL_PRICE_MAS = 100;
+
+/**
+ * `active` is the final roll count. `candidate` is only the pending
+ * delta on top of it (rolls bought but not yet final), and `deferred`
+ * is rolls sold whose MAS refund hasn't been credited yet — so
+ * `active + candidate + deferred` is everything currently locked.
+ */
 export interface RollCounts {
   readonly active: number;
   readonly candidate: number;
@@ -11,60 +19,50 @@ export interface OperationResult {
   readonly operationId: string;
 }
 
-export interface TransferParams {
-  readonly fromAddress: string;
-  readonly toAddress: string;
-  readonly token: TokenSymbol;
-  readonly amount: number;
-}
-
-export interface SwapParams {
+export interface GeneratedAccount {
+  readonly privateKey: string;
   readonly address: string;
-  readonly fromToken: TokenSymbol;
-  readonly toToken: TokenSymbol;
-  readonly amount: number;
-}
-
-export interface RollOperationParams {
-  readonly address: string;
-  readonly rollCount: number;
 }
 
 /**
  * Adapter boundary between the app and the Massa blockchain.
  *
- * Every method is async because every real implementation talks to a node
- * over JSON-RPC (balance reads) or submits/awaits a smart-contract
- * operation (transfers, swaps, roll buy/sell). The rest of the app only
- * ever depends on this interface — never on a concrete SDK — so the mock
- * implementation used for this demo can be swapped for one backed by
- * `@massalabs/massa-web3` (JsonRpcProvider / Account / smart-contract
- * calls) without touching a single component or the store.
+ * Amounts here are `bigint`, in each token's smallest unit (nanoMAS for
+ * MAS — 9 decimals; each MRC-20's own `decimals` from TOKEN_REGISTRY
+ * otherwise) — exactly what massa-web3 itself deals in. Conversion
+ * to/from human-readable `number` values happens at the UI edge (see
+ * the `Mas`/token amount helpers), never inside this interface or its
+ * implementations.
+ *
+ * Write methods take a raw `privateKey` rather than a massa-web3
+ * `Account` object, so no massa-web3 type ever has to leak past this
+ * file into the rest of the app — the real implementation derives an
+ * `Account` from it internally (`Account.fromPrivateKey`), same as the
+ * reference MassaService does.
  */
 export interface MassaProvider {
-  getBalance(address: string, token: TokenSymbol): Promise<number>;
-  getRolls(address: string): Promise<RollCounts>;
-  transfer(params: TransferParams): Promise<OperationResult>;
-  swap(params: SwapParams): Promise<OperationResult & { received: number }>;
-  buyRolls(params: RollOperationParams): Promise<OperationResult>;
-  sellRolls(params: RollOperationParams): Promise<OperationResult>;
-  generateWalletAddress(): Promise<string>;
-  /** Fresh keypair for "create a new wallet" during registration. */
+  // ---- wallet ---------------------------------------------------------
   generateAccount(): Promise<GeneratedAccount>;
-  /**
-   * Resolves the address for an imported private key, or `null` if the
-   * key is not a valid Massa secret key. A real implementation derives
-   * this locally from the key material (no network round trip needed
-   * for that part) — kept on the provider boundary because it's still
-   * "ask the SDK", and to keep components from ever touching raw key
-   * material directly.
-   */
+  /** Resolves the address for a private key, or `null` if it isn't valid. */
   resolveAddress(privateKey: string): Promise<string | null>;
-}
 
-export interface GeneratedAccount {
-  readonly privateKey: string;
-  readonly address: string;
+  // ---- native MAS -------------------------------------------------------
+  getBalance(privateKey: string, isFinal?: boolean): Promise<bigint>;
+  transferMas(privateKey: string, toAddress: string, amount: bigint): Promise<OperationResult>;
+
+  // ---- MRC-20 tokens ------------------------------------------------------
+  getTokenBalance(privateKey: string, contractAddress: string): Promise<bigint>;
+  transferToken(
+    privateKey: string,
+    contractAddress: string,
+    toAddress: string,
+    amount: bigint,
+  ): Promise<OperationResult>;
+
+  // ---- rolls (staking) ----------------------------------------------------
+  getRolls(address: string): Promise<RollCounts>;
+  buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
+  sellRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
 }
 
 export const MASSA_PROVIDER = new InjectionToken<MassaProvider>('MASSA_PROVIDER');

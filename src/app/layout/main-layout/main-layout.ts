@@ -7,10 +7,11 @@ import { BuyRollModal } from '../../features/modals/buy-roll-modal/buy-roll-moda
 import { ReceiveModal } from '../../features/modals/receive-modal/receive-modal';
 import { SellRollModal } from '../../features/modals/sell-roll-modal/sell-roll-modal';
 import { SendModal } from '../../features/modals/send-modal/send-modal';
-import { SwapModal } from '../../features/modals/swap-modal/swap-modal';
+// import { SwapModal } from '../../features/modals/swap-modal/swap-modal';
 import { WalletsModal } from '../../features/modals/wallets-modal/wallets-modal';
 import { RenameAccountModal } from '../../features/modals/rename-account-modal/rename-account-modal';
 import { BackupPhraseModal } from '../../features/modals/backup-phrase-modal/backup-phrase-modal';
+import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 
@@ -22,12 +23,13 @@ import { AuthStore } from '../../core/state/auth-store';
     ToastHost,
     ReceiveModal,
     SendModal,
-    SwapModal,
+    // SwapModal,
     BuyRollModal,
     SellRollModal,
     WalletsModal,
     RenameAccountModal,
     BackupPhraseModal,
+    LogoutModal,
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',

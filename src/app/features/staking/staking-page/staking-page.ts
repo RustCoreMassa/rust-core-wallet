@@ -1,7 +1,7 @@
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { Modal } from '../../../core/services/modal';
-import { ROLL_PRICE_MAS } from '../../../core/services/mock-massa-provider';
+import { ROLL_PRICE_MAS } from '../../../core/services/massa-provider';
 import { WalletStore } from '../../../core/state/wallet-store';
 
 @Component({
@@ -16,7 +16,7 @@ export class StakingPage {
 
   protected readonly wallet = this.store.activeWallet;
 
-  protected readonly finalMas = computed(() => this.wallet().balances.MAS);
+  protected readonly finalMas = computed(() => this.wallet().balances.MAS ?? 0);
 
   protected readonly stakedMas = computed(() => {
     const rolls = this.wallet().rolls;
@@ -25,5 +25,5 @@ export class StakingPage {
 
   protected readonly totalMas = computed(() => this.finalMas() + this.stakedMas());
 
-  protected readonly masPrice = computed(() => this.store.prices().MAS);
+  protected readonly masPrice = computed(() => this.store.prices().MAS ?? 0);
 }

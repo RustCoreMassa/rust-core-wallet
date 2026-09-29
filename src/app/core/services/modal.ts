@@ -9,6 +9,7 @@ export type ModalId =
   | 'wallets'
   | 'rename-account'
   | 'backup-phrase'
+  | 'logout'
   | null;
 
 @Injectable({ providedIn: 'root' })

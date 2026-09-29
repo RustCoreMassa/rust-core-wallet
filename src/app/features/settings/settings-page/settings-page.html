@@ -29,12 +29,12 @@
     </svg>
   </button>
 
-  <button class="settings-row" type="button" (click)="store.toggleNetwork()">
+  <button class="settings-row" type="button" (click)="toggleNetwork()">
     <div>
       <div class="label">Network</div>
-      <div class="sub">{{ isTestnet() ? 'Testnet' : 'Mainnet' }}</div>
+      <div class="sub">{{ isBuildnet() ? 'Buildnet' : 'Mainnet' }}</div>
     </div>
-    <div class="switch" [class.on]="isTestnet()"></div>
+    <div class="switch" [class.on]="isBuildnet()"></div>
   </button>
 
   <div class="settings-row">
@@ -70,6 +70,7 @@
   <button class="settings-row" type="button" (click)="logOut()">
     <div>
       <div class="label">Log out</div>
+      <div class="sub">Removes all wallets from this device</div>
     </div>
     <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />

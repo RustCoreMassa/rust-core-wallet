@@ -79,6 +79,17 @@ export class AuthStore {
   }
 
   /**
+   * Full log out: locks the session AND deletes the encrypted vault from
+   * this device. Irreversible — the wallets can only come back by
+   * importing their private keys again under a new PIN.
+   */
+  logout(): void {
+    this.lock();
+    this.vaultStorage.clear();
+    this._hasVault.set(false);
+  }
+
+  /**
    * Re-checks a PIN against the stored vault WITHOUT touching session
    * state (`isUnlocked`, `accounts`, `sessionKey` are all left alone).
    * For step-up confirmation before revealing something sensitive

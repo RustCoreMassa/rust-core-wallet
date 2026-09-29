@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Modal } from '../../../core/services/modal';
-import { ROLL_PRICE_MAS } from '../../../core/services/mock-massa-provider';
+import { ROLL_PRICE_MAS } from '../../../core/services/massa-provider';
 import { Toast } from '../../../core/services/toast';
 import { WalletStore } from '../../../core/state/wallet-store';
 

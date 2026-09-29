@@ -10,9 +10,9 @@
           <path d="M6 9l6 6 6-6" stroke="#c7c7cd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </button>
-      <button class="network-pill" type="button" [class.testnet]="store.network() === 'testnet'" (click)="store.toggleNetwork()">
-        {{ store.network() === 'mainnet' ? 'Mainnet' : 'Testnet' }}
-      </button>
+      <span class="network-pill" [class.buildnet]="store.network() === 'buildnet'">
+        {{ store.network() === 'mainnet' ? 'Mainnet' : 'Buildnet' }}
+      </span>
     </div>
   </div>
   <button class="header-icon" type="button" (click)="modal.open('receive')">
@@ -80,9 +80,9 @@
   @for (symbol of tokenSymbols(); track symbol) {
   <app-token-row
     [symbol]="symbol"
-    [balance]="wallet().balances[symbol]"
-    [price]="store.prices()[symbol]"
-    [changePct]="store.dayChangePct()[symbol]"
+    [balance]="wallet().balances[symbol] ?? 0"
+    [price]="store.prices()[symbol] ?? 0"
+    [changePct]="store.dayChangePct()[symbol] ?? 0"
   />
   }
   } @else {

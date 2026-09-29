@@ -7,7 +7,7 @@
 <label class="field-label" for="send-token">Asset</label>
 <div class="select-fake">
   <select id="send-token" [ngModel]="token()" (ngModelChange)="token.set($event)">
-    @for (t of tokens; track t) {
+    @for (t of tokens(); track t) {
     <option [value]="t">{{ t }}</option>
     }
   </select>

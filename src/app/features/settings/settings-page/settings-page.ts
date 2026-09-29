@@ -32,7 +32,7 @@ export class SettingsPage {
     return `${count} wallet${count > 1 ? 's' : ''}`;
   });
 
-  protected readonly isTestnet = computed(() => this.store.network() === 'testnet');
+  protected readonly isBuildnet = computed(() => this.store.network() === 'buildnet');
 
   protected readonly activeAccount = computed(
     () => this.authStore.accounts().find((a) => a.id === this.store.activeWalletId()) ?? null,
@@ -59,7 +59,13 @@ export class SettingsPage {
     this.modal.open('backup-phrase');
   }
 
+  protected toggleNetwork(): void {
+    const next = this.isBuildnet() ? 'mainnet' : 'buildnet';
+    this.store.setNetwork(next);
+    this.toast.show(`Switched to ${next === 'mainnet' ? 'Mainnet' : 'Buildnet'}`);
+  }
+
   protected logOut(): void {
-    this.toast.show('Logged out (mock)');
+    this.modal.open('logout');
   }
 }
