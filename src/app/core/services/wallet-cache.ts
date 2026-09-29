@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { SavedAddress } from '../models/saved-address.model';
+import { TokenPrices } from '../models/token.model';
 import { WalletState } from '../models/wallet.model';
 import { AuthStore } from '../state/auth-store';
 import { Network } from '../state/network-store';
@@ -7,18 +8,19 @@ import { Ciphertext } from './crypto-vault';
 
 const STORAGE_KEY = 'massa-wallet:cache';
 /** Bump when the snapshot shape changes — older caches are then ignored. */
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 export interface WalletCacheSnapshot {
   readonly version: number;
   readonly activeWalletId: string;
   readonly addressBook: readonly SavedAddress[];
+  readonly prices: TokenPrices;
   readonly wallets: Record<Network, Record<string, WalletState>>;
 }
 
 /**
  * Last-known wallet state (balances, rolls, history, MNS domains, address
- * book) for the current browser tab, so a page reload doesn't start from
+ * book, token prices) for the current browser tab, so a page reload doesn't start from
  * empty: after unlock the UI paints these values immediately and
  * refreshes them in the background.
  *

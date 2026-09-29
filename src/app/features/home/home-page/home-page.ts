@@ -36,18 +36,24 @@ export class HomePage {
   protected readonly wallet = this.store.activeWallet;
   protected readonly totalUsd = this.store.portfolioValueUsd;
 
-  protected readonly changePct = computed(() => this.store.dayChangePct().MAS ?? 0);
-
   protected readonly showAllTokens = signal(loadShowAll());
 
-  /** Tokens on this network worth under LOW_BALANCE_USD — MAS is never one. */
+  /**
+   * Tokens on this network worth under LOW_BALANCE_USD — MAS is never one.
+   * A held token with no Dusa price can't be valued, so only an empty one
+   * counts as low; hiding a real holding just for lacking a price would
+   * be wrong.
+   */
   private readonly lowBalanceTokens = computed(() => {
     const balances = this.wallet().balances;
     const prices = this.store.prices();
     return new Set(
-      this.store
-        .availableTokens()
-        .filter((s) => s !== 'MAS' && (balances[s] ?? 0) * (prices[s] ?? 0) < LOW_BALANCE_USD),
+      this.store.availableTokens().filter((s) => {
+        if (s === 'MAS') return false;
+        const balance = balances[s] ?? 0;
+        const price = prices[s];
+        return price === undefined ? balance === 0 : balance * price < LOW_BALANCE_USD;
+      }),
     );
   });
 

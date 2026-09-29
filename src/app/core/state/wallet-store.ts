@@ -10,6 +10,7 @@ import {
 } from '../models/token.model';
 import { HistoryPaging, HistoryStream, TransactionRecord } from '../models/transaction.model';
 import { WalletState } from '../models/wallet.model';
+import { DusaPrices } from '../services/dusa-prices';
 import { ExplorerApi, HistoryPage } from '../services/explorer-api';
 import { MASSA_PROVIDER, NETWORK_FEE_MAS, ROLL_PRICE_MAS } from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
@@ -29,6 +30,9 @@ const TOKENS_BY_NETWORK: Readonly<Record<Network, typeof MRC20_TOKENS>> = {
 
 /** How long auto-refresh leaves a wallet alone after a write (see `autoRefresh`). */
 const WRITE_SETTLE_MS = 8000;
+
+/** Token prices are re-read from Dusa at most this often. */
+const PRICES_REFRESH_MS = 60_000;
 
 /** MNS ownership rarely changes — re-read at most this often when the NFT page is opened. */
 const DOMAINS_REFRESH_MS = 60_000;
@@ -57,29 +61,6 @@ function newWallet(id: string, name: string, address: string): WalletState {
     domains: null,
   };
 }
-
-/**
- * Static placeholder USD prices — there is no price feed yet, so the
- * portfolio value is indicative only. Balances themselves are real.
- */
-const DEMO_PRICES: TokenPrices = {
-  MAS: 0.02,
-  PUR: 0.004,
-  DUSA: 0.05,
-  'USDC.e': 1,
-  'WETH.e': 3182.4,
-  'DAI.e': 1,
-  'WBTC.e': 64000,
-  'WETH.b': 3182.4,
-  'USDT.b': 1,
-};
-
-const DEMO_DAY_CHANGE_PCT: TokenPrices = {
-  MAS: 4.82,
-  'USDC.e': 0.01,
-  'WETH.e': -1.14,
-  'WETH.b': -1.14,
-};
 
 function shortAddress(address: string): string {
   return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
@@ -214,10 +195,11 @@ function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): Tok
  * reconciles. History comes from the Massa explorer API (mainnet only),
  * paged by cursor (`loadMoreHistory`) and merged with operations just
  * sent from this app that it hasn't indexed yet (see `mergeHistory`);
- * on buildnet it is local only. Prices are not wired to any source yet.
+ * on buildnet it is local only. USD prices come from the Dusa DEX
+ * (`refreshPrices`); tokens without Dusa liquidity have no price.
  *
  * The whole state (minus private keys, which never live here) is cached
- * encrypted in localStorage via WalletCache: `restoreCache` paints the
+ * encrypted in sessionStorage via WalletCache: `restoreCache` paints the
  * last-known values right after unlock, and every change is saved back,
  * debounced. Names always follow AuthStore (see the constructor).
  *
@@ -233,12 +215,14 @@ export class WalletStore {
   private readonly networkStore = inject(NetworkStore);
   private readonly explorer = inject(ExplorerApi);
   private readonly cache = inject(WalletCache);
+  private readonly dusa = inject(DusaPrices);
 
   private readonly _walletsByNetwork = signal<WalletsByNetwork>(emptyWallets());
   private readonly _activeWalletId = signal<string>('');
   private readonly _addressBook = signal<SavedAddress[]>([]);
-  private readonly _prices = signal<TokenPrices>(DEMO_PRICES);
-  private readonly _dayChangePct = signal<TokenPrices>(DEMO_DAY_CHANGE_PCT);
+  private readonly _prices = signal<TokenPrices>({});
+  private pricesFetchedAt = 0;
+  private pricesInFlight = false;
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
   private readonly _loadingHistory = signal(false);
   private readonly _loadingDomains = signal(false);
@@ -255,7 +239,6 @@ export class WalletStore {
   readonly activeWalletId = this._activeWalletId.asReadonly();
   readonly addressBook = this._addressBook.asReadonly();
   readonly prices = this._prices.asReadonly();
-  readonly dayChangePct = this._dayChangePct.asReadonly();
 
   readonly walletList = computed(() => Object.values(this.wallets()));
 
@@ -316,6 +299,7 @@ export class WalletStore {
         wallets: this._walletsByNetwork(),
         activeWalletId: this._activeWalletId(),
         addressBook: this._addressBook(),
+        prices: this._prices(),
       };
       if (!this.auth.isUnlocked() || !snapshot.activeWalletId) return;
       clearTimeout(this.cacheSaveTimer);
@@ -369,11 +353,31 @@ export class WalletStore {
     });
     if (accountIds.has(snapshot.activeWalletId)) this._activeWalletId.set(snapshot.activeWalletId);
     this._addressBook.set([...snapshot.addressBook]);
+    this._prices.set(snapshot.prices);
   }
 
-  /** Background refresh of every wallet on the current network. */
+  /** Background refresh of every wallet on the current network, plus prices. */
   refreshAll(): void {
     for (const id of Object.keys(this.wallets())) this.refreshInBackground(id);
+    this.refreshPricesInBackground();
+  }
+
+  /**
+   * Re-reads USD prices from Dusa, at most every PRICES_REFRESH_MS. A
+   * token missing from a read keeps its previous price — an RPC hiccup
+   * and "no liquidity" look the same from here, and a flickering price
+   * is worse than a one-minute-old one.
+   */
+  async refreshPrices(): Promise<void> {
+    if (this.pricesInFlight || Date.now() - this.pricesFetchedAt < PRICES_REFRESH_MS) return;
+    this.pricesInFlight = true;
+    try {
+      const fresh = await this.dusa.getUsdPrices();
+      this._prices.update((prev) => ({ ...prev, ...fresh }));
+      this.pricesFetchedAt = Date.now();
+    } finally {
+      this.pricesInFlight = false;
+    }
   }
 
   /** Drops every wallet, history entry and saved address — used on log out. */
@@ -460,6 +464,7 @@ export class WalletStore {
    * overwrite the optimistic balance with the stale pre-write one.
    */
   autoRefresh(): void {
+    this.refreshPricesInBackground();
     const id = this._activeWalletId();
     if (!id || this._refreshingIds().has(id)) return;
     if (Date.now() < (this.settleUntil.get(id) ?? 0)) return;
@@ -731,6 +736,10 @@ export class WalletStore {
   }
 
   // ---- internal helpers ----------------------------------------------------
+
+  private refreshPricesInBackground(): void {
+    this.refreshPrices().catch((err) => console.warn('Dusa price refresh failed', err));
+  }
 
   /** Fire-and-forget `refresh` — logs instead of leaving an unhandled rejection. */
   private refreshInBackground(id: string): void {

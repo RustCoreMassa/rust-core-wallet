@@ -45,7 +45,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   'USDC.e': {
     symbol: 'USDC.e',
     name: 'USD Coin',
-    decimals: 18,
+    decimals: 6,
     contract: 'AS1hCJXjndR4c9vekLWsXGnrdigp4AaZ7uYG3UKFzzKnWVsrNLPJ',
     isErc20: true,
     asset: 'assets/USDC.png',
@@ -69,7 +69,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   'WBTC.e': {
     symbol: 'WBTC.e',
     name: 'Wrapped BTC',
-    decimals: 18,
+    decimals: 8,
     contract: 'AS12fr54YtBY575Dfhtt7yftpT8KXgXb1ia5Pn1LofoLFLf9WcjGL',
     isErc20: true,
     asset: 'assets/BTC.png',

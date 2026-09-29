@@ -14,15 +14,22 @@ const MAX_DISPLAY_DECIMALS = 6;
 export class TokenRow {
   readonly symbol = input.required<TokenSymbol>();
   readonly balance = input.required<number>();
-  /** Missing for tokens without market data — the row then hides price/variation. */
+  /** USD price from Dusa; 0 for tokens without Dusa liquidity — the row then hides it. */
   readonly price = input<number>(0);
-  readonly changePct = input<number>(0);
 
   protected readonly meta = computed(() => TOKEN_REGISTRY[this.symbol()]);
   /** Set when the icon image fails to load — the row falls back to a symbol badge. */
   protected readonly iconFailed = signal(false);
   protected readonly hasPrice = computed(() => this.price() > 0);
   protected readonly usdValue = computed(() => this.balance() * this.price());
+
+  /** Sub-dollar prices keep 4 significant digits (MAS ≈ $0.01266, not $0.01). */
+  protected readonly priceText = computed(() => {
+    const price = this.price();
+    return price >= 1
+      ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+      : `$${price.toLocaleString('en-US', { maximumSignificantDigits: 4 })}`;
+  });
   protected readonly amountFormat = computed(
     () => `1.2-${Math.min(this.meta().decimals, MAX_DISPLAY_DECIMALS)}`,
   );

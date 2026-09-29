@@ -8,10 +8,7 @@
     <div class="row-name">{{ meta().name }}</div>
     <div class="row-sub">
       @if (hasPrice()) {
-      {{ price() | currency: 'USD' : 'symbol' : '1.2-2' }}
-      <span [class.pos]="changePct() >= 0" [class.neg]="changePct() < 0">
-          {{ changePct() >= 0 ? '+' : '' }}{{ changePct() | number: '1.2-2' }}%
-        </span>
+      {{ priceText() }}
       } @else {
       {{ symbol() }}
       }

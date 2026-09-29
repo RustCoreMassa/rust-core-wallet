@@ -40,9 +40,6 @@
   </div>
   <div class="balance-sub">
     <span>{{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
-    <span class="change" [class.up]="changePct() >= 0" [class.down]="changePct() < 0">
-      {{ changePct() >= 0 ? '+' : '' }}{{ changePct() | number: '1.2-2' }}%
-    </span>
   </div>
 </section>
 
@@ -89,7 +86,6 @@
     [symbol]="symbol"
     [balance]="wallet().balances[symbol] ?? 0"
     [price]="store.prices()[symbol] ?? 0"
-    [changePct]="store.dayChangePct()[symbol] ?? 0"
   />
   }
   @if (store.availableTokens().length > 1) {
