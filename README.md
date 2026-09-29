@@ -154,7 +154,9 @@ The service worker that makes the app installable runs in production builds only
 Every release is a git tag (`v1.0.0`, …) with a
 [GitHub Release](https://github.com/RustCoreMassa/rust-core-wallet/releases) that contains the
 release notes from the [changelog](CHANGELOG.md), the production build as a zip, and a
-`SHA256SUMS` file.
+`SHA256SUMS` file. Releases are built and published by
+[GitHub Actions](.github/workflows/release.yml) from the tagged commit — the tests must pass
+first — so the build log is public too.
 
 To check that a build is exactly what the source says, check out the release tag, build it and
 compare the checksums with the release's `SHA256SUMS`:
@@ -167,12 +169,23 @@ cd dist/rust-core-wallet/browser
 find . -type f ! -name ngsw.json | sort | xargs shasum -a 256
 ```
 
-With the same Node.js version (dependencies are pinned by `package-lock.json`) the build is
+With the same Node.js version (pinned in `.nvmrc`; dependencies are pinned by
+`package-lock.json`) the build is
 reproducible: every file matches except `ngsw.json`, the service worker's manifest, which records
 the build time — it's left out of `SHA256SUMS` for that reason.
 
 Versions follow [Semantic Versioning](https://semver.org): major for breaking changes, minor for
 new features, patch for fixes.
+
+**Publishing a release (maintainers):** bump the version (`npm version 1.1.0 --no-git-tag-version`),
+add a `## [1.1.0]` section to `CHANGELOG.md`, commit, then push a matching tag:
+
+```bash
+git tag v1.1.0
+git push origin master v1.1.0
+```
+
+The workflow refuses a tag that doesn't match `package.json` or has no changelog section.
 
 ## Roadmap
 
@@ -200,7 +213,7 @@ new features, patch for fixes.
 **Later**
 - [ ] Hardware-wallet support
 - [x] Reproducible builds with published checksums (see [Releases](#releases))
-- [ ] Automated release builds in CI
+- [x] Automated release builds in CI
 
 ## Support the project
 

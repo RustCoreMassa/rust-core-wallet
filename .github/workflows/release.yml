@@ -1,0 +1,98 @@
+# Publishes a GitHub Release when a version tag is pushed:
+#
+#   git tag v1.2.3 && git push origin v1.2.3
+#
+# The release gets the notes for that version from CHANGELOG.md, the production
+# build as a zip and a SHA256SUMS file — built here, in public CI, from exactly
+# the tagged commit, so anyone can check that what they run matches the source
+# (see "Releases" in the README).
+#
+# Only first-party actions are used (actions/checkout, actions/setup-node) plus
+# the GitHub CLI preinstalled on the runner — nothing third-party touches the
+# build of a wallet.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write # create the release and upload its files
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (version pinned in .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Tag must match package.json version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Tag $TAG does not match package.json version $VERSION (expected v$VERSION)."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Release notes must exist in CHANGELOG.md
+        run: |
+          # The section from "## [X.Y.Z]" up to the next "## [" heading.
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no \"## [$VERSION]\" section."
+            exit 1
+          fi
+          # Drop link-reference lines ("[1.0.0]: https://…") that belong to the file, not the notes.
+          sed -i '/^\[[0-9][^]]*\]: /d' release-notes.md
+          cat release-notes.md
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run the tests
+        run: npx ng test --watch=false
+
+      - name: Production build
+        run: npx ng build
+
+      - name: Package the build and checksums
+        run: |
+          BUILD=dist/rust-core-wallet/browser
+          ZIP="rust-core-wallet-$TAG.zip"
+          # ngsw.json records the build time, so it's the one file left out of the
+          # reproducible checksums (see README → Releases).
+          (cd "$BUILD" && find . -type f ! -name ngsw.json | sort | xargs sha256sum) > SHA256SUMS
+          (cd "$BUILD" && zip -qr "$GITHUB_WORKSPACE/$ZIP" .)
+          sha256sum "$ZIP" >> SHA256SUMS
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          cat SHA256SUMS
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "$ZIP" SHA256SUMS \
+            --title "RustCore Wallet $TAG" \
+            --notes-file release-notes.md \
+            --verify-tag
