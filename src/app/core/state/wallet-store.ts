@@ -28,9 +28,6 @@ const TOKENS_BY_NETWORK: Readonly<Record<Network, typeof MRC20_TOKENS>> = {
   buildnet: [],
 };
 
-/** How long auto-refresh leaves a wallet alone after a write (see `autoRefresh`). */
-const WRITE_SETTLE_MS = 8000;
-
 /** Token prices are re-read from Dusa at most this often. */
 const PRICES_REFRESH_MS = 60_000;
 
@@ -183,11 +180,6 @@ function assertMasForFee(held: number, required: number, message: string): void 
   }
 }
 
-/** Adds `delta` (may be negative) to one token, clamped at 0. */
-function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): TokenBalances {
-  return { ...balances, [token]: Math.max(0, (balances[token] ?? 0) + delta) };
-}
-
 /**
  * Per-wallet chain state for the UI: balances, rolls, local history.
  *
@@ -200,10 +192,9 @@ function adjust(balances: TokenBalances, token: TokenSymbol, delta: number): Tok
  * conversion to/from `bigint` units (via each token's `decimals`)
  * happens only right at the MassaProvider calls below.
  *
- * Balances and rolls come from the chain (`refresh`). After a write the
- * store applies the expected change optimistically — the chain only
- * reflects it once the operation is final, so a later `refresh`
- * reconciles. History comes from the Massa explorer API (mainnet only),
+ * Balances and rolls only ever come from the chain (`refresh`) — writes
+ * wait for the chain to execute the operation, then re-read it; nothing
+ * is updated optimistically. History comes from the Massa explorer API (mainnet only),
  * paged by cursor (`loadMoreHistory`) and merged with operations just
  * sent from this app that it hasn't indexed yet (see `mergeHistory`);
  * on buildnet it is local only. USD prices come from the Dusa DEX
@@ -239,8 +230,6 @@ export class WalletStore {
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
   private readonly _loadingHistory = signal(false);
   private readonly _loadingDomains = signal(false);
-  /** Per wallet id: auto-refresh is skipped until this timestamp. */
-  private readonly settleUntil = new Map<string, number>();
   /** Per `${network}:${id}`: when history was last read from the explorer. */
   private readonly historyFetchedAt = new Map<string, number>();
   /** Per `${network}:${id}`: when MNS domains were last read. */
@@ -403,7 +392,6 @@ export class WalletStore {
     this._activeWalletId.set('');
     this._addressBook.set([]);
     this._refreshingIds.set(new Set());
-    this.settleUntil.clear();
     this.historyFetchedAt.clear();
     this.domainsFetchedAt.clear();
     clearTimeout(this.cacheSaveTimer);
@@ -494,7 +482,6 @@ export class WalletStore {
       const { [id]: _buildnet, ...buildnet } = all.buildnet;
       return { mainnet, buildnet };
     });
-    this.settleUntil.delete(id);
     for (const network of ['mainnet', 'buildnet'] as const) {
       this.historyFetchedAt.delete(`${network}:${id}`);
       this.domainsFetchedAt.delete(`${network}:${id}`);
@@ -510,17 +497,11 @@ export class WalletStore {
     this._addressBook.update((book) => [...book, { name, address }]);
   }
 
-  /**
-   * Periodic refresh of the active wallet (driven by MainLayout). Skipped
-   * while a refresh is already in flight, and for a few seconds after a
-   * write — a read that races the operation's inclusion would otherwise
-   * overwrite the optimistic balance with the stale pre-write one.
-   */
+  /** Periodic refresh of the active wallet (driven by MainLayout); skipped while one is in flight. */
   autoRefresh(): void {
     this.refreshPricesInBackground();
     const id = this._activeWalletId();
     if (!id || this._refreshingIds().has(id)) return;
-    if (Date.now() < (this.settleUntil.get(id) ?? 0)) return;
     this.refreshInBackground(id);
   }
 
@@ -655,6 +636,14 @@ export class WalletStore {
 
   // ---- transactions --------------------------------------------------------
 
+  /*
+   * Write flow — nothing on screen is ever guessed. The provider resolves
+   * only after the chain executed the operation successfully; only then is
+   * it added to the history, and balances/rolls are re-read from the chain
+   * before the call returns. A failed or unconfirmed operation changes
+   * nothing locally (the chain is re-read anyway in case it went through).
+   */
+
   async send(
     token: TokenSymbol,
     toAddress: string,
@@ -665,68 +654,32 @@ export class WalletStore {
     this.validateSend(token, toAddress, amount);
     const meta = TOKEN_REGISTRY[token];
     const units = toUnits(amount, meta.decimals);
-
-    const privateKey = this.privateKeyFor(wallet.id);
-    const { operationId } = meta.isErc20
-      ? await this.provider.transferToken(privateKey, meta.contract, toAddress, units)
-      : await this.provider.transferMas(privateKey, toAddress, units);
-
-    this.updateWallet(
-      wallet.id,
-      (w) => ({
-        ...w,
-        balances: adjust(adjust(w.balances, token, -amount), 'MAS', -NETWORK_FEE_MAS),
-        history: [
-          this.record(
-            {
-              type: 'send',
-              token,
-              amount,
-              counterparty: shortAddress(toAddress),
-              from: wallet.address,
-              to: toAddress,
-              operationId,
-            },
-            network,
-          ),
-          ...w.history,
-        ],
-      }),
-      network,
-    );
-
-    this.markWritten(wallet.id);
-
     const targetId = this.walletList().find(
       (w) => w.address === toAddress && w.id !== wallet.id,
     )?.id;
+    const touched = targetId ? [wallet.id, targetId] : [wallet.id];
+
+    const privateKey = this.privateKeyFor(wallet.id);
+    const { operationId } = await this.afterWrite(touched, network, () =>
+      meta.isErc20
+        ? this.provider.transferToken(privateKey, meta.contract, toAddress, units)
+        : this.provider.transferMas(privateKey, toAddress, units),
+    );
+
+    const details = { token, amount, from: wallet.address, to: toAddress, operationId };
+    this.addHistory(
+      wallet.id,
+      { type: 'send', counterparty: shortAddress(toAddress), ...details },
+      network,
+    );
     if (targetId) {
-      this.markWritten(targetId);
-      this.updateWallet(
+      this.addHistory(
         targetId,
-        (w) => ({
-          ...w,
-          balances: adjust(w.balances, token, amount),
-          history: [
-            this.record(
-              {
-                type: 'receive',
-                token,
-                amount,
-                counterparty: shortAddress(wallet.address),
-                from: wallet.address,
-                to: toAddress,
-                operationId,
-              },
-              network,
-            ),
-            ...w.history,
-          ],
-        }),
+        { type: 'receive', counterparty: shortAddress(wallet.address), ...details },
         network,
       );
     }
-
+    await this.refreshTouched(touched, network);
     return { internal: !!targetId };
   }
 
@@ -734,38 +687,23 @@ export class WalletStore {
     const network = this.network();
     const wallet = this.activeWallet();
     this.validateBuyRolls(rollCount);
-    const cost = rollCount * ROLL_PRICE_MAS;
 
-    const { operationId } = await this.provider.buyRolls(
-      this.privateKeyFor(wallet.id),
-      BigInt(rollCount),
+    const { operationId } = await this.afterWrite([wallet.id], network, () =>
+      this.provider.buyRolls(this.privateKeyFor(wallet.id), BigInt(rollCount)),
     );
-
-    this.markWritten(wallet.id);
-    // Bought rolls stay candidate until final; `refresh` picks that up.
-    this.updateWallet(
+    this.addHistory(
       wallet.id,
-      (w) => ({
-        ...w,
-        balances: adjust(w.balances, 'MAS', -(cost + NETWORK_FEE_MAS)),
-        rolls: { ...w.rolls, candidate: w.rolls.candidate + rollCount },
-        history: [
-          this.record(
-            {
-              type: 'buy_rolls',
-              token: 'MAS',
-              amount: cost,
-              rollCount,
-              operationId,
-              from: wallet.address,
-            },
-            network,
-          ),
-          ...w.history,
-        ],
-      }),
+      {
+        type: 'buy_rolls',
+        token: 'MAS',
+        amount: rollCount * ROLL_PRICE_MAS,
+        rollCount,
+        operationId,
+        from: wallet.address,
+      },
       network,
     );
+    await this.refreshTouched([wallet.id], network);
   }
 
   async sellRolls(rollCount: number): Promise<void> {
@@ -773,42 +711,22 @@ export class WalletStore {
     const wallet = this.activeWallet();
     this.validateSellRolls(rollCount);
 
-    const { operationId } = await this.provider.sellRolls(
-      this.privateKeyFor(wallet.id),
-      BigInt(rollCount),
+    const { operationId } = await this.afterWrite([wallet.id], network, () =>
+      this.provider.sellRolls(this.privateKeyFor(wallet.id), BigInt(rollCount)),
     );
-    const refund = rollCount * ROLL_PRICE_MAS;
-    this.markWritten(wallet.id);
-
-    // The MAS refund is a deferred credit, paid out by the chain a few
-    // cycles later — `refresh` picks it up, nothing is credited here.
-    this.updateWallet(
+    this.addHistory(
       wallet.id,
-      (w) => ({
-        ...w,
-        balances: adjust(w.balances, 'MAS', -NETWORK_FEE_MAS),
-        rolls: {
-          ...w.rolls,
-          active: w.rolls.active - rollCount,
-          deferred: w.rolls.deferred + rollCount,
-        },
-        history: [
-          this.record(
-            {
-              type: 'sell_rolls',
-              token: 'MAS',
-              amount: refund,
-              rollCount,
-              operationId,
-              from: wallet.address,
-            },
-            network,
-          ),
-          ...w.history,
-        ],
-      }),
+      {
+        type: 'sell_rolls',
+        token: 'MAS',
+        amount: rollCount * ROLL_PRICE_MAS,
+        rollCount,
+        operationId,
+        from: wallet.address,
+      },
       network,
     );
+    await this.refreshTouched([wallet.id], network);
   }
 
   // ---- internal helpers ----------------------------------------------------
@@ -857,10 +775,41 @@ export class WalletStore {
     }
   }
 
-  /** Holds off auto-refresh briefly, then forces a fresh history read. */
-  private markWritten(id: string): void {
-    this.settleUntil.set(id, Date.now() + WRITE_SETTLE_MS);
-    this.historyFetchedAt.delete(`${this.network()}:${id}`);
+  /**
+   * Runs a write; if it fails or times out, re-reads the touched wallets in
+   * the background (a timed-out operation may still have gone through)
+   * and rethrows — the local state is never changed on a failure.
+   */
+  private async afterWrite<T>(
+    ids: string[],
+    network: Network,
+    write: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await write();
+    } catch (err) {
+      this.refreshTouched(ids, network).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  /** Forces a fresh chain + explorer read of the given wallets (if still on `network`). */
+  private async refreshTouched(ids: string[], network: Network): Promise<void> {
+    if (this.network() !== network) return;
+    for (const id of ids) this.historyFetchedAt.delete(`${network}:${id}`);
+    await Promise.allSettled(ids.map((id) => this.refresh(id)));
+  }
+
+  private addHistory(
+    id: string,
+    partial: Omit<TransactionRecord, 'id' | 'timestamp'>,
+    network: Network,
+  ): void {
+    this.updateWallet(
+      id,
+      (w) => ({ ...w, history: [this.record(partial, network), ...w.history] }),
+      network,
+    );
   }
 
   /** Throws while the vault is locked — keys only exist in AuthStore when unlocked. */
@@ -883,9 +832,10 @@ export class WalletStore {
   }
 
   /**
-   * A record for an operation just sent from this app. On mainnet it
-   * shows as pending until the explorer reports it; buildnet has no
-   * explorer, so there it carries no status at all.
+   * A record for an operation this app sent and the chain has already
+   * executed (never for a merely submitted one). On mainnet it shows as
+   * pending — executed, not yet final/indexed — until the explorer
+   * reports it; buildnet has no explorer, so there it carries no status.
    */
   private record(
     partial: Omit<TransactionRecord, 'id' | 'timestamp'>,

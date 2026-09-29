@@ -52,6 +52,12 @@ export interface GeneratedAccount {
  * file into the rest of the app — the real implementation derives an
  * `Account` from it internally (`Account.fromPrivateKey`), same as the
  * reference MassaService does.
+ *
+ * Write methods resolve only once the chain has actually executed the
+ * operation successfully — never on mere submission — so callers can
+ * treat a resolved promise as "it happened". Otherwise they reject with
+ * OperationFailedError (executed, but failed) or OperationTimeoutError
+ * (not seen in time — it may still go through).
  */
 export interface MassaProvider {
   // ---- wallet ---------------------------------------------------------
@@ -83,6 +89,23 @@ export interface MassaProvider {
   // ---- Massa Name System ----------------------------------------------------
   /** Domains owned by `address`, each with the address it resolves to. */
   getOwnedDomains(address: string): Promise<MnsDomain[]>;
+}
+
+/** The chain executed the operation and it failed — nothing changed except the fee. */
+export class OperationFailedError extends Error {
+  constructor(
+    readonly operationId: string,
+    reason: string,
+  ) {
+    super(`Transaction failed: ${reason}`);
+  }
+}
+
+/** The operation wasn't seen executing in time; it may still go through later. */
+export class OperationTimeoutError extends Error {
+  constructor(readonly operationId: string) {
+    super('Not confirmed yet — it may still go through. Check History in a minute.');
+  }
 }
 
 export const MASSA_PROVIDER = new InjectionToken<MassaProvider>('MASSA_PROVIDER');
