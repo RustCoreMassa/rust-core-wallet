@@ -1,0 +1,54 @@
+@if (installer.visible()) {
+<aside class="install-card" role="dialog" aria-labelledby="install-title">
+  <div class="install-head">
+    <img class="install-icon" src="icons/icon-192.png" alt="" />
+    <div class="install-text">
+      <div class="install-title" id="install-title">Install RustCore Wallet</div>
+      <div class="install-sub">Full screen, one tap from your home screen.</div>
+    </div>
+    <button class="install-close" type="button" aria-label="Not now" (click)="installer.dismiss()">✕</button>
+  </div>
+
+  @switch (installer.mode()) {
+  @case ('native') {
+  <button class="btn btn-red install-action" type="button" (click)="install()">Install app</button>
+  }
+  @case ('ios') {
+  @if (!showSteps()) {
+  <button class="btn btn-ghost install-action" type="button" (click)="showSteps.set(true)">How to install</button>
+  } @else {
+  <ol class="install-steps">
+    <li>
+      Tap
+      <svg class="install-glyph" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-label="Share">
+        <path d="M12 3v12M7 8l5-5 5 5M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <b>Share</b> in the browser bar (in Chrome: top right, or the ⋯ menu).
+    </li>
+    <li>Scroll and choose <b>Add to Home Screen</b>.</li>
+    <li>Tap <b>Add</b>, then open RustCore from your home screen.</li>
+  </ol>
+  <p class="install-note">
+    @if (hasVault()) {
+    The installed app has its own storage on iPhone and iPad: you'll import your private key there
+    again. Back it up first under Settings → Backup private key.
+    } @else {
+    Install before creating your wallet — on iPhone and iPad the installed app keeps its own storage.
+    }
+  </p>
+  }
+  }
+  @case ('manual') {
+  @if (!showSteps()) {
+  <button class="btn btn-ghost install-action" type="button" (click)="showSteps.set(true)">How to install</button>
+  } @else {
+  <ol class="install-steps">
+    <li>Open the browser menu <b>⋮</b> (top or bottom right).</li>
+    <li>Choose <b>Install</b> or <b>Add to Home screen</b>.</li>
+    <li>Confirm, then open RustCore from your home screen.</li>
+  </ol>
+  }
+  }
+  }
+</aside>
+}

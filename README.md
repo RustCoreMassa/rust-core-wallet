@@ -47,6 +47,7 @@ built on three principles:
 | 🌐 **MNS domains** | `.massa` names owned by your wallet (Massa Name System). |
 | 💲 **Prices** | USD prices read directly from Dusa's on-chain quoters — no third-party price API. |
 | 🔀 **Networks** | Mainnet and Buildnet. |
+| 📲 **Installable** | Add it to your phone's home screen (Android and iOS) and it runs full screen like a native app. |
 
 Supported tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b.
 
@@ -68,7 +69,8 @@ Supported tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b.
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa public JSON-RPC: balances, rolls, token and DEX contract reads, and the signed operations you confirm. |
 | `explorer-api.massa.net` | Transaction history for your address. |
 
-That's all. There is no RustCore backend, no analytics, no tracking and no telemetry. Links to
+That's all. There is no RustCore backend, no analytics, no tracking and no telemetry. The
+installable app's service worker caches only the wallet's own files, never chain or explorer data. Links to
 `explorer.massa.net` and `docs.massa.net` open only when you click them.
 
 **Safeguards**
@@ -130,6 +132,14 @@ cd rust-core-wallet
 npm install
 npm start            # http://localhost:4200
 ```
+
+RustCore Wallet is a mobile app: on a desktop browser it shows an "open on your phone" screen
+with a QR code instead of the wallet. To develop on desktop, open DevTools and turn on device
+emulation (Chrome: *Toggle device toolbar*, Firefox: *Responsive Design Mode* with touch
+simulation), then reload. The restriction is the `MOBILE_ONLY` flag in `app.config.ts`.
+
+The service worker that makes the app installable runs in production builds only
+(`npm run build`), and browsers offer installation only over HTTPS (or on `localhost`).
 
 | Command | What it does |
 |---|---|

@@ -1,1 +1,23 @@
-<router-outlet/>
+@if (blocked()) {
+  <main class="desktop-gate">
+    <img class="desktop-gate-logo" src="assets/logo.png" alt="RustCore Wallet" />
+    <h1 class="desktop-gate-title">Open RustCore Wallet on your phone</h1>
+    <p class="desktop-gate-text">
+      RustCore Wallet is built for mobile. Scan the code with your phone's camera to open it there.
+    </p>
+    <div class="desktop-gate-qr">
+      <qr-code
+        [value]="pageUrl"
+        size="180"
+        errorCorrectionLevel="M"
+        [margin]="2"
+        darkColor="#0a0a0aff"
+        lightColor="#f6f6f8ff"
+      />
+    </div>
+    <p class="desktop-gate-hint">A browser extension for desktop is on the roadmap.</p>
+  </main>
+} @else {
+  <router-outlet />
+  <app-install-banner />
+}
