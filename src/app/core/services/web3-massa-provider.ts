@@ -5,19 +5,16 @@ import {
   MNS,
   MRC20,
   Mas,
-  Operation,
-  OperationStatus,
   Web3Provider,
   rpcTypes,
 } from '@massalabs/massa-web3';
 import { MnsDomain } from '../models/nft.model';
 import { NetworkStore } from '../state/network-store';
+import { waitExecuted } from './operation-execution';
 import {
   GeneratedAccount,
   MassaProvider,
-  OperationFailedError,
   OperationResult,
-  OperationTimeoutError,
   ROLL_PRICE_MAS,
   StakingInfo,
 } from './massa-provider';
@@ -68,7 +65,7 @@ export class Web3MassaProvider implements MassaProvider {
     amount: bigint,
   ): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    return this.executed(await provider.transfer(toAddress, amount));
+    return waitExecuted(await provider.transfer(toAddress, amount));
   }
 
   async getTokenBalance(privateKey: string, contractAddress: string): Promise<bigint> {
@@ -85,7 +82,7 @@ export class Web3MassaProvider implements MassaProvider {
   ): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
     const token = new MRC20(provider, contractAddress);
-    return this.executed(await token.transfer(toAddress, amount));
+    return waitExecuted(await token.transfer(toAddress, amount));
   }
 
   async getStaking(address: string): Promise<StakingInfo> {
@@ -130,12 +127,12 @@ export class Web3MassaProvider implements MassaProvider {
 
   async buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    return this.executed(await provider.buyRolls(rollCount));
+    return waitExecuted(await provider.buyRolls(rollCount));
   }
 
   async sellRolls(privateKey: string, rollCount: bigint): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    return this.executed(await provider.sellRolls(rollCount));
+    return waitExecuted(await provider.sellRolls(rollCount));
   }
 
   async getOwnedDomains(address: string): Promise<MnsDomain[]> {
@@ -152,25 +149,6 @@ export class Web3MassaProvider implements MassaProvider {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /**
-   * Waits until the chain has executed `operation` (speculatively — in a
-   * block, not yet final; a few seconds) and turns its outcome into a
-   * result or a typed error.
-   */
-  private async executed(operation: Operation): Promise<OperationResult> {
-    const status = await operation.waitSpeculativeExecution();
-    switch (status) {
-      case OperationStatus.SpeculativeSuccess:
-      case OperationStatus.Success:
-        return { operationId: operation.id };
-      case OperationStatus.SpeculativeError:
-      case OperationStatus.Error:
-        throw new OperationFailedError(operation.id, await failureReason(operation));
-      default:
-        throw new OperationTimeoutError(operation.id);
-    }
-  }
-
   private async providerFor(privateKey: string) {
     const account = await Account.fromPrivateKey(privateKey);
     return this.networkStore.network() === 'buildnet'
@@ -182,25 +160,5 @@ export class Web3MassaProvider implements MassaProvider {
     return this.networkStore.network() === 'buildnet'
       ? JsonRpcPublicProvider.buildnet()
       : JsonRpcPublicProvider.mainnet();
-  }
-}
-
-/**
- * The execution error the node reported for a failed operation, e.g.
- * `{"massa_execution_error":"…insufficient balance…"}` → the inner text.
- */
-async function failureReason(operation: Operation): Promise<string> {
-  try {
-    const events = await operation.getSpeculativeEvents();
-    const error = events.find((e) => e.context?.is_error) ?? events.at(-1);
-    if (!error?.data) return 'rejected by the network';
-    try {
-      const parsed = JSON.parse(error.data) as { massa_execution_error?: string };
-      return (parsed.massa_execution_error ?? error.data).slice(0, 200);
-    } catch {
-      return error.data.slice(0, 200);
-    }
-  } catch {
-    return 'rejected by the network';
   }
 }

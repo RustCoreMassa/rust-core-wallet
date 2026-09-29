@@ -1,65 +1,78 @@
-<!--<div class="modal">-->
-<!--<div class="modal-head">-->
-<!--  <div class="modal-title">Swap</div>-->
-<!--  <button class="modal-close" type="button" (click)="modal.close()">✕</button>-->
-<!--</div>-->
+<div class="modal">
+<div class="modal-head">
+  <div class="modal-title">{{ step() === 'confirm' ? 'Confirm swap' : 'Swap' }}</div>
+  <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+</div>
 
-<!--<label class="field-label" for="swap-from">From</label>-->
-<!--<div class="select-fake">-->
-<!--  <select id="swap-from" [ngModel]="fromToken()" (ngModelChange)="setFromToken($event)">-->
-<!--    @for (t of tokens; track t) {-->
-<!--    <option [value]="t">{{ t }}</option>-->
-<!--    }-->
-<!--  </select>-->
-<!--  <input-->
-<!--    class="num-input"-->
-<!--    style="max-width:110px;text-align:right;background:none;border:none;"-->
-<!--    type="number"-->
-<!--    placeholder="0.00"-->
-<!--    [ngModel]="fromAmount()"-->
-<!--    (ngModelChange)="fromAmount.set($event)"-->
-<!--  />-->
-<!--</div>-->
-<!--<div class="balance-hint">-->
-<!--  <span>Available: {{ availableBalance() }} {{ fromToken() }}</span>-->
-<!--  <button class="max-btn" type="button" (click)="setMax()">Max</button>-->
-<!--</div>-->
+@if (!isMainnet()) {
+<div class="hint">Swaps go through Dusa, which runs on Mainnet only. Switch network in Settings.</div>
+} @else if (step() === 'form') {
+<label class="field-label" for="swap-from">You pay</label>
+<app-dropdown inputId="swap-from" [options]="fromOptions()" [value]="fromToken()" (valueChange)="setFromToken($event)" />
+<div class="field-row swap-amount">
+  <input
+    class="num-input"
+    type="number"
+    inputmode="decimal"
+    min="0"
+    step="any"
+    placeholder="0.00"
+    [ngModel]="amount()"
+    (ngModelChange)="amount.set($event)"
+    (keydown)="blockNonDecimalKeys($event)"
+  />
+  <button class="max-btn" type="button" (click)="setMax()">Max</button>
+</div>
+<div class="balance-hint">
+  <span>Available: {{ fromBalance() }} {{ fromToken() }}</span>
+</div>
 
-<!--<div class="swap-dir">-->
-<!--  <button type="button" (click)="flip()">-->
-<!--    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">-->
-<!--      <path d="M7 10l5-5 5 5M7 14l5 5 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />-->
-<!--    </svg>-->
-<!--  </button>-->
-<!--</div>-->
+<div class="swap-dir">
+  <button type="button" aria-label="Swap direction" (click)="flip()">⇅</button>
+</div>
 
-<!--<label class="field-label" for="swap-to">To (estimated)</label>-->
-<!--<div class="select-fake">-->
-<!--  <select id="swap-to" [ngModel]="toToken()" (ngModelChange)="setToToken($event)">-->
-<!--    @for (t of tokens; track t) {-->
-<!--    <option [value]="t">{{ t }}</option>-->
-<!--    }-->
-<!--  </select>-->
-<!--  <input-->
-<!--    class="num-input"-->
-<!--    style="max-width:110px;text-align:right;background:none;border:none;color:var(&#45;&#45;gray-300);"-->
-<!--    type="text"-->
-<!--    [value]="estimatedReceive() | number: '1.2-4'"-->
-<!--    readonly-->
-<!--  />-->
-<!--</div>-->
-<!--<div class="rate-line">1 {{ fromToken() }} ≈ {{ rate() | number: '1.2-4' }} {{ toToken() }}</div>-->
+<label class="field-label" for="swap-to">You receive</label>
+<app-dropdown inputId="swap-to" [options]="toOptions()" [(value)]="toToken" />
 
-<!--@if (error()) {-->
-<!--<div class="error-text">{{ error() }}</div>-->
-<!--}-->
+<div class="swap-quote">
+  @if (isQuoting()) {
+  <span class="skeleton"></span>
+  } @else if (quote()) {
+  <div class="swap-quote-out">≈ {{ receiveText() }} {{ toToken() }}</div>
+  <div class="swap-quote-meta">{{ rateText() }} · impact {{ quote()!.priceImpactPct }}%</div>
+  } @else if (quoteError()) {
+  <div class="swap-quote-meta neg">{{ quoteError() }}</div>
+  } @else {
+  <div class="swap-quote-meta">Enter an amount to get a quote</div>
+  }
+</div>
 
-<!--<button class="btn btn-red" type="button" [disabled]="isSwapping()" (click)="submit()">-->
-<!--  @if (isSwapping()) {-->
-<!--  <div class="spinner"></div>-->
-<!--  <span>Swapping…</span>-->
-<!--  } @else {-->
-<!--  <span>Swap</span>-->
-<!--  }-->
-<!--</button>-->
-<!--</div>-->
+<div class="field-label">Slippage tolerance</div>
+<div class="chip-row">
+  @for (bps of slippageChoices; track bps) {
+  <button class="chip" type="button" [class.active]="slippageBps() === bps" (click)="slippageBps.set(bps)">
+    {{ bps / 100 }}%
+  </button>
+  }
+</div>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+
+<button class="btn btn-red" type="button" [disabled]="!quote()" (click)="review()">Review</button>
+} @else {
+<app-confirm-details
+  [rows]="confirmRows()"
+  [busy]="isSwapping()"
+  confirmLabel="Confirm & swap"
+  busyLabel="Confirming on-chain…"
+  (confirmed)="confirm()"
+  (cancelled)="step.set('form')"
+/>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+}
+</div>

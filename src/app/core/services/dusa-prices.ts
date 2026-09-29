@@ -1,11 +1,8 @@
 import { Injectable } from '@angular/core';
-import { Args, ArrayTypes, JsonRpcPublicProvider } from '@massalabs/massa-web3';
+import { JsonRpcPublicProvider } from '@massalabs/massa-web3';
 import { TOKEN_LIST, TOKEN_REGISTRY, TokenMeta, TokenPrices } from '../models/token.model';
 import { fromUnits } from '../utils/token-amount';
-
-/** Dusa (Liquidity Book DEX) mainnet quoters, as published in @dusalabs/sdk. */
-const V2_QUOTER = 'AS1d3DvZeqTo3Uq7mfAAUmNggjFXqEfGGpSUv6uTYvikVVW8EybN'; // V2_LB_QUOTER_ADDRESS
-const V1_QUOTER = 'AS12VBT5xeL3XdXhLwnpyMVB8re5RcMuW4Z8ragCKEKnDDCEkYjXL'; // LB_QUOTER_ADDRESS
+import { DUSA, decodeQuote, quoteArgs } from './dusa-contracts';
 
 interface QuoteSource {
   readonly quoter: string;
@@ -21,13 +18,12 @@ interface QuoteSource {
  * mixed in with a V2 price.
  */
 const QUOTE_SOURCES: readonly QuoteSource[] = [
-  { quoter: V2_QUOTER, checkLegacy: false },
-  { quoter: V2_QUOTER, checkLegacy: true },
-  { quoter: V1_QUOTER, checkLegacy: true },
+  { quoter: DUSA.v2Quoter, checkLegacy: false },
+  { quoter: DUSA.v2Quoter, checkLegacy: true },
+  { quoter: DUSA.v1Quoter, checkLegacy: true },
 ];
-/** Wrapped MAS — how native MAS is represented in Dusa pools. */
-const WMAS = 'AS12U4TZfNK7qoLyEERBBRDMu8nm5MKoRzPXDXans4v9wdATZedz9';
-const WMAS_DECIMALS = 9;
+const WMAS = DUSA.wmas;
+const WMAS_DECIMALS = DUSA.wmasDecimals;
 const USDC = TOKEN_REGISTRY['USDC.e'];
 
 /**
@@ -106,22 +102,11 @@ export class DusaPrices {
     const result = await this.provider.readSC({
       target: source.quoter,
       func: 'findBestPathFromAmountIn',
-      parameter: new Args()
-        .addArray(route, ArrayTypes.STRING)
-        .addU256(amountIn)
-        .addBool(source.checkLegacy)
-        .serialize(),
+      parameter: quoteArgs(route, amountIn, source.checkLegacy),
     });
     if (result.info.error || !result.value?.length)
       throw new Error(result.info.error || 'No quote');
-
-    // Quote layout: route, pairs, binSteps, amounts, virtualAmountsWithoutSlippage, fees
-    const args = new Args(result.value);
-    args.nextArray(ArrayTypes.STRING);
-    args.nextArray(ArrayTypes.STRING);
-    args.nextArray(ArrayTypes.U64);
-    args.nextArray(ArrayTypes.U256);
-    const spot = args.nextArray(ArrayTypes.U256) as bigint[];
+    const spot = decodeQuote(result.value).virtualAmountsWithoutSlippage;
     return spot.at(-1) ?? 0n;
   }
 }

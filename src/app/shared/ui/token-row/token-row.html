@@ -15,13 +15,13 @@
     </div>
   </div>
   <div class="row-values">
-    <div class="row-usd">
+    <div class="row-usd">{{ balance() | number: amountFormat() }} {{ symbol() }}</div>
+    <div class="row-amount">
       @if (hasPrice()) {
       {{ usdValue() | currency: 'USD' : 'symbol' : '1.2-2' }}
       } @else {
       —
       }
     </div>
-    <div class="row-amount">{{ balance() | number: amountFormat() }} {{ symbol() }}</div>
   </div>
 </div>

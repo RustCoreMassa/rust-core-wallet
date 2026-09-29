@@ -70,7 +70,10 @@ export class HistoryRow {
           icon: 'swap',
           glyph: '⇄',
           title: `Swap ${tx.token} → ${tx.toToken}`,
-          subtitle: 'rate applied at execution',
+          subtitle:
+            tx.received !== undefined
+              ? `≈ ${formatAmount(tx.received)} ${tx.toToken} · Dusa`
+              : 'Dusa',
           amountText: `-${amount} ${tx.token}`,
           amountPositive: false,
         };

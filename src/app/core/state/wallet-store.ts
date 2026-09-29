@@ -11,6 +11,7 @@ import {
 import { HistoryPaging, HistoryStream, TransactionRecord } from '../models/transaction.model';
 import { WalletState } from '../models/wallet.model';
 import { DusaPrices } from '../services/dusa-prices';
+import { DusaSwap, SWAP_STORAGE_COST_MAS, SwapQuote } from '../services/dusa-swap';
 import { ExplorerApi, HistoryPage } from '../services/explorer-api';
 import { MASSA_PROVIDER, NETWORK_FEE_MAS, ROLL_PRICE_MAS } from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
@@ -82,10 +83,11 @@ function mergeHistory(
   existing: readonly TransactionRecord[],
   incoming: readonly TransactionRecord[],
 ): TransactionRecord[] {
-  // Sends only: a contract call's payouts share its operation id and
-  // would otherwise shadow the send record in this map.
-  const knownSends = new Map(
-    existing.filter((r) => r.type === 'send').map((r) => [r.operationId, r]),
+  // Token sends and swaps only (both reach the explorer as a bare CallSC);
+  // a contract call's payouts share its operation id and would otherwise
+  // shadow the record in this map.
+  const knownCalls = new Map(
+    existing.filter((r) => r.type === 'send' || r.type === 'swap').map((r) => [r.operationId, r]),
   );
   const incomingOps = new Set(incoming.map((r) => r.operationId));
 
@@ -95,7 +97,7 @@ function mergeHistory(
     if (!(r.local && settled)) byId.set(r.id, r);
   }
   for (const r of incoming) {
-    const mine = knownSends.get(r.operationId);
+    const mine = knownCalls.get(r.operationId);
     byId.set(
       r.id,
       mine && r.type === 'contract_call'
@@ -218,6 +220,7 @@ export class WalletStore {
   private readonly explorer = inject(ExplorerApi);
   private readonly cache = inject(WalletCache);
   private readonly dusa = inject(DusaPrices);
+  private readonly dusaSwap = inject(DusaSwap);
 
   private readonly _walletsByNetwork = signal<WalletsByNetwork>(emptyWallets());
   private readonly _activeWalletId = signal<string>('');
@@ -634,6 +637,53 @@ export class WalletStore {
     );
   }
 
+  /**
+   * Swap checks: Dusa is mainnet-only; the router takes a 0.1 MAS storage
+   * deposit on top of the network fee — plus a second fee for the token
+   * approval when the input isn't MAS.
+   */
+  validateSwap(from: TokenSymbol, to: TokenSymbol, amount: number): void {
+    if (this.network() !== 'mainnet') throw new Error('Swaps are available on Mainnet only');
+    if (from === to) throw new Error('Choose two different tokens');
+    if (!(amount > 0)) throw new Error('Enter an amount');
+    const balances = this.activeWallet().balances;
+    const masHeld = balances.MAS ?? 0;
+    if (from === 'MAS') {
+      assertMasForFee(
+        masHeld,
+        amount + SWAP_STORAGE_COST_MAS,
+        `Insufficient MAS — keep ${SWAP_STORAGE_COST_MAS} MAS for the swap deposit plus the fee`,
+      );
+    } else {
+      if (amount > (balances[from] ?? 0)) throw new Error(`Insufficient ${from}`);
+      assertMasForFee(
+        masHeld,
+        SWAP_STORAGE_COST_MAS + NETWORK_FEE_MAS,
+        `You need ${SWAP_STORAGE_COST_MAS + 2 * NETWORK_FEE_MAS} MAS for the swap deposit and fees`,
+      );
+    }
+  }
+
+  /** Largest `from` amount a swap can spend (MAS keeps back the deposit and fee). */
+  maxSwappable(from: TokenSymbol): number {
+    const held = this.activeWallet().balances[from] ?? 0;
+    return from === 'MAS' ? subtractMas(held, SWAP_STORAGE_COST_MAS + NETWORK_FEE_MAS) : held;
+  }
+
+  quoteSwap(
+    from: TokenSymbol,
+    to: TokenSymbol,
+    amount: number,
+    slippageBps: number,
+  ): Promise<SwapQuote> {
+    return this.dusaSwap.quote(
+      from,
+      to,
+      toUnits(amount, TOKEN_REGISTRY[from].decimals),
+      slippageBps,
+    );
+  }
+
   // ---- transactions --------------------------------------------------------
 
   /*
@@ -723,6 +773,38 @@ export class WalletStore {
         rollCount,
         operationId,
         from: wallet.address,
+      },
+      network,
+    );
+    await this.refreshTouched([wallet.id], network);
+  }
+
+  /**
+   * Executes a Dusa swap quoted by `quoteSwap`. The router enforces the
+   * quote's minimum output, so a price that moved beyond the slippage
+   * tolerance makes the swap fail on-chain instead of filling badly.
+   */
+  async swap(q: SwapQuote): Promise<void> {
+    const network = this.network();
+    const wallet = this.activeWallet();
+    const amount = fromUnits(q.amountIn, TOKEN_REGISTRY[q.from].decimals);
+    this.validateSwap(q.from, q.to, amount);
+
+    const { operationId } = await this.afterWrite([wallet.id], network, () =>
+      this.dusaSwap.execute(this.privateKeyFor(wallet.id), q),
+    );
+    this.addHistory(
+      wallet.id,
+      {
+        type: 'swap',
+        token: q.from,
+        toToken: q.to,
+        amount,
+        // Quoted output — the exact fill is within the slippage tolerance.
+        received: fromUnits(q.amountOut, TOKEN_REGISTRY[q.to].decimals),
+        operationId,
+        from: wallet.address,
+        counterparty: 'Dusa',
       },
       network,
     );
