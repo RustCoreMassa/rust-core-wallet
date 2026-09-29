@@ -5,7 +5,7 @@
 # The release gets the notes for that version from CHANGELOG.md, the production
 # build as a zip and a SHA256SUMS file — built here, in public CI, from exactly
 # the tagged commit, so anyone can check that what they run matches the source
-# (see "Releases" in the README).
+# (see docs/RELEASING.md).
 #
 # Only first-party actions are used (actions/checkout, actions/setup-node) plus
 # the GitHub CLI preinstalled on the runner — nothing third-party touches the
@@ -109,7 +109,7 @@ jobs:
           BUILD=dist/rust-core-wallet/browser
           ZIP="rust-core-wallet-$TAG.zip"
           # ngsw.json records the build time, so it's the one file left out of the
-          # reproducible checksums (see README → Releases).
+          # reproducible checksums (see docs/RELEASING.md).
           (cd "$BUILD" && find . -type f ! -name ngsw.json | sort | xargs sha256sum) > SHA256SUMS
           (cd "$BUILD" && zip -qr "$GITHUB_WORKSPACE/$ZIP" .)
           sha256sum "$ZIP" >> SHA256SUMS
