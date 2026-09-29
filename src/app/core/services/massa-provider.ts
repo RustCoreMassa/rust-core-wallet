@@ -1,6 +1,6 @@
 import { InjectionToken } from '@angular/core';
 import { MnsDomain } from '../models/nft.model';
-import { StakingStats } from '../models/wallet.model';
+import { RollsState, StakingStats } from '../models/wallet.model';
 
 /** Fixed by the Massa network config — one roll always costs 100 MAS. */
 export const ROLL_PRICE_MAS = 100;
@@ -11,20 +11,8 @@ export const ROLL_PRICE_MAS = 100;
  */
 export const NETWORK_FEE_MAS = 0.01;
 
-/**
- * `active` is the final roll count. `candidate` is only the pending
- * delta on top of it (rolls bought but not yet final), and `deferred`
- * is rolls sold whose MAS refund hasn't been credited yet — so
- * `active + candidate + deferred` is everything currently locked.
- */
-export interface RollCounts {
-  readonly active: number;
-  readonly candidate: number;
-  readonly deferred: number;
-}
-
 export interface StakingInfo {
-  readonly rolls: RollCounts;
+  readonly rolls: RollsState;
   readonly stats: StakingStats;
 }
 
@@ -43,15 +31,14 @@ export interface GeneratedAccount {
  * Amounts here are `bigint`, in each token's smallest unit (nanoMAS for
  * MAS — 9 decimals; each MRC-20's own `decimals` from TOKEN_REGISTRY
  * otherwise) — exactly what massa-web3 itself deals in. Conversion
- * to/from human-readable `number` values happens at the UI edge (see
- * the `Mas`/token amount helpers), never inside this interface or its
- * implementations.
+ * to/from human-readable `number` values happens in WalletStore (see
+ * `toUnits`/`fromUnits` in utils/token-amount.ts), never inside this
+ * interface or its implementations.
  *
  * Write methods take a raw `privateKey` rather than a massa-web3
  * `Account` object, so no massa-web3 type ever has to leak past this
  * file into the rest of the app — the real implementation derives an
- * `Account` from it internally (`Account.fromPrivateKey`), same as the
- * reference MassaService does.
+ * `Account` from it internally (`Account.fromPrivateKey`).
  *
  * Write methods resolve only once the chain has actually executed the
  * operation successfully — never on mere submission — so callers can

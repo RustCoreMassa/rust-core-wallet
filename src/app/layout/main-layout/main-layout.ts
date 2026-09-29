@@ -47,7 +47,7 @@ export class MainLayout {
   constructor() {
     const authStore = inject(AuthStore);
     const walletStore = inject(WalletStore);
-    // Guarantee every real account has a matching demo-economy entry —
+    // Every vault account gets a WalletStore entry (balances, history…) —
     // covers accounts added in a session before this shell last loaded.
     for (const account of authStore.accounts()) {
       walletStore.ensureWallet(account.id, account.name, account.address);

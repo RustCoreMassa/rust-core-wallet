@@ -1,4 +1,4 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
+import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
@@ -9,10 +9,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    // Swap this single binding for a `Web3MassaProvider` (backed by
-    // `@massalabs/massa-web3`) to go from mock data to a live chain —
-    // nothing else in the app depends on the concrete implementation.
+    // The app only ever talks to MassaProvider; this binding picks the
+    // massa-web3 implementation. (The app is zoneless — there's no zone.js.)
     { provide: MASSA_PROVIDER, useClass: Web3MassaProvider },
-    // provideZonelessChangeDetection()
   ],
 };

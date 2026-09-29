@@ -2,7 +2,7 @@ import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, computed, input, signal } from '@angular/core';
 import { TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
 
-/** MRC-20s carry 18 decimals on-chain — far more than a list row can usefully show. */
+/** Tokens carry up to 18 decimals on-chain — far more than a list row can usefully show. */
 const MAX_DISPLAY_DECIMALS = 6;
 
 @Component({

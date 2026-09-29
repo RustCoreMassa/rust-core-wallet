@@ -16,8 +16,8 @@ type Step = 'list' | 'choice' | 'import' | 'generating';
  * "Your wallets" switcher AND the entry point for adding another one.
  * The list is driven by AuthStore (real accounts, real keys); adding a
  * wallet mirrors registration exactly — generate or import, with a
- * name that can't collide with an existing one. WalletStore only
- * supplies the demo balances shown per row (see `ensureWallet`).
+ * name that can't collide with an existing one. WalletStore supplies the
+ * on-chain MAS balance shown per row (see `ensureWallet`).
  */
 @Component({
   selector: 'app-wallets-modal',

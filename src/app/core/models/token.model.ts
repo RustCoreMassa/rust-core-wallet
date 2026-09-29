@@ -12,10 +12,11 @@ export interface TokenMeta {
 }
 
 /**
- * The real Massa mainnet token list (mirrors the `getTokens()` list from
- * the reference MassaService). MAS is the native coin (`contract: ''`,
- * 9 decimals — nanoMAS); everything else is an MRC-20 token read/written
- * through the `MRC20` contract wrapper at its `contract` address.
+ * The Massa mainnet tokens the wallet supports. MAS is the native coin
+ * (`contract: ''`, 9 decimals — nanoMAS); everything else is an MRC-20 token
+ * read/written through the `MRC20` contract wrapper at its `contract`
+ * address. `decimals` are the contracts' own (`decimals()`): USDC.e has 6,
+ * WBTC.e 8, the rest 18 — never assume 18.
  */
 export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   MAS: {

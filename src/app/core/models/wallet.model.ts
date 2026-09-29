@@ -2,6 +2,12 @@ import { TokenBalances, TokenSymbol } from './token.model';
 import { MnsDomain } from './nft.model';
 import { HistoryPaging, TransactionRecord } from './transaction.model';
 
+/**
+ * `active` is the final roll count. `candidate` is only the pending delta on
+ * top of it (rolls bought but not yet final), and `deferred` is rolls sold
+ * whose MAS refund hasn't been credited yet — so `active + candidate +
+ * deferred` is everything currently locked.
+ */
 export interface RollsState {
   readonly active: number;
   readonly candidate: number;
