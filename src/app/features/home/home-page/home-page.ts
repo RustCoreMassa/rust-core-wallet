@@ -1,5 +1,6 @@
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { TokenSymbol } from '../../../core/models/token.model';
 import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { HistoryRow } from '../../../shared/ui/history-row/history-row';
@@ -61,12 +62,23 @@ export class HomePage {
     this.showAllTokens() ? 0 : this.lowBalanceTokens().size,
   );
 
-  /** Registry order; low-balance tokens only when "show all" is on. */
+  /**
+   * MAS first, then the MRC-20s by USD value, highest first. Tokens
+   * without a Dusa price (value unknown) come after the priced ones;
+   * ties keep registry order. Low-balance tokens only when "show all" is on.
+   */
   protected readonly tokenSymbols = computed(() => {
     const low = this.lowBalanceTokens();
-    return this.store
+    const balances = this.wallet().balances;
+    const prices = this.store.prices();
+    const usdValue = (s: TokenSymbol) =>
+      prices[s] === undefined ? -1 : (balances[s] ?? 0) * prices[s];
+
+    const [mas, ...others] = this.store
       .availableTokens()
       .filter((symbol) => this.showAllTokens() || !low.has(symbol));
+    // Array.prototype.sort is stable, so equal values keep registry order.
+    return [mas, ...others.sort((a, b) => usdValue(b) - usdValue(a))];
   });
 
   protected setTab(tab: HomeTab): void {
