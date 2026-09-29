@@ -138,6 +138,18 @@ export class AuthStore {
     return this.cryptoVault.decrypt(payload, this.sessionKey);
   }
 
+  /**
+   * Removes one account from the vault (re-encrypted and saved). The last
+   * account can't be removed — the vault always holds at least one; a full
+   * log out is how that one goes.
+   */
+  async removeAccount(id: string): Promise<void> {
+    const accounts = this._accounts();
+    if (accounts.length <= 1) throw new Error("You can't remove your only wallet — log out instead");
+    if (!accounts.some((a) => a.id === id)) throw new Error('Unknown wallet');
+    await this.saveAccounts(accounts.filter((a) => a.id !== id));
+  }
+
   // ---- naming ------------------------------------------------------------
 
   /** Next unused "wallet_N" — used to auto-name a freshly generated wallet. */

@@ -1,10 +1,16 @@
 <div class="modal">
   <div class="modal-head">
-    <div class="modal-title">Rename wallet</div>
+    <div class="modal-title">
+      @switch (step()) {
+      @case ('edit') { Wallet }
+      @default { Remove wallet }
+      }
+    </div>
     <button class="modal-close" type="button" (click)="modal.close()">✕</button>
   </div>
 
   @if (account(); as account) {
+  @if (step() === 'edit') {
   <div class="field-label">Address</div>
   <div class="addr-box">{{ account.address | shortAddress }}</div>
 
@@ -31,5 +37,48 @@
   </button>
 
   <button class="btn btn-ghost" type="button" (click)="copyPrivateKey()">Copy private key</button>
+
+  <div class="remove-zone">
+    @if (canRemove()) {
+    <button class="remove-btn" type="button" (click)="startRemove()">Remove this wallet</button>
+    } @else {
+    <div class="hint">This is your only wallet — use Log out in Settings to remove it.</div>
+    }
+  </div>
+  }
+
+  @if (step() === 'remove-warn') {
+  <div class="error-text" style="display:block;margin-bottom:12px;">
+    {{ account.name }} will be removed from this device.
+  </div>
+  <div class="hint" style="margin-bottom:16px;">
+    Its funds stay on-chain at {{ account.address | shortAddress }}, but you'll only get access back
+    by importing its private key again. Save it first if you haven't.
+  </div>
+
+  <button class="btn btn-ghost" type="button" (click)="copyPrivateKey()">Copy private key</button>
+  <button class="btn btn-red" type="button" (click)="step.set('remove-pin')">Continue</button>
+  <button class="btn btn-ghost" type="button" (click)="cancelRemove()">Cancel</button>
+  }
+
+  @if (step() === 'remove-pin') {
+  <div class="hint" style="margin-bottom:16px;">Enter your PIN to remove {{ account.name }}.</div>
+
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
+  }
+
+  <div class="pin-dots" style="justify-content:center;margin-bottom:24px;">
+    @for (filled of dots(); track $index) {
+    <div class="pin-dot" [class.filled]="filled"></div>
+    }
+  </div>
+
+  <div style="display:flex;justify-content:center;">
+    <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
+  </div>
+
+  <button class="btn btn-ghost" type="button" [disabled]="isRemoving()" (click)="cancelRemove()">Cancel</button>
+  }
   }
 </div>

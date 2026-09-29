@@ -484,6 +484,28 @@ export class WalletStore {
     }
   }
 
+  /**
+   * Drops a removed account's state on every network. If it was the active
+   * wallet, the first remaining one becomes active and is refreshed.
+   */
+  removeWallet(id: string): void {
+    this._walletsByNetwork.update((all) => {
+      const { [id]: _mainnet, ...mainnet } = all.mainnet;
+      const { [id]: _buildnet, ...buildnet } = all.buildnet;
+      return { mainnet, buildnet };
+    });
+    this.settleUntil.delete(id);
+    for (const network of ['mainnet', 'buildnet'] as const) {
+      this.historyFetchedAt.delete(`${network}:${id}`);
+      this.domainsFetchedAt.delete(`${network}:${id}`);
+    }
+    if (this._activeWalletId() === id) {
+      const next = Object.keys(this.wallets())[0] ?? '';
+      this._activeWalletId.set(next);
+      if (next) this.refreshInBackground(next);
+    }
+  }
+
   saveAddress(name: string, address: string): void {
     this._addressBook.update((book) => [...book, { name, address }]);
   }

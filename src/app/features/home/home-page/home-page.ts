@@ -9,7 +9,7 @@ import { TokenRow } from '../../../shared/ui/token-row/token-row';
 type HomeTab = 'tokens' | 'history';
 
 /** Tokens worth less than this (USD) count as "low balance" and are hidden by default. */
-const LOW_BALANCE_USD = 1;
+const LOW_BALANCE_USD = 0.1;
 const SHOW_ALL_KEY = 'massa-wallet:show-all-tokens';
 /** Distance from the bottom of the list (px) at which the next history page loads. */
 const NEAR_BOTTOM_PX = 120;
