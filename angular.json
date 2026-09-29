@@ -22,6 +22,15 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
+            "allowedCommonJsDependencies": [
+              "crypto",
+              "google-protobuf",
+              "grpc-web",
+              "lodash.isequal",
+              "qrcode",
+              "secure-random",
+              "varint"
+            ],
             "inlineStyleLanguage": "scss",
             "assets": [
               {
