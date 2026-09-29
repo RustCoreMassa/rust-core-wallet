@@ -135,6 +135,7 @@ npm start            # http://localhost:4200
 |---|---|
 | `npm start` | Development server with live reload |
 | `npm run build` | Production build into `dist/` |
+| `npm test` | Unit tests (Vitest) |
 | `npx tsc -p tsconfig.app.json --noEmit` | Type-check |
 | `npx prettier --write .` | Format the code |
 
@@ -192,7 +193,8 @@ Contributions are welcome — bug reports, ideas and pull requests.
 1. Open an issue first for anything larger than a small fix, so we can agree on the approach.
 2. Keep the security rules above intact (no network calls beyond the list above, no optimistic
    updates, review step before any signature).
-3. Run the type-check and Prettier before opening a pull request.
+3. Run the tests, the type-check and Prettier before opening a pull request, and add tests for
+   any logic that touches amounts, fees, keys or transactions.
 
 Because RustCore Wallet will also ship as a browser extension and in the mobile app stores,
 contributors are asked to sign a **Contributor License Agreement (CLA)** before their first
