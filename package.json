@@ -9,6 +9,8 @@
     "test": "ng test"
   },
   "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
+  "author": "Gicu Adasanu",
   "packageManager": "npm@11.12.1",
   "dependencies": {
     "@angular/common": "^22.1.0",
