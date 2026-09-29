@@ -168,6 +168,23 @@ published build.
 - [ ] Hardware-wallet support
 - [ ] Reproducible builds with published checksums
 
+## Support the project
+
+RustCore Wallet is free and built in the open. If it's useful to you and you'd like to help fund
+its development (the browser extension, mobile apps and a security audit), you can send a
+voluntary donation in MAS or any Massa token to:
+
+```
+AU126s93ZxbT4QUJcZYqsAxyMc3wv8nkHJYKYCtgQyEnZ8VGRM99P
+```
+
+Donations are entirely optional and don't unlock any features — the wallet is the same for
+everyone. Before sending, always check the address against this README in the official repository —
+nobody from RustCore will ever DM you asking for funds or give you a different address.
+
+Not in a position to donate? Starring the repository, reporting bugs and spreading the word help
+just as much.
+
 ## Contributing
 
 Contributions are welcome — bug reports, ideas and pull requests.
