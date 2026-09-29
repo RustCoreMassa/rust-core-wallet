@@ -1,5 +1,6 @@
 import { InjectionToken } from '@angular/core';
 import { MnsDomain } from '../models/nft.model';
+import { StakingStats } from '../models/wallet.model';
 
 /** Fixed by the Massa network config — one roll always costs 100 MAS. */
 export const ROLL_PRICE_MAS = 100;
@@ -20,6 +21,11 @@ export interface RollCounts {
   readonly active: number;
   readonly candidate: number;
   readonly deferred: number;
+}
+
+export interface StakingInfo {
+  readonly rolls: RollCounts;
+  readonly stats: StakingStats;
 }
 
 export interface OperationResult {
@@ -67,7 +73,10 @@ export interface MassaProvider {
   ): Promise<OperationResult>;
 
   // ---- rolls (staking) ----------------------------------------------------
-  getRolls(address: string): Promise<RollCounts>;
+  /** Roll counts plus block-production stats, from one address-info read. */
+  getStaking(address: string): Promise<StakingInfo>;
+  /** Rolls staked across the whole network (sum over all stakers). */
+  getTotalRolls(): Promise<number>;
   buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
   sellRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
 

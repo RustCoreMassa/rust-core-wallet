@@ -1,9 +1,10 @@
 <div class="modal">
 <div class="modal-head">
-  <div class="modal-title">Sell roll</div>
+  <div class="modal-title">{{ step() === 'confirm' ? 'Confirm roll sale' : 'Sell roll' }}</div>
   <button class="modal-close" type="button" (click)="modal.close()">✕</button>
 </div>
 
+@if (step() === 'form') {
 <label class="field-label" for="sell-roll-count">
   Number of rolls
   <span style="float:right;color:var(--gray-500);">max {{ maxRolls() }}</span>
@@ -13,9 +14,12 @@
     id="sell-roll-count"
     class="num-input"
     type="number"
+    inputmode="numeric"
     min="1"
+    step="1"
     [ngModel]="count()"
     (ngModelChange)="count.set($event)"
+    (keydown)="blockNonDigitKeys($event)"
   />
 </div>
 <div class="hint">You'll receive: {{ proceeds() }} MAS (after unstake delay)</div>
@@ -24,12 +28,19 @@
 <div class="error-text">{{ error() }}</div>
 }
 
-<button class="btn btn-ghost" type="button" [disabled]="isSelling()" (click)="submit()">
-  @if (isSelling()) {
-  <div class="spinner"></div>
-  <span>Selling…</span>
-  } @else {
-  <span>Sell roll</span>
-  }
-</button>
+<button class="btn btn-ghost" type="button" (click)="review()">Review</button>
+} @else {
+<app-confirm-details
+  [rows]="confirmRows()"
+  [busy]="isSelling()"
+  confirmLabel="Confirm & sell"
+  busyLabel="Selling…"
+  (confirmed)="confirm()"
+  (cancelled)="step.set('form')"
+/>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+}
 </div>

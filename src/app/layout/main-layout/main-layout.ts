@@ -56,6 +56,7 @@ export class MainLayout {
     // MNS is prefetched too, so the NFT page opens with data already there.
     walletStore.refreshAll();
     walletStore.loadDomains().catch((err) => console.warn('Prefetching MNS domains failed', err));
+    walletStore.loadTotalRolls().catch((err) => console.warn('Prefetching total rolls failed', err));
 
     // Live balances for as long as the unlocked shell is on screen —
     // paused while the tab is hidden, caught up as soon as it's back.

@@ -1,8 +1,10 @@
 <div class="modal">
 <div class="modal-head">
-  <div class="modal-title">Send</div>
+  <div class="modal-title">{{ step() === 'confirm' ? 'Confirm send' : 'Send' }}</div>
   <button class="modal-close" type="button" (click)="modal.close()">✕</button>
 </div>
+
+@if (step() === 'form') {
 
 <label class="field-label" for="send-token">Asset</label>
 <div class="token-picker" #tokenPicker>
@@ -118,12 +120,19 @@
 <div class="error-text">{{ error() }}</div>
 }
 
-<button class="btn btn-red" type="button" [disabled]="isSending()" (click)="submit()">
-  @if (isSending()) {
-  <div class="spinner"></div>
-  <span>Sending…</span>
-  } @else {
-  <span>Send</span>
-  }
-</button>
+<button class="btn btn-red" type="button" (click)="review()">Review</button>
+} @else {
+<app-confirm-details
+  [rows]="confirmRows()"
+  [busy]="isSending()"
+  confirmLabel="Confirm & send"
+  busyLabel="Sending…"
+  (confirmed)="confirm()"
+  (cancelled)="step.set('form')"
+/>
+
+@if (error()) {
+<div class="error-text">{{ error() }}</div>
+}
+}
 </div>

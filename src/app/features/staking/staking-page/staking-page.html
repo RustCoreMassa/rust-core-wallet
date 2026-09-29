@@ -1,45 +1,190 @@
 <div class="view-header">Staking</div>
 
+@if (!wallet().loaded) {
+<div class="staking-card">
+  <div class="staking-row">
+    <div class="staking-stat"><div class="stat-num"><span class="skeleton"></span></div><div class="stat-label">final roll</div></div>
+    <div class="staking-stat"><div class="stat-num"><span class="skeleton"></span></div><div class="stat-label">candidate roll</div></div>
+  </div>
+</div>
+} @else if (status() === 'idle') {
+<div class="stake-status idle">Not staking</div>
+
+<div class="staking-card stake-intro">
+  <div class="stake-intro-title">This wallet isn't staking</div>
+  <div class="stake-apr">
+    Current APR
+    <span class="stake-apr-value">
+      @if (apr() !== null) { ~{{ apr() | number: '1.2-2' }}% } @else { <span class="skeleton"></span> }
+    </span>
+  </div>
+  <p class="stake-intro-text">
+    Staking on Massa means holding <b>rolls</b> and letting a Massa node produce blocks with this
+    wallet. You earn MAS for every block and endorsement it creates.
+  </p>
+
+  <ol class="stake-steps">
+    <li>
+      <span class="stake-step-num">1</span>
+      <div>
+        <div class="stake-step-title">Buy rolls</div>
+        <div class="stake-step-text">1 roll = {{ rollPrice }} MAS. You can buy them right here.</div>
+      </div>
+    </li>
+    <li>
+      <span class="stake-step-num">2</span>
+      <div>
+        <div class="stake-step-title">Run a node</div>
+        <div class="stake-step-text">
+          Add this wallet to your Massa node and start staking with
+          <code>node_start_staking &lt;address&gt;</code>. Keep it online.
+        </div>
+      </div>
+    </li>
+    <li>
+      <span class="stake-step-num">3</span>
+      <div>
+        <div class="stake-step-title">Wait for activation</div>
+        <div class="stake-step-text">Rolls join the draw after 3 cycles (about 1 h 40 min).</div>
+      </div>
+    </li>
+  </ol>
+
+  <div class="stake-intro-hint">
+    Available: {{ finalMas() | number: '1.2-2' }} MAS
+    @if (affordableRolls() > 0) {
+    · enough for {{ affordableRolls() }} roll{{ affordableRolls() > 1 ? 's' : '' }}
+    }
+  </div>
+
+  <div class="stake-intro-actions">
+    <button class="btn btn-red" type="button" (click)="modal.open('buy-roll')">Buy rolls</button>
+    <a class="btn btn-ghost stake-docs" [href]="docsUrl" target="_blank" rel="noopener noreferrer">Read the staking guide ↗</a>
+  </div>
+</div>
+} @else {
+<div class="stake-status" [class]="status()">
+  @switch (status()) {
+  @case ('active') { Staking · active }
+  @case ('activating') { Staking · activating }
+  @case ('missing') { Staking · missing slots }
+  @case ('unstaking') { Unstaking }
+  }
+</div>
+
+@if (status() === 'activating') {
+<div class="stake-note">Your rolls join the block draw 3 cycles after purchase (about 1 h 40 min).</div>
+} @else if (status() === 'missing') {
+<div class="stake-note warn">
+  Your node missed {{ stats()?.missed | number }} slot{{ stats()?.missed === 1 ? '' : 's' }} recently — make
+  sure it's online and staking with this address. Missed slots earn nothing.
+</div>
+} @else if (status() === 'unstaking') {
+<div class="stake-note">Your rolls are sold; the MAS refund is paid out a few cycles after the sale.</div>
+}
+
 <div class="staking-card">
   <div class="staking-row">
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ wallet().rolls.active }}} @else {<span class="skeleton"></span>}</div>
-      <div class="stat-label">final roll</div>
+      <div class="stat-num">{{ wallet().rolls.active | number }}</div>
+      <div class="stat-label">final rolls</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ wallet().rolls.candidate }}} @else {<span class="skeleton"></span>}</div>
-      <div class="stat-label">candidate roll</div>
+      <div class="stat-num">{{ wallet().rolls.candidate | number }}</div>
+      <div class="stat-label">pending rolls</div>
+    </div>
+    @if (wallet().rolls.deferred > 0) {
+    <div class="staking-stat">
+      <div class="stat-num">{{ wallet().rolls.deferred | number }}</div>
+      <div class="stat-label">being sold</div>
+    </div>
+    }
+  </div>
+
+  <div class="staking-divider"></div>
+  <div class="staking-row">
+    <div class="staking-stat">
+      <div class="stat-num stake-apr-value">
+        @if (apr() !== null) { {{ apr() | number: '1.2-2' }}% } @else { <span class="skeleton"></span> }
+      </div>
+      <div class="stat-label">APR</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">
+        @if (dailyReward() !== null) { {{ dailyReward() | number: '1.2-2' }} } @else { <span class="skeleton"></span> }
+      </div>
+      <div class="stat-label">est. MAS / day</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">
+        @if (store.totalRolls() !== null) { {{ store.totalRolls() | number }} } @else { <span class="skeleton"></span> }
+      </div>
+      <div class="stat-label">network rolls</div>
     </div>
   </div>
+
+  @if (stats(); as stats) {
+  <div class="staking-divider"></div>
+  <div class="staking-row">
+    <div class="staking-stat">
+      <div class="stat-num">{{ stats.produced | number }}</div>
+      <div class="stat-label">slots produced</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num" [class.neg]="stats.missed > 0">{{ stats.missed | number }}</div>
+      <div class="stat-label">slots missed</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">
+        @if (successRate() !== null) { {{ successRate() | number: '1.0-1' }}% } @else { — }
+      </div>
+      <div class="stat-label">success rate</div>
+    </div>
+  </div>
+  <div class="staking-row">
+    <div class="staking-stat">
+      <div class="stat-num">{{ stats.activeRolls | number }}</div>
+      <div class="stat-label">rolls in draw</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ stats.nextBlockDraws | number }}</div>
+      <div class="stat-label">upcoming blocks</div>
+    </div>
+    <div class="staking-stat">
+      <div class="stat-num">{{ stats.nextEndorsementDraws | number }}</div>
+      <div class="stat-label">upcoming endorsements</div>
+    </div>
+  </div>
+  }
 
   <div class="staking-divider"></div>
 
   <div class="staking-row">
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ finalMas() | number: '1.2-2' }}} @else {<span class="skeleton"></span>}</div>
+      <div class="stat-num">{{ finalMas() | number: '1.2-2' }}</div>
       <div class="stat-label">final MAS balance</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ stakedMas() | number: '1.0-0' }}} @else {<span class="skeleton"></span>}</div>
+      <div class="stat-num">{{ stakedMas() | number: '1.0-0' }}</div>
       <div class="stat-label">staked MAS balance</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ totalMas() | number: '1.2-2' }}} @else {<span class="skeleton"></span>}</div>
+      <div class="stat-num">{{ totalMas() | number: '1.2-2' }}</div>
       <div class="stat-label">total MAS balance</div>
     </div>
   </div>
 
   <div class="staking-row">
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ finalMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}} @else {<span class="skeleton"></span>}</div>
+      <div class="stat-num">{{ finalMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
       <div class="stat-label">final USD balance</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ stakedMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}} @else {<span class="skeleton"></span>}</div>
+      <div class="stat-num">{{ stakedMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
       <div class="stat-label">staked USD balance</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">@if (wallet().loaded) {{{ totalMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}} @else {<span class="skeleton"></span>}</div>
+      <div class="stat-num">{{ totalMas() * masPrice() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
       <div class="stat-label">total USD balance</div>
     </div>
   </div>
@@ -51,3 +196,6 @@
     <button class="pill-btn" type="button" (click)="modal.open('sell-roll')">Sell roll</button>
   </div>
 </div>
+
+<a class="stake-docs-link" [href]="docsUrl" target="_blank" rel="noopener noreferrer">Massa staking guide ↗</a>
+}

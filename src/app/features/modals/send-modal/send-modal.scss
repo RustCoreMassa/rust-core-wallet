@@ -2,18 +2,6 @@
   display: contents;
 }
 
-/* No increment/decrement spinners on the amount field — amounts are typed or set via Max. */
-input[type='number'] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-input[type='number']::-webkit-outer-spin-button,
-input[type='number']::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
 /* ---------- asset picker (custom dropdown) ---------- */
 .token-picker {
   position: relative;

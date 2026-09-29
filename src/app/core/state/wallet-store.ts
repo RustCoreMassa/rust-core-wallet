@@ -34,6 +34,9 @@ const WRITE_SETTLE_MS = 8000;
 /** Token prices are re-read from Dusa at most this often. */
 const PRICES_REFRESH_MS = 60_000;
 
+/** The network's total roll count moves slowly — re-read at most this often. */
+const TOTAL_ROLLS_REFRESH_MS = 10 * 60_000;
+
 /** MNS ownership rarely changes — re-read at most this often when the NFT page is opened. */
 const DOMAINS_REFRESH_MS = 60_000;
 /** Coalesces bursts of state changes into one encrypted cache write. */
@@ -56,6 +59,7 @@ function newWallet(id: string, name: string, address: string): WalletState {
     loaded: false,
     balances: { MAS: 0 },
     rolls: { active: 0, candidate: 0, deferred: 0 },
+    staking: null,
     history: [],
     historyPaging: null,
     domains: null,
@@ -151,6 +155,13 @@ function withNames(
   return changed ? next : wallets;
 }
 
+/**
+ * Shape check for a Massa address: `AU` (user) or `AS` (smart contract)
+ * followed by base58. The chain does the real validation on send; this
+ * just catches typos before the confirmation step.
+ */
+const MASSA_ADDRESS = /^A[US][1-9A-HJ-NP-Za-km-z]{40,60}$/;
+
 /** Smallest amount the Send flow accepts, in any token. */
 export const MIN_SEND_AMOUNT = 0.01;
 
@@ -222,6 +233,8 @@ export class WalletStore {
   private readonly _addressBook = signal<SavedAddress[]>([]);
   private readonly _prices = signal<TokenPrices>({});
   private pricesFetchedAt = 0;
+  private readonly _totalRolls = signal<Partial<Record<Network, number>>>({});
+  private readonly totalRollsFetchedAt = new Map<Network, number>();
   private pricesInFlight = false;
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
   private readonly _loadingHistory = signal(false);
@@ -267,6 +280,9 @@ export class WalletStore {
   });
 
   readonly isLoadingHistory = this._loadingHistory.asReadonly();
+
+  /** Rolls staked across the current network; `null` until first read. */
+  readonly totalRolls = computed(() => this._totalRolls()[this.network()] ?? null);
 
   /** First explorer page is in (always true on buildnet, where history is local only). */
   readonly isHistoryLoaded = computed(
@@ -330,6 +346,7 @@ export class WalletStore {
     this.networkStore.set(network);
     this.refreshAll();
     this.loadDomains().catch((err) => console.warn('Loading MNS domains failed', err));
+    this.loadTotalRolls().catch((err) => console.warn('Loading total rolls failed', err));
   }
 
   /**
@@ -453,6 +470,20 @@ export class WalletStore {
     return token === 'MAS' ? subtractMas(held, NETWORK_FEE_MAS) : held;
   }
 
+  /** Reads the network's total roll count (for APR), at most every TOTAL_ROLLS_REFRESH_MS. */
+  async loadTotalRolls(): Promise<void> {
+    const network = this.network();
+    if (Date.now() - (this.totalRollsFetchedAt.get(network) ?? 0) < TOTAL_ROLLS_REFRESH_MS) return;
+    this.totalRollsFetchedAt.set(network, Date.now());
+    try {
+      const total = await this.provider.getTotalRolls();
+      this._totalRolls.update((all) => ({ ...all, [network]: total }));
+    } catch (err) {
+      this.totalRollsFetchedAt.delete(network); // retry on the next call
+      throw err;
+    }
+  }
+
   saveAddress(name: string, address: string): void {
     this._addressBook.update((book) => [...book, { name, address }]);
   }
@@ -491,13 +522,13 @@ export class WalletStore {
 
     this._refreshingIds.update((ids) => new Set(ids).add(id));
     try {
-      const [[mas, rolls], tokens, [history]] = await Promise.all([
+      const [[mas, staking], tokens, [history]] = await Promise.all([
         Promise.allSettled([
           // Candidate (not final) balance: already includes operations
           // that are executed but not yet final, so sends show up in
           // seconds instead of after finality.
           this.provider.getBalance(privateKey, false),
-          this.provider.getRolls(wallet.address),
+          this.provider.getStaking(wallet.address),
         ]),
         Promise.allSettled(
           tokenList.map((t) => this.provider.getTokenBalance(privateKey, t.contract)),
@@ -508,7 +539,7 @@ export class WalletStore {
         this.historyFetchedAt.set(historyKey, Date.now());
       }
 
-      const failures = [mas, rolls, ...tokens, history].filter((r) => r.status === 'rejected');
+      const failures = [mas, staking, ...tokens, history].filter((r) => r.status === 'rejected');
       if (failures.length)
         console.warn(`Wallet refresh: ${failures.length} read(s) failed`, failures);
 
@@ -529,7 +560,8 @@ export class WalletStore {
             ...w,
             balances,
             loaded: w.loaded || mas.status === 'fulfilled',
-            rolls: rolls.status === 'fulfilled' ? rolls.value : w.rolls,
+            rolls: staking.status === 'fulfilled' ? staking.value.rolls : w.rolls,
+            staking: staking.status === 'fulfilled' ? staking.value.stats : w.staking,
             ...(history.status === 'fulfilled' && history.value
               ? {
                   history: mergeHistory(w.history, history.value.records),
@@ -551,15 +583,13 @@ export class WalletStore {
     }
   }
 
-  // ---- transactions --------------------------------------------------------
+  // ---- pre-flight checks (the UI runs these before asking to confirm) -------
 
-  async send(
-    token: TokenSymbol,
-    toAddress: string,
-    amount: number,
-  ): Promise<{ internal: boolean }> {
-    const network = this.network();
+  /** Throws a user-facing message when the transfer can't go through. */
+  validateSend(token: TokenSymbol, toAddress: string, amount: number): void {
     const wallet = this.activeWallet();
+    if (!MASSA_ADDRESS.test(toAddress)) throw new Error('Enter a valid Massa address');
+    if (toAddress === wallet.address) throw new Error("That's this wallet's own address");
     if (!(amount >= MIN_SEND_AMOUNT)) throw new Error(`Minimum amount is ${MIN_SEND_AMOUNT}`);
     const masHeld = wallet.balances.MAS ?? 0;
     if (token === 'MAS') {
@@ -572,10 +602,47 @@ export class WalletStore {
       if (amount > (wallet.balances[token] ?? 0)) throw new Error('Insufficient balance');
       assertMasForFee(masHeld, 0, `You need ${NETWORK_FEE_MAS} MAS for the network fee`);
     }
+    if (toUnits(amount, TOKEN_REGISTRY[token].decimals) === 0n) {
+      throw new Error('Amount is too small');
+    }
+  }
 
+  validateBuyRolls(rollCount: number): void {
+    if (!Number.isInteger(rollCount) || rollCount <= 0) {
+      throw new Error('Enter a valid amount of rolls');
+    }
+    assertMasForFee(
+      this.activeWallet().balances.MAS ?? 0,
+      rollCount * ROLL_PRICE_MAS,
+      `Insufficient MAS — ${NETWORK_FEE_MAS} MAS is needed for the network fee`,
+    );
+  }
+
+  validateSellRolls(rollCount: number): void {
+    const wallet = this.activeWallet();
+    if (!Number.isInteger(rollCount) || rollCount <= 0) {
+      throw new Error('Enter a valid amount of rolls');
+    }
+    if (rollCount > wallet.rolls.active) throw new Error('Not enough active rolls');
+    assertMasForFee(
+      wallet.balances.MAS ?? 0,
+      0,
+      `You need ${NETWORK_FEE_MAS} MAS for the network fee`,
+    );
+  }
+
+  // ---- transactions --------------------------------------------------------
+
+  async send(
+    token: TokenSymbol,
+    toAddress: string,
+    amount: number,
+  ): Promise<{ internal: boolean }> {
+    const network = this.network();
+    const wallet = this.activeWallet();
+    this.validateSend(token, toAddress, amount);
     const meta = TOKEN_REGISTRY[token];
     const units = toUnits(amount, meta.decimals);
-    if (units === 0n) throw new Error('Amount is too small');
 
     const privateKey = this.privateKeyFor(wallet.id);
     const { operationId } = meta.isErc20
@@ -644,14 +711,8 @@ export class WalletStore {
   async buyRolls(rollCount: number): Promise<void> {
     const network = this.network();
     const wallet = this.activeWallet();
-    if (!Number.isInteger(rollCount) || rollCount <= 0)
-      throw new Error('Enter a valid amount of rolls');
+    this.validateBuyRolls(rollCount);
     const cost = rollCount * ROLL_PRICE_MAS;
-    assertMasForFee(
-      wallet.balances.MAS ?? 0,
-      cost,
-      `Insufficient MAS — ${NETWORK_FEE_MAS} MAS is needed for the network fee`,
-    );
 
     const { operationId } = await this.provider.buyRolls(
       this.privateKeyFor(wallet.id),
@@ -688,14 +749,7 @@ export class WalletStore {
   async sellRolls(rollCount: number): Promise<void> {
     const network = this.network();
     const wallet = this.activeWallet();
-    if (!Number.isInteger(rollCount) || rollCount <= 0)
-      throw new Error('Enter a valid amount of rolls');
-    if (rollCount > wallet.rolls.active) throw new Error('Not enough active rolls');
-    assertMasForFee(
-      wallet.balances.MAS ?? 0,
-      0,
-      `You need ${NETWORK_FEE_MAS} MAS for the network fee`,
-    );
+    this.validateSellRolls(rollCount);
 
     const { operationId } = await this.provider.sellRolls(
       this.privateKeyFor(wallet.id),

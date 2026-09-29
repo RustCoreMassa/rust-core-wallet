@@ -15,7 +15,7 @@ import {
   MassaProvider,
   OperationResult,
   ROLL_PRICE_MAS,
-  RollCounts,
+  StakingInfo,
 } from './massa-provider';
 
 /**
@@ -27,7 +27,7 @@ import {
  * network NetworkStore currently points at — no key or provider is
  * ever cached across calls, so a network switch applies immediately.
  *
- * `getRolls` needs no key: roll counts aren't on the `Provider` wrapper,
+ * `getStaking` needs no key: roll counts aren't on the `Provider` wrapper,
  * so it goes through the raw JSON-RPC client (`getAddressInfo`) of a
  * keyless `JsonRpcPublicProvider` — `Web3Provider` is itself just an
  * alias of `JsonRpcProvider`, which wraps the same client.
@@ -86,22 +86,44 @@ export class Web3MassaProvider implements MassaProvider {
     return { operationId: operation.id };
   }
 
-  async getRolls(address: string): Promise<RollCounts> {
+  async getStaking(address: string): Promise<StakingInfo> {
     // Explicit type: massa-web3's own publicAPI.d.ts imports its RPC types
     // from an unresolvable 'src/generated/' path, so they arrive as `any`.
-    const info: rpcTypes.AddressInfo =
-      await this.publicProvider().client.getAddressInfo(address);
+    const info: rpcTypes.AddressInfo = await this.publicProvider().client.getAddressInfo(address);
     // Deferred credits are MAS amounts (decimal strings) from sold rolls
     // still waiting to be paid out — convert back to a roll count.
     const deferredNanoMas = info.deferred_credits.reduce(
       (sum, credit) => sum + (credit.amount ? Mas.fromString(credit.amount) : 0n),
       0n,
     );
+    // Oldest → newest; the last entry is the current (non-final) cycle.
+    const cycles = info.cycle_infos;
     return {
-      active: info.final_roll_count,
-      candidate: Math.max(0, info.candidate_roll_count - info.final_roll_count),
-      deferred: Number(deferredNanoMas / Mas.fromString(String(ROLL_PRICE_MAS))),
+      rolls: {
+        active: info.final_roll_count,
+        candidate: Math.max(0, info.candidate_roll_count - info.final_roll_count),
+        deferred: Number(deferredNanoMas / Mas.fromString(String(ROLL_PRICE_MAS))),
+      },
+      stats: {
+        activeRolls: Number(cycles.at(-1)?.active_rolls ?? 0),
+        produced: cycles.reduce((sum, c) => sum + Number(c.ok_count), 0),
+        missed: cycles.reduce((sum, c) => sum + Number(c.nok_count), 0),
+        nextBlockDraws: info.next_block_draws.length,
+        nextEndorsementDraws: info.next_endorsement_draws.length,
+      },
     };
+  }
+
+  async getTotalRolls(): Promise<number> {
+    const client = this.publicProvider().client;
+    const limit = 1000;
+    let total = 0;
+    // Each staker comes back as an [address, rollCount] pair.
+    for (let offset = 0; ; offset += limit) {
+      const page = (await client.getStakers({ offset, limit })) as unknown as [string, number][];
+      total += page.reduce((sum, [, rolls]) => sum + Number(rolls), 0);
+      if (page.length < limit) return total;
+    }
   }
 
   async buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult> {

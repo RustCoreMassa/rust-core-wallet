@@ -6,10 +6,11 @@ import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
+import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 
 @Component({
   selector: 'app-send-modal',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, ConfirmDetails],
   templateUrl: './send-modal.html',
   styleUrl: './send-modal.scss',
   host: {
@@ -92,16 +93,60 @@ export class SendModal {
     if (['-', '+', 'e', 'E'].includes(event.key)) event.preventDefault();
   }
 
-  protected async submit(): Promise<void> {
+  /** `form` → fill in; `confirm` → review the details, then Confirm or Cancel. */
+  protected readonly step = signal<'form' | 'confirm'>('form');
+
+  protected readonly confirmRows = computed<ConfirmRow[]>(() => {
+    const token = this.token();
+    const amount = this.amount() ?? 0;
+    const wallet = this.store.activeWallet();
+    const price = this.store.prices()[token];
+    const fee = this.networkFee;
+    const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 9 });
+    const recipient = this.store.walletList().find((w) => w.address === this.address().trim());
+
+    return [
+      { label: 'From', value: `${wallet.name} · ${shortAddress(wallet.address)}` },
+      {
+        label: recipient ? `To (${recipient.name})` : 'To',
+        value: this.address().trim(),
+        mono: true,
+      },
+      {
+        label: 'Amount',
+        value:
+          `${fmt(amount)} ${token}` +
+          (price
+            ? ` (≈ $${(amount * price).toLocaleString('en-US', { maximumFractionDigits: 2 })})`
+            : ''),
+      },
+      { label: 'Network fee', value: `${fee} MAS` },
+      {
+        label: 'Total',
+        value:
+          token === 'MAS' ? `${fmt(amount + fee)} MAS` : `${fmt(amount)} ${token} + ${fee} MAS`,
+        strong: true,
+      },
+      { label: 'Network', value: this.store.network() === 'mainnet' ? 'Mainnet' : 'Buildnet' },
+    ];
+  });
+
+  /** Runs every pre-flight check, then shows the confirmation step. */
+  protected review(): void {
+    this.error.set(null);
+    try {
+      this.store.validateSend(this.token(), this.address().trim(), this.amount() ?? 0);
+      this.tokenMenuOpen.set(false);
+      this.step.set('confirm');
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+    }
+  }
+
+  protected async confirm(): Promise<void> {
     const address = this.address().trim();
     const amount = this.amount() ?? 0;
     this.error.set(null);
-
-    if (!address) {
-      this.error.set('Enter a recipient address');
-      return;
-    }
-
     this.isSending.set(true);
     try {
       const result = await this.store.send(this.token(), address, amount);
@@ -128,5 +173,10 @@ export class SendModal {
     this.amount.set(null);
     this.saveChecked.set(false);
     this.saveName.set('');
+    this.step.set('form');
   }
+}
+
+function shortAddress(address: string): string {
+  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
 }
