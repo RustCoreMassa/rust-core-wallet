@@ -35,7 +35,13 @@ export class HomePage {
   protected readonly activeTab = signal<HomeTab>('tokens');
 
   protected readonly wallet = this.store.activeWallet;
+  /** All tokens with a Dusa price — shown as the Tokens tab total. */
   protected readonly totalUsd = this.store.portfolioValueUsd;
+
+  /** The header shows MAS only, so its USD line is MAS only too. */
+  protected readonly masUsd = computed(
+    () => (this.wallet().balances.MAS ?? 0) * (this.store.prices().MAS ?? 0),
+  );
 
   protected readonly showAllTokens = signal(loadShowAll());
 

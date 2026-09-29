@@ -29,7 +29,7 @@
 </header>
 
 <section class="balance">
-  <div class="balance-label">Total balance</div>
+  <div class="balance-label">MAS balance</div>
   <div class="balance-amount">
     @if (wallet().loaded) {
     <span>{{ wallet().balances.MAS | number: '1.2-2' }}</span>
@@ -39,7 +39,11 @@
     <span class="unit">MAS</span>
   </div>
   <div class="balance-sub">
-    <span>{{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+    @if (wallet().loaded) {
+    <span>{{ masUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</span>
+    } @else {
+    <span class="skeleton"></span>
+    }
   </div>
 </section>
 
@@ -73,7 +77,9 @@
 <div class="tabs">
   <button class="tab" [class.active]="activeTab() === 'tokens'" type="button" (click)="setTab('tokens')">Tokens</button>
   <button class="tab" [class.active]="activeTab() === 'history'" type="button" (click)="setTab('history')">History</button>
-  <div class="tab-meta">{{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+  @if (activeTab() === 'tokens' && wallet().loaded) {
+  <div class="tab-meta">Total {{ totalUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</div>
+  }
 </div>
 
 <div class="token-list" (scroll)="onListScroll($event)">
