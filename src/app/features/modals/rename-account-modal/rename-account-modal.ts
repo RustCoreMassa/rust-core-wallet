@@ -7,6 +7,7 @@ import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { PinPad } from '../../../shared/ui/pin-pad/pin-pad';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 /** `edit` → rename; `remove-warn` → explain what removal means; `remove-pin` → confirm with the PIN. */
 type Step = 'edit' | 'remove-warn' | 'remove-pin';
@@ -77,7 +78,7 @@ export class RenameAccountModal {
       this.toast.show(`${account.name} removed`);
       this.modal.close();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
       this.pin.set('');
     } finally {
       this.isRemoving.set(false);
@@ -115,7 +116,7 @@ export class RenameAccountModal {
       this.toast.show('Wallet renamed');
       this.modal.close();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     } finally {
       this.isSaving.set(false);
     }

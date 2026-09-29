@@ -8,7 +8,7 @@ import { Ciphertext } from './crypto-vault';
 
 const STORAGE_KEY = 'massa-wallet:cache';
 /** Bump when the snapshot shape changes — older caches are then ignored. */
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 export interface WalletCacheSnapshot {
   readonly version: number;

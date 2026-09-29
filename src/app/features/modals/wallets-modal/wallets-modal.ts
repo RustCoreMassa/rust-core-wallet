@@ -8,6 +8,7 @@ import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { AVATAR_COLORS } from '../../../shared/ui/avatar-colors';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 type Step = 'list' | 'choice' | 'import' | 'generating';
 
@@ -81,7 +82,7 @@ export class WalletsModal {
       const name = this.authStore.suggestWalletName();
       await this.addAccount({ id: crypto.randomUUID(), name, address, privateKey });
     } catch (err) {
-      this.error.set(errorMessage(err));
+      this.error.set(toUserMessage(err));
       this.step.set('choice');
     }
   }
@@ -113,7 +114,7 @@ export class WalletsModal {
       }
       await this.addAccount({ id: crypto.randomUUID(), name, address, privateKey });
     } catch (err) {
-      this.error.set(errorMessage(err));
+      this.error.set(toUserMessage(err));
     } finally {
       this.isBusy.set(false);
     }
@@ -126,8 +127,4 @@ export class WalletsModal {
     this.toast.show(`${account.name} added`);
     this.modal.close();
   }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'Something went wrong — please try again';
 }

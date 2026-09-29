@@ -7,6 +7,7 @@ import { Toast } from '../../../core/services/toast';
 import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 @Component({
   selector: 'app-send-modal',
@@ -126,7 +127,7 @@ export class SendModal {
       this.store.validateSend(this.token(), this.address().trim(), this.amount() ?? 0);
       this.step.set('confirm');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     }
   }
 
@@ -149,7 +150,7 @@ export class SendModal {
       this.reset();
       this.modal.close();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     } finally {
       this.isSending.set(false);
     }

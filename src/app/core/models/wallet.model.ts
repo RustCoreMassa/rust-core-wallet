@@ -1,4 +1,4 @@
-import { TokenBalances } from './token.model';
+import { TokenBalances, TokenSymbol } from './token.model';
 import { MnsDomain } from './nft.model';
 import { HistoryPaging, TransactionRecord } from './transaction.model';
 
@@ -29,7 +29,15 @@ export interface WalletState {
   readonly address: string;
   /** False until balances/rolls have been read from the chain once — the UI shows a placeholder, not 0. */
   readonly loaded: boolean;
+  /** Human-readable amounts for display and checks (a JS number: ~16 significant digits). */
   readonly balances: TokenBalances;
+  /**
+   * The exact on-chain balances in smallest units, as decimal strings (so they
+   * survive JSON caching). `balances` can't hold 18-decimal precision — a
+   * Max amount rounded up in the last digits would exceed what's held — so
+   * spends are clamped against these (see WalletStore.spendableUnits).
+   */
+  readonly rawBalances: Partial<Record<TokenSymbol, string>>;
   readonly rolls: RollsState;
   /** `null` until first read from the chain. */
   readonly staking: StakingStats | null;

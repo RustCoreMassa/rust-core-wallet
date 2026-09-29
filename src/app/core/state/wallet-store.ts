@@ -56,6 +56,7 @@ function newWallet(id: string, name: string, address: string): WalletState {
     address,
     loaded: false,
     balances: { MAS: 0 },
+    rawBalances: {},
     rolls: { active: 0, candidate: 0, deferred: 0 },
     staking: null,
     history: [],
@@ -553,18 +554,27 @@ export class WalletStore {
         id,
         (w) => {
           const balances: TokenBalances = { ...w.balances };
-          if (mas.status === 'fulfilled')
+          const rawBalances: Partial<Record<TokenSymbol, string>> = { ...w.rawBalances };
+          if (mas.status === 'fulfilled') {
             balances.MAS = fromUnits(mas.value, TOKEN_REGISTRY.MAS.decimals);
+            rawBalances.MAS = mas.value.toString();
+          }
           tokens.forEach((result, i) => {
             if (result.status !== 'fulfilled') return;
             const { symbol, decimals } = tokenList[i];
             // Sparse: only tokens actually held get a key.
-            if (result.value > 0n) balances[symbol] = fromUnits(result.value, decimals);
-            else delete balances[symbol];
+            if (result.value > 0n) {
+              balances[symbol] = fromUnits(result.value, decimals);
+              rawBalances[symbol] = result.value.toString();
+            } else {
+              delete balances[symbol];
+              delete rawBalances[symbol];
+            }
           });
           return {
             ...w,
             balances,
+            rawBalances,
             loaded: w.loaded || mas.status === 'fulfilled',
             rolls: staking.status === 'fulfilled' ? staking.value.rolls : w.rolls,
             staking: staking.status === 'fulfilled' ? staking.value.stats : w.staking,
@@ -676,12 +686,23 @@ export class WalletStore {
     amount: number,
     slippageBps: number,
   ): Promise<SwapQuote> {
-    return this.dusaSwap.quote(
-      from,
-      to,
-      toUnits(amount, TOKEN_REGISTRY[from].decimals),
-      slippageBps,
-    );
+    return this.dusaSwap.quote(from, to, this.spendableUnits(from, amount), slippageBps);
+  }
+
+  /**
+   * `amount` in smallest units, never above what's actually held. The
+   * displayed balance is a float: for an 18-decimal token, Max can come out
+   * a few units above the real on-chain balance once converted back (e.g.
+   * 0.999797356704804 DAI → …804000 units vs …803912 held), and the token
+   * contract rejects that with "insufficient funds". Validation has already
+   * checked `amount` against the displayed balance, so anything above the
+   * exact balance is only that rounding — clamp it.
+   */
+  private spendableUnits(token: TokenSymbol, amount: number): bigint {
+    const units = toUnits(amount, TOKEN_REGISTRY[token].decimals);
+    const raw = this.activeWallet().rawBalances[token];
+    const held = raw !== undefined ? BigInt(raw) : null;
+    return held !== null && units > held ? held : units;
   }
 
   // ---- transactions --------------------------------------------------------
@@ -703,7 +724,7 @@ export class WalletStore {
     const wallet = this.activeWallet();
     this.validateSend(token, toAddress, amount);
     const meta = TOKEN_REGISTRY[token];
-    const units = toUnits(amount, meta.decimals);
+    const units = this.spendableUnits(token, amount);
     const targetId = this.walletList().find(
       (w) => w.address === toAddress && w.id !== wallet.id,
     )?.id;

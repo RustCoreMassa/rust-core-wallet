@@ -83,7 +83,6 @@ export class BackupPhraseModal {
     }
   }
 
-
   protected copyPrivateKey(): void {
     const account = this.selectedAccount();
     if (!account) return;

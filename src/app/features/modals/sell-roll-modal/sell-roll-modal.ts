@@ -5,6 +5,7 @@ import { NETWORK_FEE_MAS, ROLL_PRICE_MAS } from '../../../core/services/massa-pr
 import { Toast } from '../../../core/services/toast';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 @Component({
   selector: 'app-sell-roll-modal',
@@ -31,7 +32,11 @@ export class SellRollModal {
     const count = this.count();
     return [
       { label: 'Rolls to sell', value: `${count}` },
-      { label: 'You receive', value: `${this.proceeds().toLocaleString('en-US')} MAS`, strong: true },
+      {
+        label: 'You receive',
+        value: `${this.proceeds().toLocaleString('en-US')} MAS`,
+        strong: true,
+      },
       { label: 'Paid out', value: 'a few cycles after the sale' },
       { label: 'Network fee', value: `${NETWORK_FEE_MAS} MAS` },
       { label: 'Rolls left', value: `${Math.max(0, this.maxRolls() - count)}` },
@@ -49,7 +54,7 @@ export class SellRollModal {
       this.store.validateSellRolls(this.count());
       this.step.set('confirm');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     }
   }
 
@@ -62,7 +67,7 @@ export class SellRollModal {
       this.toast.show(`Selling ${count} roll${count > 1 ? 's' : ''} — unstaking`);
       this.modal.close();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     } finally {
       this.isSelling.set(false);
     }

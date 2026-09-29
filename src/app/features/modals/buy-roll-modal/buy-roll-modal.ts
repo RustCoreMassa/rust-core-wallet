@@ -5,6 +5,7 @@ import { NETWORK_FEE_MAS, ROLL_PRICE_MAS } from '../../../core/services/massa-pr
 import { Toast } from '../../../core/services/toast';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 @Component({
   selector: 'app-buy-roll-modal',
@@ -54,7 +55,7 @@ export class BuyRollModal {
       this.store.validateBuyRolls(this.count());
       this.step.set('confirm');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     }
   }
 
@@ -67,7 +68,7 @@ export class BuyRollModal {
       this.toast.show(`Bought ${count} roll${count > 1 ? 's' : ''}`);
       this.modal.close();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     } finally {
       this.isBuying.set(false);
     }

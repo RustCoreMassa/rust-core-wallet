@@ -9,6 +9,7 @@ import { WalletStore } from '../../../core/state/wallet-store';
 import { fromUnits } from '../../../core/utils/token-amount';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 /** Quotes are re-read this long after the user stops typing. */
 const QUOTE_DEBOUNCE_MS = 400;
@@ -142,7 +143,7 @@ export class SwapModal {
       if (!this.quote()) throw new Error(this.quoteError() ?? 'Waiting for a quote…');
       this.step.set('confirm');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     }
   }
 
@@ -156,7 +157,7 @@ export class SwapModal {
       this.toast.show(`Swapped ${this.fromText(q)} → ${this.receiveText()} ${q.to}`);
       this.modal.close();
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Something went wrong');
+      this.error.set(toUserMessage(err));
     } finally {
       this.isSwapping.set(false);
     }
@@ -187,7 +188,7 @@ export class SwapModal {
         if (request === this.quoteRequest) this.quote.set(q);
       } catch (err) {
         if (request === this.quoteRequest) {
-          this.quoteError.set(err instanceof Error ? err.message : 'No quote available');
+          this.quoteError.set(toUserMessage(err));
         }
       } finally {
         if (request === this.quoteRequest) this.isQuoting.set(false);

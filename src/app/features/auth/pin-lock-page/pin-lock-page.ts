@@ -6,6 +6,7 @@ import { MASSA_PROVIDER } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { PinPad } from '../../../shared/ui/pin-pad/pin-pad';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 type Step = 'unlock' | 'set-pin' | 'confirm-pin' | 'key-choice' | 'import-key' | 'generating';
 
@@ -144,7 +145,7 @@ export class PinLockPage {
       const name = this.authStore.suggestWalletName();
       await this.completeRegistration({ id: 'main', name, address, privateKey });
     } catch (err) {
-      this.error.set(errorMessage(err));
+      this.error.set(toUserMessage(err));
       this.step.set('key-choice');
     }
   }
@@ -189,7 +190,7 @@ export class PinLockPage {
       }
       await this.completeRegistration({ id: 'main', name, address, privateKey });
     } catch (err) {
-      this.error.set(errorMessage(err));
+      this.error.set(toUserMessage(err));
     } finally {
       this.isBusy.set(false);
     }
@@ -199,8 +200,4 @@ export class PinLockPage {
     await this.authStore.register(this.firstPin, [account]);
     this.router.navigateByUrl('/home');
   }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'Something went wrong — please try again';
 }
