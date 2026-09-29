@@ -22,6 +22,9 @@ const QUOTE_SOURCES: readonly QuoteSource[] = [
   { quoter: DUSA.v2Quoter, checkLegacy: true },
   { quoter: DUSA.v1Quoter, checkLegacy: true },
 ];
+/** Probe sizes, as powers of ten below one whole unit: 1, then 0.0001. */
+const PROBE_SCALE_DOWNS = [0, 4] as const;
+
 const WMAS = DUSA.wmas;
 const WMAS_DECIMALS = DUSA.wmasDecimals;
 const USDC = TOKEN_REGISTRY['USDC.e'];
@@ -45,6 +48,11 @@ const USDC = TOKEN_REGISTRY['USDC.e'];
 export class DusaPrices {
   private readonly provider = JsonRpcPublicProvider.mainnet();
 
+  /**
+   * Throws if MAS can't be read (every WMAS-routed price depends on it) —
+   * the caller then keeps its previous prices. A token whose own read hits
+   * an RPC error is left out of the result, so it keeps its previous price.
+   */
   async getUsdPrices(): Promise<TokenPrices> {
     const masUsd = await this.firstPrice((source) =>
       this.quoteOne(source, WMAS, WMAS_DECIMALS, USDC.contract, USDC.decimals),
@@ -56,10 +64,37 @@ export class DusaPrices {
     // node starts rejecting requests at ~30 concurrent ones, and balance
     // reads run alongside.
     for (const token of TOKEN_LIST.filter((t) => t.isErc20 && t.symbol !== 'USDC.e')) {
-      const usd = await this.tokenUsd(token, masUsd);
+      const usd = await this.tokenUsd(token, masUsd).catch(() => 0); // RPC hiccup: skip
+      if (usd > 0) prices[token.symbol] = usd;
+    }
+
+    // Second pass: some tokens only pool against another token rather than
+    // USDC.e/WMAS (WETH.b trades against WETH.e) — price them through any
+    // token already priced above.
+    for (const token of TOKEN_LIST.filter((t) => t.isErc20 && prices[t.symbol] === undefined)) {
+      const usd = await this.viaPricedToken(token, prices).catch(() => 0); // RPC hiccup: skip
       if (usd > 0) prices[token.symbol] = usd;
     }
     return prices;
+  }
+
+  private async viaPricedToken(token: TokenMeta, prices: TokenPrices): Promise<number> {
+    const bases = TOKEN_LIST.filter(
+      (b) => b.isErc20 && b.symbol !== token.symbol && (prices[b.symbol] ?? 0) > 0,
+    );
+    // V2 pools only here: legacy prices are stale, and this pass is a
+    // fallback that would otherwise multiply the number of reads.
+    for (const base of bases) {
+      const inBase = await this.quoteOne(
+        QUOTE_SOURCES[0],
+        token.contract,
+        token.decimals,
+        base.contract,
+        base.decimals,
+      );
+      if (inBase > 0) return inBase * prices[base.symbol]!;
+    }
+    return 0;
   }
 
   private tokenUsd(token: TokenMeta, masUsd: number): Promise<number> {
@@ -72,7 +107,12 @@ export class DusaPrices {
     });
   }
 
-  /** Walks QUOTE_SOURCES in order; the first positive price wins, 0 if none has one. */
+  /**
+   * Walks QUOTE_SOURCES in order; the first positive price wins, 0 if none
+   * has one. Only a genuine "no liquidity" moves on to the next (legacy)
+   * source — an RPC error propagates instead, so a network hiccup can
+   * never make a stale legacy price win.
+   */
   private async firstPrice(priceFrom: (source: QuoteSource) => Promise<number>): Promise<number> {
     for (const source of QUOTE_SOURCES) {
       const price = await priceFrom(source);
@@ -81,7 +121,14 @@ export class DusaPrices {
     return 0;
   }
 
-  /** Output (human units) for selling 1 `from`; 0 without liquidity or on a failed read. */
+  /**
+   * Output (human units) for selling 1 `from`; 0 without liquidity.
+   *
+   * One whole unit first. For a pricey token (1 WETH ≈ $2 700) that can
+   * exceed what the pool holds and the quoter fails or returns 0 — then
+   * 1/10 000 of a unit is quoted and scaled back up. A tiny probe isn't the
+   * default because for very cheap tokens (PUR) it rounds to nothing.
+   */
   private async quoteOne(
     source: QuoteSource,
     from: string,
@@ -89,12 +136,16 @@ export class DusaPrices {
     to: string,
     toDecimals: number,
   ): Promise<number> {
-    try {
-      const out = await this.quote(source, [from, to], 10n ** BigInt(fromDecimals));
-      return fromUnits(out, toDecimals);
-    } catch {
-      return 0;
+    for (const scaleDown of PROBE_SCALE_DOWNS) {
+      if (scaleDown > fromDecimals) continue;
+      try {
+        const out = await this.quote(source, [from, to], 10n ** BigInt(fromDecimals - scaleDown));
+        if (out > 0n) return fromUnits(out, toDecimals) * 10 ** scaleDown;
+      } catch (err) {
+        if (!(err instanceof NoQuoteError)) throw err; // RPC failure, not "no liquidity"
+      }
     }
+    return 0;
   }
 
   /** Spot output amount (smallest units) of the best path for `route`. */
@@ -104,9 +155,13 @@ export class DusaPrices {
       func: 'findBestPathFromAmountIn',
       parameter: quoteArgs(route, amountIn, source.checkLegacy),
     });
-    if (result.info.error || !result.value?.length)
-      throw new Error(result.info.error || 'No quote');
+    // The contract answered, but with no path at this size (e.g. more than
+    // the pool holds). Transport errors are thrown by readSC itself.
+    if (result.info.error || !result.value?.length) throw new NoQuoteError();
     const spot = decodeQuote(result.value).virtualAmountsWithoutSlippage;
     return spot.at(-1) ?? 0n;
   }
 }
+
+/** The quoter itself found no path — as opposed to the RPC call failing. */
+class NoQuoteError extends Error {}
