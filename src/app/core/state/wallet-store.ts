@@ -24,6 +24,9 @@ const TOKENS_BY_NETWORK: Readonly<Record<Network, typeof MRC20_TOKENS>> = {
   buildnet: [],
 };
 
+/** How long auto-refresh leaves a wallet alone after a write (see `autoRefresh`). */
+const WRITE_SETTLE_MS = 8000;
+
 type WalletsByNetwork = Record<Network, Record<string, WalletState>>;
 
 const emptyWallets = (): WalletsByNetwork => ({ mainnet: {}, buildnet: {} });
@@ -107,6 +110,8 @@ export class WalletStore {
   private readonly _prices = signal<TokenPrices>(DEMO_PRICES);
   private readonly _dayChangePct = signal<TokenPrices>(DEMO_DAY_CHANGE_PCT);
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
+  /** Per wallet id: auto-refresh is skipped until this timestamp. */
+  private readonly settleUntil = new Map<string, number>();
 
   readonly network = this.networkStore.network;
   readonly wallets = computed(() => this._walletsByNetwork()[this.network()]);
@@ -122,6 +127,12 @@ export class WalletStore {
     if (!wallet) throw new Error(`Unknown active wallet id "${this._activeWalletId()}"`);
     return wallet;
   });
+
+  /** Every token that exists on the current network, registry order. */
+  readonly availableTokens = computed<readonly TokenSymbol[]>(() => [
+    'MAS',
+    ...TOKENS_BY_NETWORK[this.network()].map((t) => t.symbol),
+  ]);
 
   readonly isRefreshing = computed(() => this._refreshingIds().has(this._activeWalletId()));
 
@@ -155,6 +166,7 @@ export class WalletStore {
     this._activeWalletId.set('');
     this._addressBook.set([]);
     this._refreshingIds.set(new Set());
+    this.settleUntil.clear();
   }
 
   // ---- wallets -------------------------------------------------------------
@@ -192,6 +204,19 @@ export class WalletStore {
   }
 
   /**
+   * Periodic refresh of the active wallet (driven by MainLayout). Skipped
+   * while a refresh is already in flight, and for a few seconds after a
+   * write — a read that races the operation's inclusion would otherwise
+   * overwrite the optimistic balance with the stale pre-write one.
+   */
+  autoRefresh(): void {
+    const id = this._activeWalletId();
+    if (!id || this._refreshingIds().has(id)) return;
+    if (Date.now() < (this.settleUntil.get(id) ?? 0)) return;
+    this.refreshInBackground(id);
+  }
+
+  /**
    * Re-reads MAS, every MRC-20 balance and roll counts from the chain.
    * Each read is independent: one that fails (RPC hiccup, bad token
    * contract) keeps its previous value instead of failing the rest.
@@ -207,7 +232,10 @@ export class WalletStore {
     try {
       const [[mas, rolls], tokens] = await Promise.all([
         Promise.allSettled([
-          this.provider.getBalance(privateKey),
+          // Candidate (not final) balance: already includes operations
+          // that are executed but not yet final, so sends show up in
+          // seconds instead of after finality.
+          this.provider.getBalance(privateKey, false),
           this.provider.getRolls(wallet.address),
         ]),
         Promise.allSettled(
@@ -289,10 +317,13 @@ export class WalletStore {
       network,
     );
 
+    this.markWritten(wallet.id);
+
     const targetId = this.walletList().find(
       (w) => w.address === toAddress && w.id !== wallet.id,
     )?.id;
     if (targetId) {
+      this.markWritten(targetId);
       this.updateWallet(
         targetId,
         (w) => ({
@@ -329,6 +360,7 @@ export class WalletStore {
       BigInt(rollCount),
     );
 
+    this.markWritten(wallet.id);
     // Bought rolls stay candidate until final; `refresh` picks that up.
     this.updateWallet(
       wallet.id,
@@ -357,6 +389,7 @@ export class WalletStore {
       BigInt(rollCount),
     );
     const refund = rollCount * ROLL_PRICE_MAS;
+    this.markWritten(wallet.id);
 
     // The MAS refund is a deferred credit, paid out by the chain a few
     // cycles later — `refresh` picks it up, nothing is credited here.
@@ -383,6 +416,10 @@ export class WalletStore {
   /** Fire-and-forget `refresh` — logs instead of leaving an unhandled rejection. */
   private refreshInBackground(id: string): void {
     this.refresh(id).catch((err) => console.warn(`Wallet refresh failed for "${id}"`, err));
+  }
+
+  private markWritten(id: string): void {
+    this.settleUntil.set(id, Date.now() + WRITE_SETTLE_MS);
   }
 
   /** Throws while the vault is locked — keys only exist in AuthStore when unlocked. */

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Modal } from '../../core/services/modal';
 import { BottomNav } from '../../shared/ui/bottom-nav/bottom-nav';
@@ -14,6 +14,9 @@ import { BackupPhraseModal } from '../../features/modals/backup-phrase-modal/bac
 import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
+
+/** Massa produces a block every 0.5s; 10s keeps the UI fresh without hammering the RPC node. */
+const AUTO_REFRESH_MS = 10_000;
 
 @Component({
   selector: 'app-main-layout',
@@ -45,6 +48,20 @@ export class MainLayout {
     for (const account of authStore.accounts()) {
       walletStore.ensureWallet(account.id, account.name, account.address);
     }
+
+    // Live balances for as long as the unlocked shell is on screen —
+    // paused while the tab is hidden, caught up as soon as it's back.
+    const timer = setInterval(() => {
+      if (!document.hidden) walletStore.autoRefresh();
+    }, AUTO_REFRESH_MS);
+    const onVisibility = () => {
+      if (!document.hidden) walletStore.autoRefresh();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    });
   }
 
   protected onOverlayClick(event: MouseEvent): void {

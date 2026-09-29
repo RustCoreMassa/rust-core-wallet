@@ -85,6 +85,15 @@
     [changePct]="store.dayChangePct()[symbol] ?? 0"
   />
   }
+  @if (store.availableTokens().length > 1) {
+  <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
+    @if (showAllTokens()) {
+    Hide low balances
+    } @else {
+    Show all tokens@if (hiddenCount() > 0) { ({{ hiddenCount() }} hidden)}
+    }
+  </button>
+  }
   } @else {
   @if (wallet().history.length === 0) {
   <div class="empty-state">No transactions yet</div>

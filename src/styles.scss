@@ -62,7 +62,11 @@ button {
 /* ---------- app shell ---------- */
 .app-screen {
   position: relative;
-  min-height: 100vh;
+  /* Fixed to the viewport so the document itself never scrolls — only
+     .view-area (or a region inside a page) does. dvh tracks mobile
+     browser toolbars; the vh line is the fallback. */
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -90,7 +94,7 @@ button {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 100vh;
+  min-height: 0;
 }
 
 /* ---------- toast ---------- */
@@ -127,6 +131,7 @@ button {
 /* ---------- view area ---------- */
 .view-area {
   flex: 1;
+  min-height: 0;
   position: relative;
   overflow-y: auto;
   padding-bottom: 8px;
