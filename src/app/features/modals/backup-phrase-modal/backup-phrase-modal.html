@@ -1,6 +1,6 @@
 <div class="modal">
   <div class="modal-head">
-    <div class="modal-title">Backup phrase</div>
+    <div class="modal-title">Backup private key</div>
     <button class="modal-close" type="button" (click)="modal.close()">✕</button>
   </div>
 
@@ -25,13 +25,7 @@
   @if (step() === 'reveal') {
   @if (accounts().length > 1) {
   <label class="field-label" for="backup-account-select">Wallet</label>
-  <div class="select-fake">
-    <select id="backup-account-select" [ngModel]="selectedAccountId()" (ngModelChange)="selectAccount($event)">
-      @for (account of accounts(); track account.id) {
-      <option [value]="account.id">{{ account.name }}</option>
-      }
-    </select>
-  </div>
+  <app-dropdown inputId="backup-account-select" [options]="accountOptions()" [(value)]="selectedAccountId" />
   }
 
   <div class="error-text" style="display:block;margin-top:14px;">

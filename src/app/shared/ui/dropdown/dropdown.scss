@@ -1,0 +1,109 @@
+:host {
+  display: block;
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  width: 100%;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-trigger .dropdown-label {
+  flex: 1;
+}
+
+.dropdown-icon,
+.dropdown-avatar {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.dropdown-icon {
+  border-radius: 50%;
+}
+
+.dropdown-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.dropdown-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dropdown-chevron {
+  width: 12px;
+  height: 12px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%238a8a91' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat center;
+  transition: transform 0.15s ease;
+}
+
+.dropdown-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Same width as the field, anchored right under it. */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  color: var(--white);
+  text-align: left;
+}
+
+.dropdown-option:hover,
+.dropdown-option.selected {
+  background: var(--bg);
+}
+
+.dropdown-names {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown-sublabel {
+  font-size: 11.5px;
+  color: var(--gray-500);
+}
+
+.dropdown-trailing {
+  font-size: 12.5px;
+  color: var(--gray-300);
+}

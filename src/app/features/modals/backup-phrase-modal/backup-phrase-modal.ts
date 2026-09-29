@@ -1,18 +1,19 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { PinPad } from '../../../shared/ui/pin-pad/pin-pad';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
+import { avatarColorsFor } from '../../../shared/ui/avatar-colors';
+import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 
 type Step = 'confirm-pin' | 'reveal';
 const PIN_LENGTH = 6;
 
 @Component({
   selector: 'app-backup-phrase-modal',
-  imports: [PinPad, FormsModule, ShortAddressPipe],
+  imports: [PinPad, ShortAddressPipe, Dropdown],
   templateUrl: './backup-phrase-modal.html',
   styleUrl: './backup-phrase-modal.scss',
 })
@@ -36,6 +37,22 @@ export class BackupPhraseModal {
 
   protected readonly selectedAccount = computed(
     () => this.accounts().find((a) => a.id === this.selectedAccountId()) ?? null,
+  );
+
+  /** Wallet picker entries: letter avatar, name, short address. */
+  protected readonly accountOptions = computed<DropdownOption[]>(() =>
+    this.accounts().map((account) => {
+      const [from, to] = avatarColorsFor(account.name);
+      return {
+        value: account.id,
+        label: account.name,
+        sublabel: `${account.address.slice(0, 6)}…${account.address.slice(-4)}`,
+        avatar: {
+          background: `linear-gradient(155deg, ${from}, ${to})`,
+          text: account.name.slice(0, 2).toUpperCase(),
+        },
+      };
+    }),
   );
 
   protected async onDigit(digit: string): Promise<void> {
@@ -66,9 +83,6 @@ export class BackupPhraseModal {
     }
   }
 
-  protected selectAccount(id: string): void {
-    this.selectedAccountId.set(id);
-  }
 
   protected copyPrivateKey(): void {
     const account = this.selectedAccount();

@@ -93,7 +93,7 @@ export class AuthStore {
    * Re-checks a PIN against the stored vault WITHOUT touching session
    * state (`isUnlocked`, `accounts`, `sessionKey` are all left alone).
    * For step-up confirmation before revealing something sensitive
-   * (e.g. a backup phrase) while already unlocked.
+   * (e.g. a private key backup) while already unlocked.
    */
   async verifyPin(pin: string): Promise<boolean> {
     const envelope = this.vaultStorage.load();

@@ -1,5 +1,4 @@
-import { DecimalPipe } from '@angular/common';
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TOKEN_LIST, TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
 import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
@@ -7,16 +6,13 @@ import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
+import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 
 @Component({
   selector: 'app-send-modal',
-  imports: [FormsModule, DecimalPipe, ConfirmDetails],
+  imports: [FormsModule, ConfirmDetails, Dropdown],
   templateUrl: './send-modal.html',
   styleUrl: './send-modal.scss',
-  host: {
-    '(document:click)': 'closeTokenMenuOnOutsideClick($event)',
-    '(document:keydown.escape)': 'tokenMenuOpen.set(false)',
-  },
 })
 export class SendModal {
   protected readonly modal = inject(Modal);
@@ -37,25 +33,17 @@ export class SendModal {
     return TOKEN_LIST.map((t) => t.symbol).filter((s) => s === 'MAS' || (balances[s] ?? 0) > 0);
   });
 
-  protected readonly tokenMeta = TOKEN_REGISTRY;
-
-  /**
-   * Asset picker is a custom dropdown, not a native <select>: the browser
-   * draws a native option list itself (its own width and look), which CSS
-   * can't make match the field.
-   */
-  protected readonly tokenMenuOpen = signal(false);
-  private readonly tokenPicker = viewChild<ElementRef<HTMLElement>>('tokenPicker');
-
-  protected pickToken(token: TokenSymbol): void {
-    this.token.set(token);
-    this.tokenMenuOpen.set(false);
-  }
-
-  protected closeTokenMenuOnOutsideClick(event: MouseEvent): void {
-    const picker = this.tokenPicker()?.nativeElement;
-    if (picker && !picker.contains(event.target as Node)) this.tokenMenuOpen.set(false);
-  }
+  /** Asset picker entries: icon, symbol, full name, balance. */
+  protected readonly tokenOptions = computed<DropdownOption<TokenSymbol>[]>(() => {
+    const balances = this.store.activeWallet().balances;
+    return this.tokens().map((symbol) => ({
+      value: symbol,
+      label: symbol,
+      sublabel: TOKEN_REGISTRY[symbol].name,
+      icon: TOKEN_REGISTRY[symbol].asset,
+      trailing: (balances[symbol] ?? 0).toLocaleString('en-US', { maximumFractionDigits: 6 }),
+    }));
+  });
 
   protected readonly otherWallets = computed(() =>
     this.store.walletList().filter((w) => w.id !== this.store.activeWalletId()),
@@ -136,7 +124,6 @@ export class SendModal {
     this.error.set(null);
     try {
       this.store.validateSend(this.token(), this.address().trim(), this.amount() ?? 0);
-      this.tokenMenuOpen.set(false);
       this.step.set('confirm');
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : 'Something went wrong');
