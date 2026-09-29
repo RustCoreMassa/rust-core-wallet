@@ -1,23 +1,70 @@
 <div class="view-header">NFTs</div>
 
-<div class="field-label section-label">Domains (MNS)</div>
-<div class="settings-list">
+<section class="collect-section">
+  <div class="section-head">
+    <div>
+      <div class="section-title">Domains</div>
+      <div class="section-sub">Massa Name System</div>
+    </div>
+    @if (domains(); as domains) {
+    <span class="count-pill">{{ domains.length }}</span>
+    }
+  </div>
+
   @if (domains(); as domains) {
   @if (domains.length > 0) {
-  @for (domain of domains; track domain.name) {
-  <div class="settings-row">
-    <div class="label">{{ domain.name }}.massa</div>
+  <div class="collect-card">
+    @for (domain of domains; track domain.name) {
+    <button class="domain-row" type="button" (click)="openDomain(domain)">
+      <div class="domain-avatar" [style.background]="avatar(domain.name)">
+        {{ domain.name.slice(0, 1).toUpperCase() }}
+      </div>
+      <div class="domain-name">{{ domain.name }}<span class="tld">.massa</span></div>
+      <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
+    }
+  </div>
+  } @else {
+  <div class="collect-empty">
+    <div class="collect-empty-title">No domains yet</div>
+    <div class="collect-empty-sub">.massa names owned by this wallet will show up here.</div>
   </div>
   }
-  } @else {
-  <div class="empty-state">No domains owned by this wallet</div>
-  }
   } @else if (hasError()) {
-  <div class="empty-state">Couldn't load domains</div>
+  <div class="collect-empty">
+    <div class="collect-empty-title">Couldn't load domains</div>
+    <div class="collect-empty-sub">Check your connection — we'll retry when you come back.</div>
+  </div>
   } @else {
-  <div class="empty-state">Loading domains…</div>
+  <div class="collect-card">
+    @for (row of skeletonRows; track row) {
+    <div class="domain-row">
+      <div class="domain-avatar skeleton-block"></div>
+      <span class="skeleton"></span>
+    </div>
+    }
+  </div>
   }
-</div>
+</section>
 
-<div class="field-label section-label">NFTs</div>
-<div class="empty-state">Coming soon</div>
+<section class="collect-section">
+  <div class="section-head">
+    <div>
+      <div class="section-title">NFTs</div>
+      <div class="section-sub">Collectibles</div>
+    </div>
+  </div>
+
+  <div class="collect-empty coming-soon">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
+      <rect x="14" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
+      <rect x="3" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
+      <rect x="14" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
+    </svg>
+    <div class="collect-empty-title">Coming soon</div>
+    <div class="collect-empty-sub">NFTs held by this wallet will show up here.</div>
+  </div>
+</section>

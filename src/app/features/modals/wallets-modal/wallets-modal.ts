@@ -7,15 +7,9 @@ import { Toast } from '../../../core/services/toast';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
+import { AVATAR_COLORS } from '../../../shared/ui/avatar-colors';
 
 type Step = 'list' | 'choice' | 'import' | 'generating';
-
-const AVATAR_COLORS: readonly [string, string][] = [
-  ['#ff2d42', '#7a0f1c'],
-  ['#4361ff', '#1c2a8f'],
-  ['#ff8a3d', '#a84f10'],
-  ['#33d17a', '#0f6b3a'],
-];
 
 /**
  * "Your wallets" switcher AND the entry point for adding another one.
@@ -43,7 +37,7 @@ export class WalletsModal {
   protected readonly error = signal<string | null>(null);
   protected readonly isBusy = signal(false);
 
-  protected avatarColors(index: number): [string, string] {
+  protected avatarColors(index: number): readonly [string, string] {
     return AVATAR_COLORS[index % AVATAR_COLORS.length];
   }
 

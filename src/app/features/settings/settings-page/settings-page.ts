@@ -6,13 +6,7 @@ import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
-
-const AVATAR_COLORS: readonly [string, string][] = [
-  ['#ff2d42', '#7a0f1c'],
-  ['#4361ff', '#1c2a8f'],
-  ['#ff8a3d', '#a84f10'],
-  ['#33d17a', '#0f6b3a'],
-];
+import { AVATAR_COLORS } from '../../../shared/ui/avatar-colors';
 
 @Component({
   selector: 'app-settings-page',
@@ -38,7 +32,7 @@ export class SettingsPage {
     () => this.authStore.accounts().find((a) => a.id === this.store.activeWalletId()) ?? null,
   );
 
-  protected avatarColors(index: number): [string, string] {
+  protected avatarColors(index: number): readonly [string, string] {
     return AVATAR_COLORS[index % AVATAR_COLORS.length];
   }
 

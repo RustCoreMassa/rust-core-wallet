@@ -2,7 +2,130 @@
   display: contents;
 }
 
-.section-label {
-  padding: 0 20px;
-  margin-top: 18px;
+.collect-section {
+  padding: 14px 20px 6px;
+}
+
+.section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.section-sub {
+  font-size: 11.5px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+.count-pill {
+  min-width: 24px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--gray-300);
+}
+
+.collect-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.domain-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--white);
+  text-align: left;
+}
+
+.domain-row:last-child {
+  border-bottom: none;
+}
+
+button.domain-row:hover {
+  background: var(--bg-elevated-2);
+}
+
+.domain-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.domain-avatar.skeleton-block {
+  background: var(--bg-elevated-2);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.domain-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tld {
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+.chev {
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+
+.collect-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 26px 20px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+.collect-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.collect-empty-sub {
+  font-size: 12px;
+}
+
+.coming-soon svg {
+  margin-bottom: 6px;
 }

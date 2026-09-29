@@ -1,0 +1,47 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">Domain</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (domain(); as domain) {
+  <div class="domain-hero">
+    <div class="domain-hero-avatar" [style.background]="avatar()">{{ domain.name.slice(0, 1).toUpperCase() }}</div>
+    <div class="domain-hero-name">{{ domain.name }}<span class="tld">.massa</span></div>
+    <div class="domain-hero-sub">Massa Name System</div>
+  </div>
+
+  <dl class="domain-fields">
+    <div class="domain-field">
+      <dt>Status</dt>
+      <dd [class.linked]="!!domain.target">
+        @if (!domain.target) {
+        Not linked to an address
+        } @else if (pointsToThisWallet()) {
+        Points to this wallet
+        } @else {
+        Points to {{ domain.target | shortAddress }}
+        }
+      </dd>
+    </div>
+    <div class="domain-field">
+      <dt>Owner</dt>
+      <dd>This wallet</dd>
+    </div>
+  </dl>
+
+  <div class="field-label">Full domain</div>
+  <button class="addr-box domain-copy" type="button" (click)="copy(domain.name + '.massa', 'Domain')">
+    {{ domain.name }}.massa
+  </button>
+
+  @if (domain.target) {
+  <div class="field-label">Points to</div>
+  <button class="addr-box domain-copy" type="button" (click)="copy(domain.target, 'Address')">{{ domain.target }}</button>
+  }
+
+  @if (explorerUrl(); as url) {
+  <a class="btn btn-red domain-explorer" [href]="url" target="_blank" rel="noopener noreferrer">View address on explorer ↗</a>
+  }
+  }
+</div>

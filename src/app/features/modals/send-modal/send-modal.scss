@@ -13,3 +13,95 @@ input[type='number']::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ---------- asset picker (custom dropdown) ---------- */
+.token-picker {
+  position: relative;
+}
+
+.token-picker-trigger {
+  width: 100%;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.token-picker-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.token-picker-symbol {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.token-picker-trigger .token-picker-symbol {
+  flex: 1;
+}
+
+.token-picker-chevron {
+  width: 12px;
+  height: 12px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%238a8a91' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat center;
+  transition: transform 0.15s ease;
+}
+
+.token-picker-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Same width as the field, anchored right under it. */
+.token-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.token-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  color: var(--white);
+  text-align: left;
+}
+
+.token-picker-option:hover,
+.token-picker-option.selected {
+  background: var(--bg);
+}
+
+.token-picker-names {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.token-picker-name {
+  font-size: 11.5px;
+  color: var(--gray-500);
+}
+
+.token-picker-balance {
+  font-size: 12.5px;
+  color: var(--gray-300);
+}

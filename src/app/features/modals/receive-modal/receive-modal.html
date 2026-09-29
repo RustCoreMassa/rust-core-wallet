@@ -5,11 +5,18 @@
 </div>
 
 <div class="qr-wrap">
-  <canvas #qrCanvas width="160" height="160"></canvas>
+  <qr-code
+    [value]="address()"
+    size="180"
+    errorCorrectionLevel="M"
+    [margin]="2"
+    darkColor="#0a0a0aff"
+    lightColor="#f6f6f8ff"
+  />
 </div>
 
 <div class="field-label">Your address</div>
-<div class="addr-box">{{ store.activeWallet().address }}</div>
+<div class="addr-box">{{ address() }}</div>
 
 <div class="copy-row">
   <button class="btn btn-red" type="button" (click)="copyAddress()">Copy address</button>

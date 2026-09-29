@@ -1,0 +1,85 @@
+:host {
+  display: contents;
+}
+
+.domain-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 18px;
+}
+
+.domain-hero-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.domain-hero-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  word-break: break-all;
+  text-align: center;
+}
+
+.tld {
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+.domain-hero-sub {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.domain-fields {
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.domain-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.domain-field dt {
+  color: var(--gray-500);
+}
+
+.domain-field dd {
+  margin: 0;
+  text-align: right;
+  color: var(--gray-300);
+}
+
+.domain-field dd.linked {
+  color: var(--green);
+}
+
+.domain-copy {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: copy;
+}
+
+.domain-explorer {
+  display: block;
+  margin-top: 18px;
+  text-align: center;
+  text-decoration: none;
+}

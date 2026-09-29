@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TOKEN_LIST, TokenSymbol } from '../../../core/models/token.model';
+import { TOKEN_LIST, TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
 import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -12,6 +12,10 @@ import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
   imports: [FormsModule, DecimalPipe],
   templateUrl: './send-modal.html',
   styleUrl: './send-modal.scss',
+  host: {
+    '(document:click)': 'closeTokenMenuOnOutsideClick($event)',
+    '(document:keydown.escape)': 'tokenMenuOpen.set(false)',
+  },
 })
 export class SendModal {
   protected readonly modal = inject(Modal);
@@ -31,6 +35,26 @@ export class SendModal {
     const balances = this.store.activeWallet().balances;
     return TOKEN_LIST.map((t) => t.symbol).filter((s) => s === 'MAS' || (balances[s] ?? 0) > 0);
   });
+
+  protected readonly tokenMeta = TOKEN_REGISTRY;
+
+  /**
+   * Asset picker is a custom dropdown, not a native <select>: the browser
+   * draws a native option list itself (its own width and look), which CSS
+   * can't make match the field.
+   */
+  protected readonly tokenMenuOpen = signal(false);
+  private readonly tokenPicker = viewChild<ElementRef<HTMLElement>>('tokenPicker');
+
+  protected pickToken(token: TokenSymbol): void {
+    this.token.set(token);
+    this.tokenMenuOpen.set(false);
+  }
+
+  protected closeTokenMenuOnOutsideClick(event: MouseEvent): void {
+    const picker = this.tokenPicker()?.nativeElement;
+    if (picker && !picker.contains(event.target as Node)) this.tokenMenuOpen.set(false);
+  }
 
   protected readonly otherWallets = computed(() =>
     this.store.walletList().filter((w) => w.id !== this.store.activeWalletId()),

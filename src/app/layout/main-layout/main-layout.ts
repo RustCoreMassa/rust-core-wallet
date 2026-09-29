@@ -13,6 +13,7 @@ import { RenameAccountModal } from '../../features/modals/rename-account-modal/r
 import { BackupPhraseModal } from '../../features/modals/backup-phrase-modal/backup-phrase-modal';
 import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
 import { TxDetailsModal } from '../../features/modals/tx-details-modal/tx-details-modal';
+import { DomainDetailsModal } from '../../features/modals/domain-details-modal/domain-details-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 
@@ -35,6 +36,7 @@ const AUTO_REFRESH_MS = 10_000;
     BackupPhraseModal,
     LogoutModal,
     TxDetailsModal,
+    DomainDetailsModal,
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',

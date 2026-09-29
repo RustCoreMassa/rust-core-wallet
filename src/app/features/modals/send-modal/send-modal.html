@@ -5,12 +5,41 @@
 </div>
 
 <label class="field-label" for="send-token">Asset</label>
-<div class="select-fake">
-  <select id="send-token" [ngModel]="token()" (ngModelChange)="token.set($event)">
+<div class="token-picker" #tokenPicker>
+  <button
+    id="send-token"
+    class="select-fake token-picker-trigger"
+    type="button"
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="tokenMenuOpen()"
+    (click)="tokenMenuOpen.set(!tokenMenuOpen())"
+  >
+    <img class="token-picker-icon" [src]="tokenMeta[token()].asset" alt="" />
+    <span class="token-picker-symbol">{{ token() }}</span>
+    <span class="token-picker-chevron" [class.open]="tokenMenuOpen()"></span>
+  </button>
+
+  @if (tokenMenuOpen()) {
+  <div class="token-picker-menu" role="listbox" aria-labelledby="send-token">
     @for (t of tokens(); track t) {
-    <option [value]="t">{{ t }}</option>
+    <button
+      class="token-picker-option"
+      type="button"
+      role="option"
+      [attr.aria-selected]="t === token()"
+      [class.selected]="t === token()"
+      (click)="pickToken(t)"
+    >
+      <img class="token-picker-icon" [src]="tokenMeta[t].asset" alt="" />
+      <span class="token-picker-names">
+        <span class="token-picker-symbol">{{ t }}</span>
+        <span class="token-picker-name">{{ tokenMeta[t].name }}</span>
+      </span>
+      <span class="token-picker-balance">{{ store.activeWallet().balances[t] ?? 0 | number: '1.0-6' }}</span>
+    </button>
     }
-  </select>
+  </div>
+  }
 </div>
 
 <div class="field-label">Your wallets</div>

@@ -1,5 +1,8 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { MnsDomain } from '../../../core/models/nft.model';
+import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
+import { avatarColorsFor } from '../../../shared/ui/avatar-colors';
 
 /**
  * MNS domains owned by the active wallet, read on-chain from the Massa
@@ -17,6 +20,7 @@ import { WalletStore } from '../../../core/state/wallet-store';
 })
 export class NftsPage {
   protected readonly store = inject(WalletStore);
+  private readonly modal = inject(Modal);
 
   protected readonly domains = computed(() => this.store.activeWallet().domains);
 
@@ -29,6 +33,18 @@ export class NftsPage {
       this.store.network();
       untracked(() => this.load());
     });
+  }
+
+  /** Placeholder rows while the first read is in flight. */
+  protected readonly skeletonRows = [0, 1, 2];
+
+  protected avatar(name: string): string {
+    const [from, to] = avatarColorsFor(name);
+    return `linear-gradient(155deg, ${from}, ${to})`;
+  }
+
+  protected openDomain(domain: MnsDomain): void {
+    this.modal.open('domain-details', domain);
   }
 
   private load(): void {

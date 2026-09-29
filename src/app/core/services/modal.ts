@@ -11,6 +11,7 @@ export type ModalId =
   | 'backup-phrase'
   | 'logout'
   | 'tx-details'
+  | 'domain-details'
   | null;
 
 @Injectable({ providedIn: 'root' })
