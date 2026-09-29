@@ -29,6 +29,9 @@ built on three principles:
   wallet does with their data — and confirm that it takes none.
 - **What you see is what's on-chain.** Balances, rolls and history come from the blockchain. The
   wallet never shows a transaction as done before the network has actually executed it.
+- **Served from the blockchain, too.** The wallet is hosted on [DeWeb](https://docs.massa.net/docs/deweb/home),
+  Massa's decentralized web: its files are stored on-chain and delivered by DeWeb gateways — there
+  is no RustCore web server to take down or tamper with.
 
 > **Version 1.0.0 — first production release** ([changelog](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not yet had an independent security audit:
@@ -66,12 +69,13 @@ Supported tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b.
 
 | Destination | Why |
 |---|---|
+| The DeWeb gateway you open the wallet from | Delivers the wallet's own files (the app itself), read from the Massa blockchain. |
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa public JSON-RPC: balances, rolls, token and DEX contract reads, and the signed operations you confirm. |
 | `explorer-api.massa.net` | Transaction history for your address. |
 
 That's all. There is no RustCore backend, no analytics, no tracking and no telemetry. The
-installable app's service worker caches only the wallet's own files, never chain or explorer data. Links to
-`explorer.massa.net` and `docs.massa.net` open only when you click them.
+installable app's service worker caches only the wallet's own files, never chain or explorer
+data. Links to `explorer.massa.net` and `docs.massa.net` open only when you click them.
 
 **Safeguards**
 
@@ -99,6 +103,7 @@ Found a vulnerability? Please **do not open a public issue** — see [Security](
 | DEX | Dusa Liquidity Book contracts (quoter + router), called directly on-chain |
 | History | Massa explorer API |
 | QR codes | [`ng-qrcode`](https://github.com/mnahkies/ng-qrcode) |
+| Hosting | [DeWeb](https://docs.massa.net/docs/deweb/home) — static files stored on the Massa blockchain |
 
 ```
 src/app/
@@ -187,6 +192,26 @@ git push origin master v1.1.0
 
 The workflow refuses a tag that doesn't match `package.json` or has no changelog section.
 
+### Deploying to DeWeb
+
+The release zip is ready to upload as-is — it has `index.html` at its root, which is what
+[`deweb-cli`](https://docs.massa.net/docs/deweb/cli/upload) expects:
+
+```bash
+shasum -a 256 -c SHA256SUMS --ignore-missing   # check the zip first (Linux: sha256sum -c …)
+deweb-cli upload -w <wallet> -n https://mainnet.massa.net/api/v2 ./rust-core-wallet-v1.0.0.zip
+```
+
+Nothing in the app needs changing for DeWeb:
+
+- **Links to any screen work**, including on reload: when a path like `/staking` isn't a file,
+  the DeWeb server falls back to `index.html` (its built-in single-page-app support), and the
+  wallet's router takes it from there.
+- **Installing as an app works**: gateways serve the site over HTTPS, which the service worker
+  requires.
+- The app talks to the Massa RPC and explorer directly, so it doesn't depend on which gateway it
+  was loaded from.
+
 ## Roadmap
 
 **Phase 1 — Web wallet** *(current)*
@@ -196,6 +221,8 @@ The workflow refuses a tag that doesn't match `package.json` or has no changelog
 - [x] Staking: rolls, status, APR and rewards
 - [x] Swaps through Dusa
 - [x] MNS domains
+- [x] Installable app (PWA)
+- [ ] Published on DeWeb
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations (i18n)
