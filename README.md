@@ -15,6 +15,12 @@
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
 
+<p align="center">
+  <b>Open it on your phone:</b>
+  <a href="https://rustcore.deweb.half-red.net"><b>rustcore.massa</b></a>
+  — live on DeWeb
+</p>
+
 ---
 
 ## Why RustCore Wallet
@@ -57,7 +63,9 @@ Mainnet (and Buildnet, the test network).
 RustCore Wallet runs in your **phone's browser** — Android or iPhone, any browser. On a computer
 it shows a QR code to open it on your phone instead.
 
-1. **Open it** on your phone at its official DeWeb address, which will be published here.
+1. **Open it** on your phone: **`rustcore.massa`** — tap
+   [rustcore.deweb.half-red.net](https://rustcore.deweb.half-red.net) or open `rustcore.massa`
+   through any DeWeb gateway or [Massa Station](https://station.massa.network).
 2. **Install it** (recommended): the wallet offers it at the top of the screen.
    - *Android* — tap **Install app**.
    - *iPhone / iPad* — tap **Share**, then **Add to Home Screen**. Do this **before** creating
@@ -99,6 +107,9 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
 
 **Good to know**
 
+- **`rustcore.massa` is the only official address.** A copy of the wallet on any other address
+  could steal your keys — never enter your PIN or private key anywhere else, and never on a site
+  someone sent you in a message.
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
 - The wallet hasn't had an independent audit yet (it's on the [roadmap](#roadmap)).
@@ -137,7 +148,7 @@ on the roadmap.
 - [x] Swaps through Dusa
 - [x] `.massa` domains
 - [x] Installable app (Android & iOS)
-- [ ] Published on DeWeb
+- [x] Published on DeWeb (`rustcore.massa`)
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations

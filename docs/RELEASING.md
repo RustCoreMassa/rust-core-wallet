@@ -55,7 +55,8 @@ the build time — it's left out of `SHA256SUMS` for that reason.
 ## Deploying to DeWeb
 
 The wallet is hosted on [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized
-web. What gets uploaded is the **folder** with the built app — `index.html` at its root plus the
+web, as **`rustcore.massa`** (public gateway: https://rustcore.deweb.half-red.net). Each release
+replaces the site's files there. What gets uploaded is the **folder** with the built app — `index.html` at its root plus the
 scripts, styles, icons and assets next to it.
 
 A GitHub Release can only hold files, so the release carries that folder as
@@ -72,7 +73,11 @@ shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA25
 
 Every line must say `OK`. (`ngsw.json` isn't listed — it records the build time — and
 `--ignore-missing` only skips the zip's own line, since the zip isn't inside the folder.) Then
-upload this folder to DeWeb.
+upload this folder to the `rustcore.massa` site.
+
+After uploading, open the site on a phone and check that the app loads and shows its first
+screen. Installed copies update themselves: the service worker downloads the new version on one
+launch and switches to it on the next.
 
 Nothing in the app needs changing for DeWeb:
 
