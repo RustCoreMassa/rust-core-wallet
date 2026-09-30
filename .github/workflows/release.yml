@@ -104,6 +104,11 @@ jobs:
       - name: Production build
         run: npx ng build
 
+      - name: The built app must boot
+        # Loads the production bundle in a simulated phone browser and checks the app renders —
+        # catches bundle-order bugs that type-checks and unit tests can't see.
+        run: npm run smoke
+
       - name: Package the build and checksums
         run: |
           BUILD=dist/rust-core-wallet/browser

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-brightgreen" />
+  <img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
@@ -32,7 +32,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.0.0 — first production release** ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.0.1** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -202,7 +202,7 @@ In plain words (the [license text](LICENSE.md) is what legally applies):
 The names **"RustCore"** and **"RustCore Wallet"** and the RustCore logo are not licensed for
 use in other products, including forks.
 
-Copyright © 2026 Gicu Adasanu. All rights reserved except as granted by the license.
+Copyright © 2026 Whisky098. All rights reserved except as granted by the license.
 
 ## Disclaimer
 

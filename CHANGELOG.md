@@ -5,6 +5,19 @@ All notable changes to RustCore Wallet are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-09-30
+
+### Fixed
+
+- The production build no longer shows a blank page on load ("class heritage … is not an object
+  or null"). An import cycle inside the massa-web3 library was ordered wrongly by the production
+  bundler; the app now loads the library through its entry point first.
+
+### Added
+
+- Every release is now boot-tested before publishing: the built app is loaded in a simulated
+  phone browser and must render its first screen.
+
 ## [1.0.0] — 2026-09-29
 
 First production release of RustCore Wallet, a self-custodial mobile web wallet for the Massa
@@ -40,4 +53,5 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.0.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.1
 [1.0.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.0

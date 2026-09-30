@@ -6,7 +6,7 @@ FSL-1.1-ALv2
 
 ## Notice
 
-Copyright 2026 Gicu Adasanu
+Copyright 2026 Whisky098
 
 ## Terms and Conditions
 

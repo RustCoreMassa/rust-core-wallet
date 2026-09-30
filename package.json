@@ -1,16 +1,17 @@
 {
   "name": "rust-core-wallet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "smoke": "node --no-warnings scripts/smoke-boot.mjs"
   },
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
-  "author": "Gicu Adasanu",
+  "author": "Whisky098",
   "packageManager": "npm@11.12.1",
   "dependencies": {
     "@angular/common": "^22.1.0",

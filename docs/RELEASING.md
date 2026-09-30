@@ -26,9 +26,10 @@ Actions. It builds from exactly the tagged commit, in public, and:
 - refuses a tag that doesn't match `package.json`, has no changelog section, was already
   released, or isn't higher than the latest release — a version can only move forward;
 - runs the tests — if one fails, nothing is published;
-- builds for production and publishes a
-  [GitHub Release](https://github.com/RustCoreMassa/rust-core-wallet/releases) with the
-  changelog notes, the build as `rust-core-wallet-vX.Y.Z.zip`, and `SHA256SUMS`.
+- builds for production, then boots that build in a simulated phone browser — if the app
+  doesn't render, nothing is published;
+- publishes a [GitHub Release](https://github.com/RustCoreMassa/rust-core-wallet/releases) with
+  the changelog notes, the build as `rust-core-wallet-vX.Y.Z.zip`, and `SHA256SUMS`.
 
 A version bump without a tag publishes nothing.
 
@@ -53,13 +54,24 @@ the build time — it's left out of `SHA256SUMS` for that reason.
 ## Deploying to DeWeb
 
 The wallet is hosted on [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized
-web. The release zip is ready to upload as-is — it has `index.html` at its root, which is what
-[`deweb-cli`](https://docs.massa.net/docs/deweb/cli/upload) expects:
+web. What gets uploaded is the **folder** with the built app — `index.html` at its root plus the
+scripts, styles, icons and assets next to it.
+
+A GitHub Release can only hold files, so the release carries that folder as
+`rust-core-wallet-vX.Y.Z.zip`. Unzip it and upload the resulting folder; it's identical to
+`dist/rust-core-wallet/browser` from a local `npm run build`.
+
+Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-shasum -a 256 -c SHA256SUMS --ignore-missing   # check the zip first (Linux: sha256sum -c …)
-deweb-cli upload -w <wallet> -n https://mainnet.massa.net/api/v2 ./rust-core-wallet-v1.0.0.zip
+unzip rust-core-wallet-v1.0.1.zip -d rust-core-wallet-v1.0.1
+cd rust-core-wallet-v1.0.1
+shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
+
+Every line must say `OK`. (`ngsw.json` isn't listed — it records the build time — and
+`--ignore-missing` only skips the zip's own line, since the zip isn't inside the folder.) Then
+upload this folder to DeWeb.
 
 Nothing in the app needs changing for DeWeb:
 

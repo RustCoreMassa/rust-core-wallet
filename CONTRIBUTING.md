@@ -43,6 +43,7 @@ npm start            # http://localhost:4200
 | `npm test` | Unit tests (Vitest) |
 | `npx tsc -p tsconfig.app.json --noEmit` | Type-check |
 | `npm run build` | Production build into `dist/` |
+| `npm run smoke` | Boots the production build in a simulated phone browser (run after `npm run build`) |
 | `npx prettier --write .` | Format the code |
 
 **Mobile only.** RustCore Wallet is a phone app: in a desktop browser it shows an "open on your
@@ -103,3 +104,7 @@ src/app/
 data: amount conversions, the encrypted vault, validation and fees, "nothing changes on
 failure", history merging, the explorer mapping, error messages, staking rewards, Dusa quote
 encoding and platform detection. The blockchain and explorer are faked, so tests run offline.
+
+Unit tests can't see problems that only exist in the bundled output, so after
+`npm run build` run `npm run smoke`: it loads the production build in a simulated phone browser
+and checks the app renders. The release workflow runs it too, before publishing anything.
