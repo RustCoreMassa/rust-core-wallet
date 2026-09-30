@@ -18,11 +18,14 @@
       "32": "icons/icon-32.png"
     }
   },
+  "side_panel": {
+    "default_path": "index.html?view=side-panel"
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "alarms"],
+  "permissions": ["storage", "alarms", "sidePanel"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net"
   }

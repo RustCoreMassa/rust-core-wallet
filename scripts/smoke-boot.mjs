@@ -66,6 +66,8 @@ if (extension) {
   globalThis.chrome = {
     storage: { local: storageArea(), session: storageArea() },
     alarms: { create: async () => {}, clear: async () => true, onAlarm: { addListener() {} } },
+    windows: { getCurrent: async () => ({ id: 1 }) },
+    sidePanel: { open: async () => {} },
   };
 }
 

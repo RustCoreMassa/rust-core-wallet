@@ -1,12 +1,13 @@
 /* Extension build only (angular.json → "extension" → styles), after styles.scss.
-   Chrome sizes a popup from its content (at most 800×600) while the app fills
-   the viewport — so the popup gets a fixed, phone-like size. */
-html,
-body {
-  width: 375px;
+   Popup: Chrome sizes it from its content (at most 800×600) while the app fills
+   the viewport — so it gets a fixed size. The side panel (html.side-panel) is a
+   normal full-height viewport and keeps the app's own sizing. */
+html:not(.side-panel),
+html:not(.side-panel) body {
+  width: 400px;
   height: 600px;
 }
 
-.app-screen {
+html:not(.side-panel) .app-screen {
   height: 600px;
 }

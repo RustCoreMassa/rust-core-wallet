@@ -802,8 +802,9 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .num-input {
-  flex: 1;
+  flex: 1; /* next to a Max button in a .field-row */
   min-width: 0;
+  width: 100%; /* on its own: full width, not the browser's ~20-character default */
   background: var(--bg);
   border: 1px solid var(--border-strong);
   color: var(--white);

@@ -61,7 +61,9 @@ build time: `src/app/platform-providers.ts` (web) is replaced by
 `src/extension/platform-providers.ts` — `chrome.storage` instead of the page's storage, hash
 routing, no mobile gate, service worker or install banner, and an unlocked session that survives
 closing the popup (the vault key is kept in memory-only `chrome.storage.session` and wiped
-15 minutes after the popup was last open). The extension's pages may connect only to the Massa
+15 minutes after the popup was last open). The same page also runs as Chrome's side panel
+(Settings → *Open in side panel*; `?view=side-panel`): the popup is fixed at 400×600 — Chrome's
+height limit — while the side panel takes the window's full height. The extension's pages may connect only to the Massa
 nodes and the explorer API (CSP in `src/extension/manifest.json`).
 
 **Installable app.** The service worker runs in production builds only (`npm run build`), and
