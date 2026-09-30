@@ -66,6 +66,30 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "extension": {
+              "outputPath": "dist/extension",
+              "serviceWorker": false,
+              "fileReplacements": [
+                {
+                  "replace": "src/app/platform-providers.ts",
+                  "with": "src/extension/platform-providers.ts"
+                }
+              ],
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              },
+              "styles": [
+                "node_modules/@fontsource-variable/inter/index.css",
+                "node_modules/@fontsource-variable/space-grotesk/index.css",
+                "src/styles.scss",
+                "src/extension/popup.scss"
+              ]
             }
           },
           "defaultConfiguration": "production"

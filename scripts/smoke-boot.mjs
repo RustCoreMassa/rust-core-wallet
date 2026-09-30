@@ -1,12 +1,16 @@
 // Loads the production build's entry module with a simulated DOM and reports
 // whether all modules evaluate — catches bundle-order bugs (e.g. a class that
 // extends a not-yet-defined class) that only show up in the built output.
+// With --extension it boots the extension's popup instead, over an in-memory
+// stand-in for the chrome.storage / chrome.alarms APIs.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { JSDOM } from 'jsdom';
 
-const dir = resolve(process.argv[2] ?? 'dist/rust-core-wallet/browser');
+const args = process.argv.slice(2);
+const extension = args.includes('--extension');
+const dir = resolve(args.find((a) => !a.startsWith('--')) ?? 'dist/rust-core-wallet/browser');
 const html = readFileSync(join(dir, 'index.html'), 'utf8');
 const dom = new JSDOM(html, { url: 'https://wallet.test/', pretendToBeVisual: true });
 const win = dom.window;
@@ -39,6 +43,30 @@ for (const key of [
   try {
     Object.defineProperty(globalThis, key, { value: win[key], configurable: true, writable: true });
   } catch {}
+}
+
+if (extension) {
+  const storageArea = () => {
+    const items = {};
+    return {
+      get: async (keys) =>
+        keys == null
+          ? { ...items }
+          : Object.fromEntries(
+              [keys]
+                .flat()
+                .filter((k) => k in items)
+                .map((k) => [k, items[k]]),
+            ),
+      set: async (entries) => void Object.assign(items, entries),
+      remove: async (keys) => [keys].flat().forEach((k) => delete items[k]),
+      onChanged: { addListener() {} },
+    };
+  };
+  globalThis.chrome = {
+    storage: { local: storageArea(), session: storageArea() },
+    alarms: { create: async () => {}, clear: async () => true, onAlarm: { addListener() {} } },
+  };
 }
 
 const main = readdirSync(dir).find((f) => /^main-.*\.js$/.test(f));

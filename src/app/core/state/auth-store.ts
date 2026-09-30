@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { VaultAccount, VaultPayload } from '../models/vault.model';
 import { Ciphertext, CryptoVault } from '../services/crypto-vault';
+import { SESSION_KEY_STORE } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
 
 /**
@@ -12,7 +13,9 @@ import { VaultStorage } from '../services/vault-storage';
  * The PIN itself never lives in a field on this class. It passes
  * through `unlock`/`register` as a local parameter and is handed to
  * CryptoVault, which returns a `CryptoKey` — that key is what gets
- * cached in `sessionKey`, never the PIN.
+ * cached in `sessionKey`, never the PIN. A SessionKeyStore may keep that
+ * key beyond this page (the extension popup, see `resume`); the web app's
+ * keeps nothing.
  *
  * A 6-digit PIN only has 1,000,000 possible values. PBKDF2 (in
  * CryptoVault) makes each offline guess expensive, but it cannot make
@@ -26,6 +29,7 @@ import { VaultStorage } from '../services/vault-storage';
 export class AuthStore {
   private readonly cryptoVault = inject(CryptoVault);
   private readonly vaultStorage = inject(VaultStorage);
+  private readonly sessionKeys = inject(SESSION_KEY_STORE);
 
   private readonly _isUnlocked = signal(false);
   private readonly _accounts = signal<VaultAccount[]>([]);
@@ -41,7 +45,7 @@ export class AuthStore {
 
   /** First-time setup: encrypts `accounts` under a fresh PIN and unlocks. */
   async register(pin: string, accounts: VaultAccount[]): Promise<void> {
-    const { key, salt } = await this.cryptoVault.deriveNewKey(pin);
+    const { key, salt } = await this.cryptoVault.deriveNewKey(pin, this.sessionKeys.keepsKey);
     const payload: VaultPayload = { accounts };
     const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
 
@@ -50,6 +54,7 @@ export class AuthStore {
     this._accounts.set(accounts);
     this._isUnlocked.set(true);
     this._hasVault.set(true);
+    await this.keepSession(key);
   }
 
   /** Returns false on a wrong PIN instead of throwing — callers just check the result. */
@@ -57,17 +62,33 @@ export class AuthStore {
     const envelope = this.vaultStorage.load();
     if (!envelope) return false;
 
+    let key: CryptoKey;
     try {
-      const key = await this.cryptoVault.deriveExistingKey(pin, envelope.salt);
-      const plaintext = await this.cryptoVault.decrypt(envelope, key);
-      const payload = JSON.parse(plaintext) as VaultPayload;
-
-      this.sessionKey = key;
-      this._accounts.set(payload.accounts);
-      this._isUnlocked.set(true);
-      return true;
+      key = await this.cryptoVault.deriveExistingKey(pin, envelope.salt, this.sessionKeys.keepsKey);
+      await this.open(key);
     } catch {
       // Wrong PIN (AES-GCM auth tag mismatch) or a corrupted vault.
+      return false;
+    }
+    await this.keepSession(key);
+    return true;
+  }
+
+  /**
+   * Unlocks without the PIN when the SessionKeyStore still holds this
+   * session's key (the extension popup reopened before auto-lock). Always
+   * false on the web.
+   */
+  async resume(): Promise<boolean> {
+    if (this._isUnlocked()) return true;
+    const key = await this.sessionKeys.restore().catch(() => null);
+    if (!key) return false;
+    try {
+      await this.open(key);
+      return true;
+    } catch {
+      // No vault any more, or a key from another one (logged out and re-created meanwhile).
+      await this.sessionKeys.clear().catch(() => {});
       return false;
     }
   }
@@ -76,6 +97,7 @@ export class AuthStore {
     this._isUnlocked.set(false);
     this._accounts.set([]);
     this.sessionKey = null;
+    this.sessionKeys.clear().catch((err) => console.warn('Clearing the session key failed', err));
   }
 
   /**
@@ -105,6 +127,23 @@ export class AuthStore {
     } catch {
       return false;
     }
+  }
+
+  /** Throws when `key` doesn't decrypt the stored vault; state changes only on success. */
+  private async open(key: CryptoKey): Promise<void> {
+    const envelope = this.vaultStorage.load();
+    if (!envelope) throw new Error('No vault');
+    const payload = JSON.parse(await this.cryptoVault.decrypt(envelope, key)) as VaultPayload;
+    this.sessionKey = key;
+    this._accounts.set(payload.accounts);
+    this._isUnlocked.set(true);
+  }
+
+  /** Best-effort: without it the session just ends with this page. */
+  private async keepSession(key: CryptoKey): Promise<void> {
+    await this.sessionKeys
+      .save(key)
+      .catch((err) => console.warn('Keeping the session failed', err));
   }
 
   /** Persists an updated account list under the already-derived session key. */
@@ -145,7 +184,8 @@ export class AuthStore {
    */
   async removeAccount(id: string): Promise<void> {
     const accounts = this._accounts();
-    if (accounts.length <= 1) throw new Error("You can't remove your only wallet — log out instead");
+    if (accounts.length <= 1)
+      throw new Error("You can't remove your only wallet — log out instead");
     if (!accounts.some((a) => a.id === id)) throw new Error('Unknown wallet');
     await this.saveAccounts(accounts.filter((a) => a.id !== id));
   }

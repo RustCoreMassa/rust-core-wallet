@@ -1,10 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { VaultEnvelope } from '../models/vault.model';
+import { LOCAL_STORE } from '../platform/app-storage';
 
 const STORAGE_KEY = 'massa-wallet:vault';
 
 /**
- * Thin wrapper around localStorage for the encrypted vault envelope.
+ * Thin wrapper around LOCAL_STORE (localStorage on the web, chrome.storage.local
+ * in the extension) for the encrypted vault envelope.
  *
  * localStorage (not IndexedDB) is deliberate here: the vault is a single
  * small JSON blob, read once at startup and written only when accounts
@@ -16,12 +18,14 @@ const STORAGE_KEY = 'massa-wallet:vault';
  */
 @Injectable({ providedIn: 'root' })
 export class VaultStorage {
+  private readonly store = inject(LOCAL_STORE);
+
   exists(): boolean {
-    return localStorage.getItem(STORAGE_KEY) !== null;
+    return this.store.getItem(STORAGE_KEY) !== null;
   }
 
   load(): VaultEnvelope | null {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = this.store.getItem(STORAGE_KEY);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as VaultEnvelope;
@@ -32,10 +36,10 @@ export class VaultStorage {
   }
 
   save(envelope: VaultEnvelope): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+    this.store.setItem(STORAGE_KEY, JSON.stringify(envelope));
   }
 
   clear(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    this.store.removeItem(STORAGE_KEY);
   }
 }

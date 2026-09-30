@@ -1,6 +1,7 @@
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { TokenSymbol } from '../../../core/models/token.model';
+import { KeyValueStore, LOCAL_STORE } from '../../../core/platform/app-storage';
 import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { HistoryRow } from '../../../shared/ui/history-row/history-row';
@@ -14,9 +15,9 @@ const SHOW_ALL_KEY = 'massa-wallet:show-all-tokens';
 /** Distance from the bottom of the list (px) at which the next history page loads. */
 const NEAR_BOTTOM_PX = 120;
 
-function loadShowAll(): boolean {
+function loadShowAll(store: KeyValueStore): boolean {
   try {
-    return localStorage.getItem(SHOW_ALL_KEY) === 'true';
+    return store.getItem(SHOW_ALL_KEY) === 'true';
   } catch {
     return false;
   }
@@ -31,6 +32,7 @@ function loadShowAll(): boolean {
 export class HomePage {
   protected readonly store = inject(WalletStore);
   protected readonly modal = inject(Modal);
+  private readonly localStore = inject(LOCAL_STORE);
 
   protected readonly activeTab = signal<HomeTab>('tokens');
 
@@ -43,7 +45,7 @@ export class HomePage {
     () => (this.wallet().balances.MAS ?? 0) * (this.store.prices().MAS ?? 0),
   );
 
-  protected readonly showAllTokens = signal(loadShowAll());
+  protected readonly showAllTokens = signal(loadShowAll(this.localStore));
 
   /**
    * Tokens on this network worth under LOW_BALANCE_USD — MAS is never one.
@@ -106,7 +108,7 @@ export class HomePage {
     const next = !this.showAllTokens();
     this.showAllTokens.set(next);
     try {
-      localStorage.setItem(SHOW_ALL_KEY, String(next));
+      this.localStore.setItem(SHOW_ALL_KEY, String(next));
     } catch {
       // Storage unavailable — the choice still holds until reload.
     }

@@ -6,7 +6,7 @@ const SALT_LENGTH_BYTES = 16;
 const IV_LENGTH_BYTES = 12;
 
 export interface DerivedKey {
-  readonly key: CryptoKey; // non-extractable — can encrypt/decrypt, can't be read back out
+  readonly key: CryptoKey; // non-extractable unless asked for — see deriveKey
   readonly salt: string; // base64 — safe to persist alongside the ciphertext
 }
 
@@ -35,14 +35,18 @@ export interface Ciphertext {
 @Injectable({ providedIn: 'root' })
 export class CryptoVault {
   /** Registration: no salt yet, so generate one. */
-  async deriveNewKey(pin: string): Promise<DerivedKey> {
+  async deriveNewKey(pin: string, extractable = false): Promise<DerivedKey> {
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH_BYTES));
-    return { key: await this.deriveKey(pin, salt), salt: toBase64(salt) };
+    return { key: await this.deriveKey(pin, salt, extractable), salt: toBase64(salt) };
   }
 
   /** Unlock: re-derive using the salt that was stored alongside the vault. */
-  async deriveExistingKey(pin: string, saltBase64: string): Promise<CryptoKey> {
-    return this.deriveKey(pin, fromBase64(saltBase64));
+  async deriveExistingKey(
+    pin: string,
+    saltBase64: string,
+    extractable = false,
+  ): Promise<CryptoKey> {
+    return this.deriveKey(pin, fromBase64(saltBase64), extractable);
   }
 
   async encrypt(plaintext: string, key: CryptoKey): Promise<Ciphertext> {
@@ -67,7 +71,11 @@ export class CryptoVault {
     return new TextDecoder().decode(buffer);
   }
 
-  private async deriveKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {
+  /**
+   * `extractable` only for a SessionKeyStore that keeps the session alive
+   * outside this page (the extension popup) — the web app never asks for it.
+   */
+  private async deriveKey(pin: string, salt: Uint8Array, extractable: boolean): Promise<CryptoKey> {
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(pin),
@@ -85,10 +93,23 @@ export class CryptoVault {
       },
       keyMaterial,
       { name: 'AES-GCM', length: KEY_LENGTH_BITS },
-      false,
+      extractable,
       ['encrypt', 'decrypt'],
     );
   }
+}
+
+/** Raw bytes (base64) of an extractable vault key, for a SessionKeyStore to keep. */
+export async function exportVaultKey(key: CryptoKey): Promise<string> {
+  return toBase64(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
+}
+
+/** Back from `exportVaultKey` — non-extractable again. */
+export async function importVaultKey(raw: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', fromBase64(raw) as BufferSource, 'AES-GCM', false, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 function toBase64(bytes: Uint8Array): string {

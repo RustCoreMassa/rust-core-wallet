@@ -1,12 +1,13 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { KeyValueStore, LOCAL_STORE } from '../platform/app-storage';
 
 export type Network = 'mainnet' | 'buildnet';
 
 const STORAGE_KEY = 'massa-wallet:network';
 
-function loadNetwork(): Network {
+function loadNetwork(store: KeyValueStore): Network {
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'buildnet' ? 'buildnet' : 'mainnet';
+    return store.getItem(STORAGE_KEY) === 'buildnet' ? 'buildnet' : 'mainnet';
   } catch {
     return 'mainnet';
   }
@@ -16,18 +17,19 @@ function loadNetwork(): Network {
  * Which Massa network every chain call targets. Kept apart from
  * WalletStore so MassaProvider can read it without a circular injection
  * (WalletStore itself depends on the provider). The choice is a device
- * preference, not a secret, so it lives in plain localStorage.
+ * preference, not a secret, so it lives in plain LOCAL_STORE.
  */
 @Injectable({ providedIn: 'root' })
 export class NetworkStore {
-  private readonly _network = signal<Network>(loadNetwork());
+  private readonly store = inject(LOCAL_STORE);
+  private readonly _network = signal<Network>(loadNetwork(this.store));
 
   readonly network = this._network.asReadonly();
 
   set(network: Network): void {
     this._network.set(network);
     try {
-      localStorage.setItem(STORAGE_KEY, network);
+      this.store.setItem(STORAGE_KEY, network);
     } catch {
       // Storage unavailable — the choice still holds for this session.
     }
@@ -37,7 +39,7 @@ export class NetworkStore {
   reset(): void {
     this._network.set('mainnet');
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      this.store.removeItem(STORAGE_KEY);
     } catch {
       // Nothing persisted to clear.
     }

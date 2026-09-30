@@ -1,0 +1,12 @@
+/* Extension build only (angular.json → "extension" → styles), after styles.scss.
+   Chrome sizes a popup from its content (at most 800×600) while the app fills
+   the viewport — so the popup gets a fixed, phone-like size. */
+html,
+body {
+  width: 375px;
+  height: 600px;
+}
+
+.app-screen {
+  height: 600px;
+}

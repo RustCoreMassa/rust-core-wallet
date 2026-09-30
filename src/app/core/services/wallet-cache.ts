@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { SESSION_STORE } from '../platform/app-storage';
 import { SavedAddress } from '../models/saved-address.model';
 import { TokenPrices } from '../models/token.model';
 import { WalletState } from '../models/wallet.model';
@@ -24,8 +25,9 @@ export interface WalletCacheSnapshot {
  * empty: after unlock the UI paints these values immediately and
  * refreshes them in the background.
  *
- * sessionStorage, not localStorage: it lives only as long as the tab and
- * is gone once the tab is closed. Still encrypted under the vault's
+ * SESSION_STORE, not LOCAL_STORE: on the web it's sessionStorage, which lives
+ * only as long as the tab; in the extension, chrome.storage.session, gone
+ * when the browser closes. Still encrypted under the vault's
  * session key (via AuthStore) — in plain text it would reveal which
  * addresses this device holds. A cache written under another vault
  * simply fails to decrypt and is ignored.
@@ -33,13 +35,14 @@ export interface WalletCacheSnapshot {
 @Injectable({ providedIn: 'root' })
 export class WalletCache {
   private readonly auth = inject(AuthStore);
+  private readonly store = inject(SESSION_STORE);
 
   async save(snapshot: Omit<WalletCacheSnapshot, 'version'>): Promise<void> {
     const payload = await this.auth.encryptForSession(
       JSON.stringify({ ...snapshot, version: CACHE_VERSION }),
     );
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      this.store.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Quota exceeded or storage unavailable — the cache is best-effort.
     }
@@ -48,7 +51,7 @@ export class WalletCache {
   /** `null` when there's no cache, it's from another vault, or it's outdated/corrupt. */
   async load(): Promise<WalletCacheSnapshot | null> {
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const raw = this.store.getItem(STORAGE_KEY);
       if (!raw) return null;
       const plaintext = await this.auth.decryptForSession(JSON.parse(raw) as Ciphertext);
       const snapshot = JSON.parse(plaintext, reviveInfinity) as WalletCacheSnapshot;
@@ -60,7 +63,7 @@ export class WalletCache {
 
   clear(): void {
     try {
-      sessionStorage.removeItem(STORAGE_KEY);
+      this.store.removeItem(STORAGE_KEY);
     } catch {
       // Nothing to clear.
     }
