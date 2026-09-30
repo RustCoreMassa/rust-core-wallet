@@ -12,7 +12,8 @@ new features, patch for fixes. Every version has a section in [CHANGELOG.md](../
 ## Publishing a release
 
 1. Bump the version: `npm version 1.1.0 --no-git-tag-version`
-2. Add a `## [1.1.0]` section to `CHANGELOG.md`.
+2. In `CHANGELOG.md`, rename the `## [Unreleased]` section (where changes collect between
+   releases) to `## [1.1.0] — <date>` and add its link at the bottom.
 3. Commit, then push a matching tag:
 
 ```bash
@@ -64,8 +65,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.0.1.zip -d rust-core-wallet-v1.0.1
-cd rust-core-wallet-v1.0.1
+unzip rust-core-wallet-v1.0.2.zip -d rust-core-wallet-v1.0.2
+cd rust-core-wallet-v1.0.2
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 

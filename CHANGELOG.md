@@ -5,6 +5,13 @@ All notable changes to RustCore Wallet are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-09-30
+
+### Fixed
+
+- Double-tapping no longer zooms the app in; pinch-to-zoom still works for accessibility.
+- Tapping into a text field on iPhone no longer zooms the page (fields now use a 16 px font).
+
 ## [1.0.1] — 2026-09-30
 
 ### Fixed
@@ -53,5 +60,6 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.0.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.2
 [1.0.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.1
 [1.0.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.0
