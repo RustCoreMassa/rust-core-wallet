@@ -7,10 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-09-30
+
 ### Changed
 
 - RustCore Wallet is live on DeWeb at **`rustcore.massa`**; the README now shows the official
   address and warns against copies of the wallet on any other address.
+
+### Fixed
+
+- On the phone, dragging up or down no longer moves the whole app (it used to shift and spring
+  back without scrolling anything).
 
 ## [1.0.2] — 2026-09-30
 
@@ -67,6 +74,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.0.3]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.3
 [1.0.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.2
 [1.0.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.1
 [1.0.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.0

@@ -1,9 +1,10 @@
 /* Header, balance, actions and tabs stay put; only the token/history
-   list scrolls. */
+   list scrolls. The height leaves room for .view-area's 8px bottom padding — at a full 100%
+   the view area overflowed by those 8px and the whole page could be dragged up and down. */
 :host {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: calc(100% - 8px);
 }
 
 :host > * {

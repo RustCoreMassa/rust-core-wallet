@@ -66,8 +66,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.0.2.zip -d rust-core-wallet-v1.0.2
-cd rust-core-wallet-v1.0.2
+unzip rust-core-wallet-v1.0.3.zip -d rust-core-wallet-v1.0.3
+cd rust-core-wallet-v1.0.3
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 

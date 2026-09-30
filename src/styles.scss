@@ -52,10 +52,21 @@
   box-sizing: border-box;
 }
 
+/* The document never scrolls (.app-screen fills the viewport; inner regions scroll), so it
+   must not rubber-band either: without this a vertical drag on the phone moves the whole app
+   and it springs back (iOS bounce, Android stretch/glow). */
 html,
 body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Scroll regions keep their own overscroll instead of handing it to the page at the ends. */
+.view-area,
+.modal {
+  overscroll-behavior: contain;
 }
 
 body {
