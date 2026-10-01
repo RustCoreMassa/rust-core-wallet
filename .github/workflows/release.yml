@@ -119,20 +119,20 @@ jobs:
       - name: Package the build and checksums
         run: |
           BUILD=dist/rust-core-wallet/browser
-          ZIP="rust-core-wallet-$TAG.zip"
+          WEB_ZIP="rust-core-wallet-$TAG.zip"
           # ngsw.json records the build time, so it's the one file left out of the
           # reproducible checksums (see docs/RELEASING.md).
           (cd "$BUILD" && find . -type f ! -name ngsw.json | sort | xargs sha256sum) > SHA256SUMS
-          (cd "$BUILD" && zip -qr "$GITHUB_WORKSPACE/$ZIP" .)
-          sha256sum "$ZIP" >> SHA256SUMS
-          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          (cd "$BUILD" && zip -qr "$GITHUB_WORKSPACE/$WEB_ZIP" .)
+          sha256sum "$WEB_ZIP" >> SHA256SUMS
+          # Not "ZIP": zip reads $ZIP as default options, so exporting it made every later
+          # `zip` call add to this archive instead of writing its own (v1.1.0's first run).
+          echo "WEB_ZIP=$WEB_ZIP" >> "$GITHUB_ENV"
           cat SHA256SUMS
 
       - name: Package the extension and checksums
         run: |
           # The two folders differ only in manifest.json, so each gets its own SHA256SUMS.
-          # Zips are written to, and summed from, this step's own directory by absolute path
-          # (writing via $GITHUB_WORKSPACE left them where the relative sha256sum didn't look).
           OUT="$PWD"
           for TARGET in chromium firefox; do
             DIR="dist/extension/$TARGET"
@@ -140,7 +140,7 @@ jobs:
             (cd "$DIR" && find . -type f | sort | xargs sha256sum) > "$OUT/SHA256SUMS-$TARGET"
             (cd "$DIR" && zip -qr "$OUT/$EXT_ZIP" .)
             if [ ! -f "$OUT/$EXT_ZIP" ]; then
-              echo "::error::$EXT_ZIP was not created in $OUT (workspace: $GITHUB_WORKSPACE)."
+              echo "::error::$EXT_ZIP was not created in $OUT."
               ls -la "$OUT"
               exit 1
             fi
@@ -152,7 +152,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" "$ZIP" SHA256SUMS \
+          gh release create "$TAG" "$WEB_ZIP" SHA256SUMS \
             "rustcore-wallet-extension-chromium-$TAG.zip" SHA256SUMS-chromium \
             "rustcore-wallet-extension-firefox-$TAG.zip" SHA256SUMS-firefox \
             --title "RustCore Wallet $TAG" \
