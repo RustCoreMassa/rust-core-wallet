@@ -20,6 +20,7 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
     enabled: !isDevMode(),
     registrationStrategy: 'registerWhenStable:30000',
   }),
-  // Phone UI: refuse to run on desktop.
-  { provide: MOBILE_ONLY, useValue: true },
+  // Phone UI: refuse to run on desktop — except in development (`npm start`),
+  // so the wallet can be worked on in a desktop browser without device emulation.
+  { provide: MOBILE_ONLY, useValue: !isDevMode() },
 ];

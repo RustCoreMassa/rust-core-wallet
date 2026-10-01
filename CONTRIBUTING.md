@@ -48,11 +48,11 @@ npm start            # http://localhost:4200
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
 | `npx prettier --write .` | Format the code |
 
-**Mobile only.** RustCore Wallet is a phone app: in a desktop browser it shows an "open on your
-phone" screen instead of the wallet. To develop on desktop, open DevTools and turn on device
-emulation (Chrome: *Toggle device toolbar*; Firefox: *Responsive Design Mode* with touch
-simulation), then reload. The restriction is the `MOBILE_ONLY` flag in
-`src/app/platform-providers.ts`.
+**Mobile only.** RustCore Wallet is a phone app: in a desktop browser the production build shows
+an "open on your phone" screen instead of the wallet. Development builds (`npm start`) skip that
+screen, so the wallet opens in any desktop browser; to see it as on a phone, turn on DevTools
+device emulation (Chrome: *Toggle device toolbar*; Firefox: *Responsive Design Mode* with touch
+simulation). The restriction is the `MOBILE_ONLY` flag in `src/app/platform-providers.ts`.
 
 **Browser extension (in progress).** The same code also builds as a Chrome (Manifest V3)
 extension: `npm run build:extension`, then in `chrome://extensions` turn on *Developer mode* →
@@ -62,7 +62,7 @@ build time: `src/app/platform-providers.ts` (web) is replaced by
 routing, no mobile gate, service worker or install banner, and an unlocked session that survives
 closing the popup (the vault key is kept in memory-only `chrome.storage.session` and wiped
 15 minutes after the popup was last open). The same page also runs as Chrome's side panel
-(Settings → *Open in side panel*; `?view=side-panel`): the popup is fixed at 400×600 — Chrome's
+(Settings → *Open in side panel*; `?view=side-panel`): the popup is fixed at 380×600 — Chrome's
 height limit — while the side panel takes the window's full height. The extension's pages may connect only to the Massa
 nodes and the explorer API (CSP in `src/extension/manifest.json`).
 
