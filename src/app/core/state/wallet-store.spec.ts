@@ -99,6 +99,24 @@ describe('WalletStore', () => {
     it('lists only tokens actually held (sparse balances)', () => {
       expect(Object.keys(store.wallets()['b'].balances)).toEqual(['MAS']);
     });
+
+    it('refreshes all wallets one at a time, the active one first (no RPC burst)', async () => {
+      const order: string[] = [];
+      let inFlight = 0;
+      let maxInFlight = 0;
+      provider.getBalance.mockImplementation(async (pk: string) => {
+        order.push(pk);
+        maxInFlight = Math.max(maxInFlight, ++inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+        return chain.mas[pk] ?? 0n;
+      });
+      chain.mas['S1b'] = 7_000_000_000n;
+      await store.refreshAll();
+      expect(order).toEqual(['S1a', 'S1b']);
+      expect(maxInFlight).toBe(1);
+      expect(store.wallets()['b'].balances.MAS).toBe(7);
+    });
   });
 
   describe('validateSend', () => {
@@ -203,6 +221,16 @@ describe('WalletStore', () => {
       expect(store.wallets()['a'].loaded).toBe(false);
       store.setNetwork('mainnet');
       expect(store.wallets()['a'].balances.MAS).toBe(100);
+    });
+
+    it('quotes exactly the typed amount, never the whole balance in its place', async () => {
+      const dusa = TestBed.inject(DusaSwap) as unknown as { quote: ReturnType<typeof vi.fn> };
+      dusa.quote = vi.fn().mockResolvedValue({});
+      await expect(store.quoteSwap('MAS', 'USDC.e', 1000, 50)).rejects.toThrow(/Insufficient MAS/);
+      expect(dusa.quote).not.toHaveBeenCalled();
+
+      await store.quoteSwap('MAS', 'USDC.e', 50, 50);
+      expect(dusa.quote).toHaveBeenCalledWith('MAS', 'USDC.e', 50_000_000_000n, 50);
     });
 
     it('only allows swaps on mainnet', () => {

@@ -3,9 +3,10 @@
 #   git tag v1.2.3 && git push origin v1.2.3
 #
 # The release gets the notes for that version from CHANGELOG.md, the production
-# build as a zip and a SHA256SUMS file — built here, in public CI, from exactly
-# the tagged commit, so anyone can check that what they run matches the source
-# (see docs/RELEASING.md).
+# build as a zip and a SHA256SUMS file, plus the browser extension (one zip for
+# Chromium browsers, one for Firefox, each with its SHA256SUMS) — built here, in
+# public CI, from exactly the tagged commit, so anyone can check that what they
+# run matches the source (see docs/RELEASING.md).
 #
 # Only first-party actions are used (actions/checkout, actions/setup-node) plus
 # the GitHub CLI preinstalled on the runner — nothing third-party touches the
@@ -109,6 +110,12 @@ jobs:
         # catches bundle-order bugs that type-checks and unit tests can't see.
         run: npm run smoke
 
+      - name: Browser extension build
+        run: npm run build:extension
+
+      - name: The extension must boot
+        run: npm run smoke:extension
+
       - name: Package the build and checksums
         run: |
           BUILD=dist/rust-core-wallet/browser
@@ -121,11 +128,25 @@ jobs:
           echo "ZIP=$ZIP" >> "$GITHUB_ENV"
           cat SHA256SUMS
 
+      - name: Package the extension and checksums
+        run: |
+          # The two folders differ only in manifest.json, so each gets its own SHA256SUMS.
+          for TARGET in chromium firefox; do
+            DIR="dist/extension/$TARGET"
+            EXT_ZIP="rustcore-wallet-extension-$TARGET-$TAG.zip"
+            (cd "$DIR" && find . -type f | sort | xargs sha256sum) > "SHA256SUMS-$TARGET"
+            (cd "$DIR" && zip -qr "$GITHUB_WORKSPACE/$EXT_ZIP" .)
+            sha256sum "$EXT_ZIP" >> "SHA256SUMS-$TARGET"
+            cat "SHA256SUMS-$TARGET"
+          done
+
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$TAG" "$ZIP" SHA256SUMS \
+            "rustcore-wallet-extension-chromium-$TAG.zip" SHA256SUMS-chromium \
+            "rustcore-wallet-extension-firefox-$TAG.zip" SHA256SUMS-firefox \
             --title "RustCore Wallet $TAG" \
             --notes-file release-notes.md \
             --verify-tag

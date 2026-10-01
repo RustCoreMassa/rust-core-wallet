@@ -19,5 +19,7 @@
   </main>
 } @else {
   <router-outlet />
-  <app-install-banner />
+  @if (installable) {
+    <app-install-banner />
+  }
 }

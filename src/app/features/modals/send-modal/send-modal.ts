@@ -7,11 +7,13 @@ import { Toast } from '../../../core/services/toast';
 import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
+import { formatDisplayAmount } from '../../../core/utils/display-amount';
 import { toUserMessage } from '../../../core/utils/user-error';
+import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 
 @Component({
   selector: 'app-send-modal',
-  imports: [FormsModule, ConfirmDetails, Dropdown],
+  imports: [FormsModule, ConfirmDetails, Dropdown, AmountPipe],
   templateUrl: './send-modal.html',
   styleUrl: './send-modal.scss',
 })
@@ -42,7 +44,7 @@ export class SendModal {
       label: symbol,
       sublabel: TOKEN_REGISTRY[symbol].name,
       icon: TOKEN_REGISTRY[symbol].asset,
-      trailing: (balances[symbol] ?? 0).toLocaleString('en-US', { maximumFractionDigits: 6 }),
+      trailing: formatDisplayAmount(balances[symbol] ?? 0),
     }));
   });
 

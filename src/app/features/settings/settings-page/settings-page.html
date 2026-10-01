@@ -37,6 +37,31 @@
     <div class="switch" [class.on]="isBuildnet()"></div>
   </button>
 
+  @if (views; as views) {
+  @if (views.current !== 'tab' && views.canOpen('tab')) {
+  <button class="settings-row" type="button" (click)="views.open('tab')">
+    <div>
+      <div class="label">Open in full screen</div>
+      <div class="sub">The wallet in its own browser tab</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+  }
+  @if (views.current !== 'side-panel' && views.canOpen('side-panel')) {
+  <button class="settings-row" type="button" (click)="views.open('side-panel')">
+    <div>
+      <div class="label">Open in side panel</div>
+      <div class="sub">Full height, next to the page you're on</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+  }
+  }
+
   <button class="settings-row" type="button" (click)="backupPhrase()">
     <div>
       <div class="label">Backup private key</div>

@@ -37,7 +37,7 @@ export function isMobileDevice(d: DeviceSignals): boolean {
 
 const TOUCH_PRIMARY_QUERY = '(pointer: coarse) and (hover: none)';
 
-function readSignals(): DeviceSignals {
+export function readDeviceSignals(): DeviceSignals {
   const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
   return {
     touchPrimary: window.matchMedia(TOUCH_PRIMARY_QUERY).matches,
@@ -50,12 +50,12 @@ function readSignals(): DeviceSignals {
 /** Live mobile/desktop state; follows DevTools toggling device emulation. */
 @Injectable({ providedIn: 'root' })
 export class Device {
-  private readonly _isMobile = signal(isMobileDevice(readSignals()));
+  private readonly _isMobile = signal(isMobileDevice(readDeviceSignals()));
   readonly isMobile = this._isMobile.asReadonly();
 
   constructor() {
     const query = window.matchMedia(TOUCH_PRIMARY_QUERY);
-    const update = () => this._isMobile.set(isMobileDevice(readSignals()));
+    const update = () => this._isMobile.set(isMobileDevice(readDeviceSignals()));
     query.addEventListener('change', update);
     inject(DestroyRef).onDestroy(() => query.removeEventListener('change', update));
   }

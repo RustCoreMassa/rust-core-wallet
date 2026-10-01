@@ -6,6 +6,7 @@ import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
+import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { AVATAR_COLORS } from '../../../shared/ui/avatar-colors';
 import { toUserMessage } from '../../../core/utils/user-error';
@@ -21,7 +22,7 @@ type Step = 'list' | 'choice' | 'import' | 'generating';
  */
 @Component({
   selector: 'app-wallets-modal',
-  imports: [ShortAddressPipe, FormsModule],
+  imports: [ShortAddressPipe, FormsModule, AmountPipe],
   templateUrl: './wallets-modal.html',
   styleUrl: './wallets-modal.scss',
 })
@@ -38,6 +39,11 @@ export class WalletsModal {
   protected readonly error = signal<string | null>(null);
   protected readonly isBusy = signal(false);
 
+  constructor() {
+    // The list shows every wallet's balance — bring them all up to date.
+    void this.store.refreshAll();
+  }
+
   protected avatarColors(index: number): readonly [string, string] {
     return AVATAR_COLORS[index % AVATAR_COLORS.length];
   }
@@ -46,8 +52,10 @@ export class WalletsModal {
     return name.slice(0, 2).toUpperCase();
   }
 
-  protected balanceFor(accountId: string): number {
-    return this.store.wallets()[accountId]?.balances.MAS ?? 0;
+  /** `null` until the wallet's first chain read — shown as a placeholder, never a fake 0. */
+  protected balanceFor(accountId: string): number | null {
+    const wallet = this.store.wallets()[accountId];
+    return wallet?.loaded ? (wallet.balances.MAS ?? 0) : null;
   }
 
   protected select(id: string): void {

@@ -29,8 +29,12 @@ Actions. It builds from exactly the tagged commit, in public, and:
 - runs the tests — if one fails, nothing is published;
 - builds for production, then boots that build in a simulated phone browser — if the app
   doesn't render, nothing is published;
+- builds the browser extension and boots its popup the same way;
 - publishes a [GitHub Release](https://github.com/RustCoreMassa/rust-core-wallet/releases) with
-  the changelog notes, the build as `rust-core-wallet-vX.Y.Z.zip`, and `SHA256SUMS`.
+  the changelog notes, the build as `rust-core-wallet-vX.Y.Z.zip`, and `SHA256SUMS`, plus the
+  extension as `rustcore-wallet-extension-chromium-vX.Y.Z.zip` and
+  `rustcore-wallet-extension-firefox-vX.Y.Z.zip`, each with its own `SHA256SUMS-chromium` /
+  `SHA256SUMS-firefox` (the two differ only in `manifest.json`).
 
 A version bump without a tag publishes nothing.
 
@@ -52,6 +56,11 @@ With the same Node.js version (dependencies are pinned by `package-lock.json`) t
 reproducible: every file matches except `ngsw.json`, the service worker's manifest, which records
 the build time — it's left out of `SHA256SUMS` for that reason.
 
+The extension is checked the same way — `npm run build:extension`, then inside
+`dist/extension/chromium` (or `firefox`) compare
+`find . -type f | sort | xargs shasum -a 256` with `SHA256SUMS-chromium` (or `-firefox`).
+Every file matches; the extension has no `ngsw.json`.
+
 ## Deploying to DeWeb
 
 The wallet is hosted on [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized
@@ -66,8 +75,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.0.3.zip -d rust-core-wallet-v1.0.3
-cd rust-core-wallet-v1.0.3
+unzip rust-core-wallet-v1.1.0.zip -d rust-core-wallet-v1.1.0
+cd rust-core-wallet-v1.1.0
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 
@@ -88,3 +97,37 @@ Nothing in the app needs changing for DeWeb:
   requires.
 - The app talks to the Massa RPC and explorer directly, so it doesn't depend on which gateway it
   was loaded from.
+
+## Publishing the browser extension
+
+Upload the zips from the GitHub Release, never a local build, so what's in each store is exactly
+what anyone can rebuild and check. Each zip has `manifest.json` at its root, as the stores
+expect. Check it against its `SHA256SUMS-*` first.
+
+| Store | Zip | Covers |
+|---|---|---|
+| [Chrome Web Store](https://chrome.google.com/webstore/devconsole) | `…-chromium-vX.Y.Z.zip` | Chrome, Brave, Opera, Vivaldi, Arc |
+| [Microsoft Edge Add-ons](https://partner.microsoft.com/dashboard/microsoftedge) | `…-chromium-vX.Y.Z.zip` | Edge |
+| [Firefox Add-ons (AMO)](https://addons.mozilla.org/developers/) | `…-firefox-vX.Y.Z.zip` | Firefox desktop and Android |
+
+What the stores ask for:
+
+- **Permissions**, to justify in the listing: `storage` (the encrypted vault and preferences),
+  `alarms` (auto-lock after 15 minutes), `sidePanel` (Chromium only — the side-panel view).
+  No host permissions, no content scripts.
+- **Data**: none is collected. Firefox's manifest declares it
+  (`data_collection_permissions: none`); the Chrome Web Store asks in its Privacy tab.
+- **Privacy policy**: the README's security & privacy section, which lists every network
+  destination.
+- **Firefox source code**: AMO reviews readable code, and the bundle is minified, so each upload
+  needs the source — the release tag's source archive from GitHub — and these build steps:
+  install Node.js from `.nvmrc`, then `npm ci && npm run build:extension`; the result is
+  `dist/extension/firefox`, byte-identical to the zip. Mozilla's linter
+  (`npx web-ext lint --source-dir dist/extension/firefox`) reports no errors; its only warnings
+  are `Function("return this")` fallbacks inside `google-protobuf` and `lodash` (pulled in by
+  `@massalabs/massa-web3`), which look up the global object and are never reached in a browser —
+  `self` is found first — and the extension's CSP forbids running them anyway.
+- The Firefox add-on ID is `rustcore-wallet@whisky098` (`browser_specific_settings` in
+  `src/extension/manifest.json`). It identifies the add-on on AMO for good — never change it.
+
+Store reviews take from a few days to a few weeks; wallets get extra scrutiny.

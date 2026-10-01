@@ -54,7 +54,7 @@ export class MainLayout {
     }
     // Cached values (if any) are already on screen; bring them up to date.
     // MNS is prefetched too, so the NFT page opens with data already there.
-    walletStore.refreshAll();
+    void walletStore.refreshAll();
     walletStore.loadDomains().catch((err) => console.warn('Prefetching MNS domains failed', err));
     walletStore.loadTotalRolls().catch((err) => console.warn('Prefetching total rolls failed', err));
 

@@ -32,7 +32,7 @@
   <div class="balance-label">MAS balance</div>
   <div class="balance-amount">
     @if (wallet().loaded) {
-    <span>{{ wallet().balances.MAS | number: '1.2-2' }}</span>
+    <span>{{ wallet().balances.MAS | amount }}</span>
     } @else {
     <span class="skeleton skeleton-lg"></span>
     }

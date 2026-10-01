@@ -173,6 +173,7 @@ export class WalletStore {
   /** Per `${network}:${id}`: when MNS domains were last read. */
   private readonly domainsFetchedAt = new Map<string, number>();
   private cacheSaveTimer: ReturnType<typeof setTimeout> | undefined;
+  private refreshAllRun = 0;
 
   readonly network = this.networkStore.network;
   readonly wallets = computed(() => this._walletsByNetwork()[this.network()]);
@@ -271,7 +272,7 @@ export class WalletStore {
   setNetwork(network: Network): void {
     if (network === this.network()) return;
     this.networkStore.set(network);
-    this.refreshAll();
+    void this.refreshAll();
     this.loadDomains().catch((err) => console.warn('Loading MNS domains failed', err));
     this.loadTotalRolls().catch((err) => console.warn('Loading total rolls failed', err));
   }
@@ -300,10 +301,23 @@ export class WalletStore {
     this._prices.set(snapshot.prices);
   }
 
-  /** Background refresh of every wallet on the current network, plus prices. */
-  refreshAll(): void {
-    for (const id of Object.keys(this.wallets())) this.refreshInBackground(id);
+  /**
+   * Re-reads every wallet on the current network (plus prices): the active
+   * one first, then the others one at a time. Never all at once — each
+   * wallet is ~11 reads, and the public RPC rejects such bursts, which left
+   * some wallets unread until selected. A newer call (e.g. after a network
+   * switch) supersedes one still running.
+   */
+  async refreshAll(): Promise<void> {
+    const run = ++this.refreshAllRun;
     this.refreshPricesInBackground();
+    const active = this._activeWalletId();
+    const ids = [active, ...Object.keys(this.wallets()).filter((id) => id !== active)];
+    for (const id of ids) {
+      if (run !== this.refreshAllRun) return;
+      if (!this.wallets()[id] || this._refreshingIds().has(id)) continue;
+      await this.refresh(id).catch((err) => console.warn(`Wallet refresh failed for "${id}"`, err));
+    }
   }
 
   /**
@@ -614,12 +628,18 @@ export class WalletStore {
     return from === 'MAS' ? subtractMas(held, SWAP_STORAGE_COST_MAS + NETWORK_FEE_MAS) : held;
   }
 
-  quoteSwap(
+  /**
+   * Quotes exactly `amount` — validated first, so an amount above what can
+   * be spent is rejected (shown instead of a quote) rather than quietly
+   * quoted for the whole balance by `spendableUnits`' rounding clamp.
+   */
+  async quoteSwap(
     from: TokenSymbol,
     to: TokenSymbol,
     amount: number,
     slippageBps: number,
   ): Promise<SwapQuote> {
+    this.validateSwap(from, to, amount);
     return this.dusaSwap.quote(from, to, this.spendableUnits(from, amount), slippageBps);
   }
 

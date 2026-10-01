@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "RustCore Wallet",
+  "short_name": "RustCore",
+  "version": "0.0.0",
+  "description": "Self-custodial wallet for the Massa blockchain.",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "RustCore Wallet",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "index.html?view=side-panel"
+  },
+  "sidebar_action": {
+    "default_panel": "index.html?view=side-panel",
+    "default_title": "RustCore Wallet",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    },
+    "open_at_install": false
+  },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "permissions": ["storage", "alarms", "sidePanel"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "rustcore-wallet@whisky098",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  }
+}

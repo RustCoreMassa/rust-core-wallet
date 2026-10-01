@@ -44,12 +44,43 @@ npm start            # http://localhost:4200
 | `npx tsc -p tsconfig.app.json --noEmit` | Type-check |
 | `npm run build` | Production build into `dist/` |
 | `npm run smoke` | Boots the production build in a simulated phone browser (run after `npm run build`) |
+| `npm run build:extension` | Browser extension into `dist/extension/chromium` and `dist/extension/firefox` |
+| `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
 | `npx prettier --write .` | Format the code |
 
-**Mobile only.** RustCore Wallet is a phone app: in a desktop browser it shows an "open on your
-phone" screen instead of the wallet. To develop on desktop, open DevTools and turn on device
-emulation (Chrome: *Toggle device toolbar*; Firefox: *Responsive Design Mode* with touch
-simulation), then reload. The restriction is the `MOBILE_ONLY` flag in `src/app/app.config.ts`.
+**Mobile only.** RustCore Wallet is a phone app: in a desktop browser the production build shows
+an "open on your phone" screen instead of the wallet. Development builds (`npm start`) skip that
+screen, so the wallet opens in any desktop browser; to see it as on a phone, turn on DevTools
+device emulation (Chrome: *Toggle device toolbar*; Firefox: *Responsive Design Mode* with touch
+simulation). The restriction is the `MOBILE_ONLY` flag in `src/app/platform-providers.ts`.
+
+**Browser extension (in progress).** The same code also builds as a Manifest V3 browser
+extension, one package per browser family: `npm run build:extension` writes
+`dist/extension/chromium` (Chrome, Edge, Brave, Opera, Vivaldi, Arc) and
+`dist/extension/firefox` (Firefox desktop and Android). They hold the same files; only
+`manifest.json` differs — `src/extension/manifest.json` has every key and the build keeps each
+browser's own (Chromium: `side_panel`, background `service_worker`; Firefox: `sidebar_action`,
+background `scripts`, `browser_specific_settings`). To try it:
+
+- Chrome / Edge / Brave: `chrome://extensions` (Edge: `edge://extensions`) → *Developer mode* →
+  *Load unpacked* → pick `dist/extension/chromium`.
+- Firefox: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* → pick
+  `dist/extension/firefox/manifest.json` (stays until Firefox restarts).
+
+What differs from the web app is swapped in at build time: `src/app/platform-providers.ts` (web)
+is replaced by `src/extension/platform-providers.ts` — `chrome.storage` instead of the page's
+storage, hash routing, no mobile gate, service worker or install banner, and an unlocked session
+that survives closing the popup (the vault key is kept in memory-only `chrome.storage.session`
+and wiped 15 minutes after the popup was last open). The same page runs in three views
+(Settings → *Open in full screen* / *Open in side panel*; `html[data-view]`, styled in
+`src/extension/views.scss`): the toolbar popup, fixed at 380×600 (the browsers' height limit);
+the side panel (`?view=side-panel` — Chrome's side panel or Firefox's sidebar), full window
+height; and a full-screen browser tab (`?view=tab`): a centered 720 px column, with dialogs in
+place of bottom sheets. What a browser offers is detected, not assumed
+(`src/extension/browser-views.ts`): no side panel where neither API exists, and on a phone
+(Firefox for Android) the popup is already full screen, so it offers no other view. The
+extension's pages may connect only to the Massa nodes and the explorer API (CSP in
+`src/extension/manifest.json`).
 
 **Installable app.** The service worker runs in production builds only (`npm run build`), and
 browsers offer installation only over HTTPS (or on `localhost`).
@@ -73,7 +104,7 @@ chain, verify them with read-only calls or simulations first, and test with smal
 src/app/
 ├── core/
 │   ├── models/      Tokens, wallets, transactions, vault, MNS
-│   ├── platform/    Device detection (mobile only), install-as-app prompt
+│   ├── platform/    Device detection (mobile only), install-as-app prompt, storage tokens
 │   ├── services/    Massa provider, Dusa prices & swap, explorer API,
 │   │                encrypted vault & session cache, on-chain execution tracking
 │   ├── state/       AuthStore (vault & session), WalletStore (balances, history,
@@ -81,7 +112,9 @@ src/app/
 │   └── utils/       Exact decimal ↔ on-chain amounts, staking rewards, user-facing errors
 ├── features/        Screens: PIN/unlock, Home, NFTs & domains, Staking, Settings, modals
 ├── layout/          App shell, navigation, auto-refresh
-└── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, PIN pad
+├── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, PIN pad
+└── platform-providers.ts   Web-app specifics (replaced in the extension build)
+src/extension/       Browser extension: manifest, background worker, chrome.storage adapters
 ```
 
 ### Design rules
@@ -108,3 +141,5 @@ encoding and platform detection. The blockchain and explorer are faked, so tests
 Unit tests can't see problems that only exist in the bundled output, so after
 `npm run build` run `npm run smoke`: it loads the production build in a simulated phone browser
 and checks the app renders. The release workflow runs it too, before publishing anything.
+For the extension, `npm run build:extension` also fails if the popup's `index.html` contains
+inline code (the extension's CSP would block it), and `npm run smoke:extension` boots the popup.

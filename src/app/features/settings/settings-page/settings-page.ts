@@ -1,6 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
+import { EXTENSION_VIEWS } from '../../../core/platform/app-platform';
 import { AuthStore } from '../../../core/state/auth-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -20,6 +21,8 @@ export class SettingsPage {
   protected readonly authStore = inject(AuthStore);
   private readonly toast = inject(Toast);
   private readonly router = inject(Router);
+  /** Extension only: switch between popup, side panel and full-screen tab. */
+  protected readonly views = inject(EXTENSION_VIEWS);
 
   protected readonly walletsCountLabel = computed(() => {
     const count = this.authStore.accounts().length;

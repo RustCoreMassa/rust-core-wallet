@@ -9,7 +9,9 @@ import { WalletStore } from '../../../core/state/wallet-store';
 import { fromUnits } from '../../../core/utils/token-amount';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
+import { formatDisplayAmount } from '../../../core/utils/display-amount';
 import { toUserMessage } from '../../../core/utils/user-error';
+import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 
 /** Quotes are re-read this long after the user stops typing. */
 const QUOTE_DEBOUNCE_MS = 400;
@@ -20,7 +22,7 @@ const fmt = (n: number, digits = 6) => n.toLocaleString('en-US', { maximumFracti
 /** Swap any two tokens through Dusa (mainnet), with a review step before signing. */
 @Component({
   selector: 'app-swap-modal',
-  imports: [FormsModule, ConfirmDetails, Dropdown],
+  imports: [FormsModule, ConfirmDetails, Dropdown, AmountPipe],
   templateUrl: './swap-modal.html',
   styleUrl: './swap-modal.scss',
 })
@@ -203,7 +205,7 @@ export class SwapModal {
       label: symbol,
       sublabel: TOKEN_REGISTRY[symbol].name,
       icon: TOKEN_REGISTRY[symbol].asset,
-      trailing: fmt(balances[symbol] ?? 0),
+      trailing: formatDisplayAmount(balances[symbol] ?? 0),
     }));
   }
 }

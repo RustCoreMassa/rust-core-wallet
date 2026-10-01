@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { VaultAccount } from '../models/vault.model';
+import { exportVaultKey, importVaultKey } from '../services/crypto-vault';
+import { SESSION_KEY_STORE, SessionKeyStore } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
 import { AuthStore } from './auth-store';
 
@@ -95,5 +97,83 @@ describe('AuthStore', () => {
   it('suggests the next free wallet_N name', async () => {
     await auth.register('123456', [main, second]);
     expect(auth.suggestWalletName()).toBe('wallet_3');
+  });
+
+  it('keeps no session on the web: a reloaded page needs the PIN', async () => {
+    await auth.register('123456', [main]);
+    const reloaded = TestBed.runInInjectionContext(() => new AuthStore());
+    expect(await reloaded.resume()).toBe(false);
+    expect(reloaded.isUnlocked()).toBe(false);
+  });
+});
+
+/** The extension's kind of store, in memory: keeps the exported raw key. */
+class KeepingSessionKeyStore implements SessionKeyStore {
+  readonly keepsKey = true;
+  raw: string | null = null;
+  async save(key: CryptoKey): Promise<void> {
+    this.raw = await exportVaultKey(key); // throws unless the key was derived extractable
+  }
+  async restore(): Promise<CryptoKey | null> {
+    return this.raw ? importVaultKey(this.raw) : null;
+  }
+  async clear(): Promise<void> {
+    this.raw = null;
+  }
+}
+
+describe('AuthStore with a session kept outside the page', () => {
+  let sessionKeys: KeepingSessionKeyStore;
+  const reopen = () => TestBed.runInInjectionContext(() => new AuthStore());
+
+  beforeEach(() => {
+    localStorage.clear();
+    sessionKeys = new KeepingSessionKeyStore();
+    TestBed.configureTestingModule({
+      providers: [{ provide: SESSION_KEY_STORE, useValue: sessionKeys }],
+    });
+  });
+
+  it('resumes a reopened popup without the PIN, key still usable', async () => {
+    await TestBed.inject(AuthStore).register('123456', [main]);
+    const popup = reopen();
+    expect(await popup.resume()).toBe(true);
+    expect(popup.accounts()).toEqual([main]);
+    await popup.saveAccounts([main, second]);
+    expect(await popup.verifyPin('123456')).toBe(true);
+  });
+
+  it('keeps the session after a PIN unlock too', async () => {
+    const auth = TestBed.inject(AuthStore);
+    await auth.register('123456', [main]);
+    auth.lock();
+    await auth.unlock('123456');
+    expect(await reopen().resume()).toBe(true);
+  });
+
+  it('ends the kept session on lock and on log out', async () => {
+    const auth = TestBed.inject(AuthStore);
+    await auth.register('123456', [main]);
+    auth.lock();
+    await Promise.resolve();
+    expect(sessionKeys.raw).toBeNull();
+    expect(await reopen().resume()).toBe(false);
+
+    await auth.unlock('123456');
+    auth.logout();
+    await Promise.resolve();
+    expect(await reopen().resume()).toBe(false);
+  });
+
+  it("drops a kept key that doesn't open the vault", async () => {
+    const auth = TestBed.inject(AuthStore);
+    await auth.register('123456', [main]);
+    const stale = sessionKeys.raw;
+    auth.logout();
+    await auth.register('654321', [second]);
+    auth.lock();
+    sessionKeys.raw = stale;
+    expect(await reopen().resume()).toBe(false);
+    expect(sessionKeys.raw).toBeNull();
   });
 });
