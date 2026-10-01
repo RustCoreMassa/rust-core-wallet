@@ -7,6 +7,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-01
+
+### Added
+
+- **Browser extension** (Manifest V3), built from the same code as the web app, in two packages:
+  one for Chrome, Edge, Brave, Opera, Vivaldi and Arc, one for Firefox (desktop and Android).
+  It opens as the toolbar popup, in the browser's side panel (Firefox: sidebar) or full screen
+  in its own tab. An unlocked wallet stays unlocked while you reopen the popup and locks itself
+  15 minutes after it was last open. The extension may connect only to the Massa nodes and the
+  explorer API. Store publishing comes next; connecting to dApps is the following step.
+- Every GitHub Release now also carries the extension packages, each with its own checksums,
+  built and boot-tested in public CI like the web app.
+
+### Changed
+
+- Amounts in balances, lists and history show exactly two decimals, cut rather than rounded up,
+  so a balance never looks larger than it is. Review screens and transaction details still show
+  exact amounts.
+
+### Fixed
+
+- After unlocking, every wallet's balance loads, not only the active one's. Wallets are now read
+  one after another; reading them all at once tripped the public node's rate limit. The wallet
+  list shows a placeholder instead of "0 MAS" until a balance is known.
+- Swap quoted the whole balance when the amount typed was larger (1 000 and 10 000 MAS both
+  showed the same result); it now says the balance isn't enough.
+- The recipient address field in Send no longer shows a double focus ring.
+- Text fields on their own (wallet name, private key, address label) span the full width.
+- The bottom navigation labels are no longer underlined.
+
 ## [1.0.3] — 2026-09-30
 
 ### Changed
@@ -74,6 +104,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.1.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.0
 [1.0.3]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.3
 [1.0.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.2
 [1.0.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.1
