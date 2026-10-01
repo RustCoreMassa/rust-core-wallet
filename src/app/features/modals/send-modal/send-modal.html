@@ -32,17 +32,14 @@
 </div>
 
 <label class="field-label" for="send-address">Recipient address</label>
-<div class="select-fake">
-  <input
-    id="send-address"
-    class="num-input"
-    style="background:none;border:none;padding:0;"
-    type="text"
-    placeholder="AU..."
-    [ngModel]="address()"
-    (ngModelChange)="address.set($event)"
-  />
-</div>
+<input
+  id="send-address"
+  class="num-input"
+  type="text"
+  placeholder="AU..."
+  [ngModel]="address()"
+  (ngModelChange)="address.set($event)"
+/>
 
 @if (showSaveOption()) {
 <label class="save-row">
