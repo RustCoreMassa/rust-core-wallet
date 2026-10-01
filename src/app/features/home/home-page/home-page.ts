@@ -1,9 +1,10 @@
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { TokenSymbol } from '../../../core/models/token.model';
 import { KeyValueStore, LOCAL_STORE } from '../../../core/platform/app-storage';
 import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
+import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 import { HistoryRow } from '../../../shared/ui/history-row/history-row';
 import { TokenRow } from '../../../shared/ui/token-row/token-row';
 
@@ -25,7 +26,7 @@ function loadShowAll(store: KeyValueStore): boolean {
 
 @Component({
   selector: 'app-home-page',
-  imports: [CurrencyPipe, DecimalPipe, TokenRow, HistoryRow],
+  imports: [CurrencyPipe, AmountPipe, TokenRow, HistoryRow],
   templateUrl: './home-page.html',
   styleUrl: './home-page.scss',
 })

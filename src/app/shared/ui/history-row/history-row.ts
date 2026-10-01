@@ -1,5 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { TransactionRecord, TransactionStatus } from '../../../core/models/transaction.model';
+import { formatDisplayAmount } from '../../../core/utils/display-amount';
 
 interface HistoryRowView {
   icon: 'up' | 'down' | 'swap' | 'rolls';
@@ -14,10 +15,6 @@ const STATUS_LABEL: Partial<Record<TransactionStatus, string>> = {
   pending: 'Pending',
   failed: 'Failed',
 };
-
-function formatAmount(amount: number): string {
-  return amount.toLocaleString('en-US', { maximumFractionDigits: 4 });
-}
 
 function timeAgo(timestamp: number): string {
   const minutes = Math.floor((Date.now() - timestamp) / 60000);
@@ -45,7 +42,7 @@ export class HistoryRow {
 
   protected readonly view = computed<HistoryRowView>(() => {
     const tx = this.tx();
-    const amount = formatAmount(tx.amount);
+    const amount = formatDisplayAmount(tx.amount);
     switch (tx.type) {
       case 'send':
         return {
@@ -72,7 +69,7 @@ export class HistoryRow {
           title: `Swap ${tx.token} → ${tx.toToken}`,
           subtitle:
             tx.received !== undefined
-              ? `≈ ${formatAmount(tx.received)} ${tx.toToken} · Dusa`
+              ? `≈ ${formatDisplayAmount(tx.received)} ${tx.toToken} · Dusa`
               : 'Dusa',
           amountText: `-${amount} ${tx.token}`,
           amountPositive: false,

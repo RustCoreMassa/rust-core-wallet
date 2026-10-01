@@ -30,7 +30,14 @@
       <div class="wallet-name">{{ account.name }}</div>
       <div class="wallet-addr">{{ account.address | shortAddress }}</div>
     </div>
-    <div class="wallet-balance">{{ balanceFor(account.id) }} MAS</div>
+    @let balance = balanceFor(account.id);
+    <div class="wallet-balance">
+      @if (balance === null) {
+      <span class="skeleton"></span>
+      } @else {
+      {{ balance | amount }} MAS
+      }
+    </div>
     @if (account.id === store.activeWalletId()) {
     <svg class="wallet-check" width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />

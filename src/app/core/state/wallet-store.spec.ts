@@ -99,6 +99,24 @@ describe('WalletStore', () => {
     it('lists only tokens actually held (sparse balances)', () => {
       expect(Object.keys(store.wallets()['b'].balances)).toEqual(['MAS']);
     });
+
+    it('refreshes all wallets one at a time, the active one first (no RPC burst)', async () => {
+      const order: string[] = [];
+      let inFlight = 0;
+      let maxInFlight = 0;
+      provider.getBalance.mockImplementation(async (pk: string) => {
+        order.push(pk);
+        maxInFlight = Math.max(maxInFlight, ++inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+        return chain.mas[pk] ?? 0n;
+      });
+      chain.mas['S1b'] = 7_000_000_000n;
+      await store.refreshAll();
+      expect(order).toEqual(['S1a', 'S1b']);
+      expect(maxInFlight).toBe(1);
+      expect(store.wallets()['b'].balances.MAS).toBe(7);
+    });
   });
 
   describe('validateSend', () => {

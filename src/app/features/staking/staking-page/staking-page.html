@@ -51,7 +51,7 @@
   </ol>
 
   <div class="stake-intro-hint">
-    Available: {{ finalMas() | number: '1.2-2' }} MAS
+    Available: {{ finalMas() | amount }} MAS
     @if (affordableRolls() > 0) {
     · enough for {{ affordableRolls() }} roll{{ affordableRolls() > 1 ? 's' : '' }}
     }
@@ -111,7 +111,7 @@
     </div>
     <div class="staking-stat">
       <div class="stat-num">
-        @if (dailyReward() !== null) { {{ dailyReward() | number: '1.2-2' }} } @else { <span class="skeleton"></span> }
+        @if (dailyReward() !== null) { {{ dailyReward() | amount }} } @else { <span class="skeleton"></span> }
       </div>
       <div class="stat-label">est. MAS / day</div>
     </div>
@@ -161,15 +161,15 @@
 
   <div class="staking-row">
     <div class="staking-stat">
-      <div class="stat-num">{{ finalMas() | number: '1.2-2' }}</div>
+      <div class="stat-num">{{ finalMas() | amount }}</div>
       <div class="stat-label">final MAS balance</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">{{ stakedMas() | number: '1.0-0' }}</div>
+      <div class="stat-num">{{ stakedMas() | amount }}</div>
       <div class="stat-label">staked MAS balance</div>
     </div>
     <div class="staking-stat">
-      <div class="stat-num">{{ totalMas() | number: '1.2-2' }}</div>
+      <div class="stat-num">{{ totalMas() | amount }}</div>
       <div class="stat-label">total MAS balance</div>
     </div>
   </div>

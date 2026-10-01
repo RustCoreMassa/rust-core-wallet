@@ -1,13 +1,11 @@
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import { Component, computed, input, signal } from '@angular/core';
 import { TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
-
-/** Tokens carry up to 18 decimals on-chain — far more than a list row can usefully show. */
-const MAX_DISPLAY_DECIMALS = 6;
+import { AmountPipe } from '../../pipes/amount-pipe';
 
 @Component({
   selector: 'app-token-row',
-  imports: [CurrencyPipe, DecimalPipe],
+  imports: [CurrencyPipe, AmountPipe],
   templateUrl: './token-row.html',
   styleUrl: './token-row.scss',
 })
@@ -30,7 +28,4 @@ export class TokenRow {
       ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
       : `$${price.toLocaleString('en-US', { maximumSignificantDigits: 4 })}`;
   });
-  protected readonly amountFormat = computed(
-    () => `1.2-${Math.min(this.meta().decimals, MAX_DISPLAY_DECIMALS)}`,
-  );
 }

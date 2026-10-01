@@ -24,7 +24,7 @@
   <button class="max-btn" type="button" (click)="setMax()">Max</button>
 </div>
 <div class="balance-hint">
-  <span>Available: {{ fromBalance() }} {{ fromToken() }}</span>
+  <span>Available: {{ fromBalance() | amount }} {{ fromToken() }}</span>
 </div>
 
 <div class="swap-dir">

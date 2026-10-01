@@ -4,6 +4,7 @@ import { Modal } from '../../../core/services/modal';
 import { ROLL_PRICE_MAS } from '../../../core/services/massa-provider';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { dailyStakingReward, stakingAprPercent } from '../../../core/utils/staking-rewards';
+import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 
 /** Official Massa staking guide. */
 const STAKING_DOCS_URL = 'https://docs.massa.net/docs/node/stake';
@@ -19,7 +20,7 @@ type StakingStatus = 'idle' | 'activating' | 'active' | 'missing' | 'unstaking';
 
 @Component({
   selector: 'app-staking-page',
-  imports: [CurrencyPipe, DecimalPipe],
+  imports: [CurrencyPipe, DecimalPipe, AmountPipe],
   templateUrl: './staking-page.html',
   styleUrl: './staking-page.scss',
 })
