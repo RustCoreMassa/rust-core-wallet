@@ -131,13 +131,21 @@ jobs:
       - name: Package the extension and checksums
         run: |
           # The two folders differ only in manifest.json, so each gets its own SHA256SUMS.
+          # Zips are written to, and summed from, this step's own directory by absolute path
+          # (writing via $GITHUB_WORKSPACE left them where the relative sha256sum didn't look).
+          OUT="$PWD"
           for TARGET in chromium firefox; do
             DIR="dist/extension/$TARGET"
             EXT_ZIP="rustcore-wallet-extension-$TARGET-$TAG.zip"
-            (cd "$DIR" && find . -type f | sort | xargs sha256sum) > "SHA256SUMS-$TARGET"
-            (cd "$DIR" && zip -qr "$GITHUB_WORKSPACE/$EXT_ZIP" .)
-            sha256sum "$EXT_ZIP" >> "SHA256SUMS-$TARGET"
-            cat "SHA256SUMS-$TARGET"
+            (cd "$DIR" && find . -type f | sort | xargs sha256sum) > "$OUT/SHA256SUMS-$TARGET"
+            (cd "$DIR" && zip -qr "$OUT/$EXT_ZIP" .)
+            if [ ! -f "$OUT/$EXT_ZIP" ]; then
+              echo "::error::$EXT_ZIP was not created in $OUT (workspace: $GITHUB_WORKSPACE)."
+              ls -la "$OUT"
+              exit 1
+            fi
+            (cd "$OUT" && sha256sum "$EXT_ZIP") >> "$OUT/SHA256SUMS-$TARGET"
+            cat "$OUT/SHA256SUMS-$TARGET"
           done
 
       - name: Publish the GitHub Release
