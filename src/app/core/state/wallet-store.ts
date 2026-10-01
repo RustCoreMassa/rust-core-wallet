@@ -628,12 +628,18 @@ export class WalletStore {
     return from === 'MAS' ? subtractMas(held, SWAP_STORAGE_COST_MAS + NETWORK_FEE_MAS) : held;
   }
 
-  quoteSwap(
+  /**
+   * Quotes exactly `amount` — validated first, so an amount above what can
+   * be spent is rejected (shown instead of a quote) rather than quietly
+   * quoted for the whole balance by `spendableUnits`' rounding clamp.
+   */
+  async quoteSwap(
     from: TokenSymbol,
     to: TokenSymbol,
     amount: number,
     slippageBps: number,
   ): Promise<SwapQuote> {
+    this.validateSwap(from, to, amount);
     return this.dusaSwap.quote(from, to, this.spendableUnits(from, amount), slippageBps);
   }
 

@@ -223,6 +223,16 @@ describe('WalletStore', () => {
       expect(store.wallets()['a'].balances.MAS).toBe(100);
     });
 
+    it('quotes exactly the typed amount, never the whole balance in its place', async () => {
+      const dusa = TestBed.inject(DusaSwap) as unknown as { quote: ReturnType<typeof vi.fn> };
+      dusa.quote = vi.fn().mockResolvedValue({});
+      await expect(store.quoteSwap('MAS', 'USDC.e', 1000, 50)).rejects.toThrow(/Insufficient MAS/);
+      expect(dusa.quote).not.toHaveBeenCalled();
+
+      await store.quoteSwap('MAS', 'USDC.e', 50, 50);
+      expect(dusa.quote).toHaveBeenCalledWith('MAS', 'USDC.e', 50_000_000_000n, 50);
+    });
+
     it('only allows swaps on mainnet', () => {
       store.setNetwork('buildnet');
       expect(() => store.validateSwap('MAS', 'USDC.e', 1)).toThrow(/Mainnet only/);
