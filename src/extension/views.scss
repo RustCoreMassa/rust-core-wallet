@@ -1,0 +1,46 @@
+/* Extension build only (angular.json → "extension" → styles), after styles.scss.
+   html[data-view] / [data-device] are set by src/extension/platform-providers.ts.
+   The side panel is a normal full-height viewport and keeps the app's own sizing. */
+
+/* Desktop popup: browsers size it from its content (at most 800×600) while the
+   app fills the viewport — so it gets a fixed size. On a phone (Firefox for
+   Android) the popup is a full-screen page and keeps the app's own sizing. */
+html[data-view='popup'][data-device='desktop'],
+html[data-view='popup'][data-device='desktop'] body {
+  width: 380px;
+  height: 600px;
+}
+
+html[data-view='popup'][data-device='desktop'] .app-screen {
+  height: 600px;
+}
+
+/* Full screen (a browser tab, like MetaMask's "Expand view"): the app as a
+   centered column over the page's own background — wide enough to breathe,
+   narrow enough that a token's name and its balance still read as one row. */
+html[data-view='tab'] {
+  --app-width: 720px;
+}
+
+html[data-view='tab'] .app-screen {
+  border-inline: 1px solid var(--border);
+  box-shadow: 0 0 120px -20px rgba(0, 0, 0, 0.9);
+}
+
+html[data-view='tab'] .app-glow {
+  width: 680px;
+}
+
+/* Dialogs instead of bottom sheets: centered, phone-width, all corners round. */
+html[data-view='tab'] .modal-overlay {
+  align-items: center;
+  padding: 24px;
+}
+
+html[data-view='tab'] .modal {
+  max-width: 480px;
+  max-height: calc(100vh - 48px);
+  border-radius: var(--radius-xl);
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 26px;
+}

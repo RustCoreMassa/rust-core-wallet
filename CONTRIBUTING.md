@@ -44,7 +44,7 @@ npm start            # http://localhost:4200
 | `npx tsc -p tsconfig.app.json --noEmit` | Type-check |
 | `npm run build` | Production build into `dist/` |
 | `npm run smoke` | Boots the production build in a simulated phone browser (run after `npm run build`) |
-| `npm run build:extension` | Browser extension build into `dist/extension/browser` |
+| `npm run build:extension` | Browser extension into `dist/extension/chromium` and `dist/extension/firefox` |
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
 | `npx prettier --write .` | Format the code |
 
@@ -54,17 +54,33 @@ screen, so the wallet opens in any desktop browser; to see it as on a phone, tur
 device emulation (Chrome: *Toggle device toolbar*; Firefox: *Responsive Design Mode* with touch
 simulation). The restriction is the `MOBILE_ONLY` flag in `src/app/platform-providers.ts`.
 
-**Browser extension (in progress).** The same code also builds as a Chrome (Manifest V3)
-extension: `npm run build:extension`, then in `chrome://extensions` turn on *Developer mode* →
-*Load unpacked* → pick `dist/extension/browser`. What differs from the web app is swapped in at
-build time: `src/app/platform-providers.ts` (web) is replaced by
-`src/extension/platform-providers.ts` — `chrome.storage` instead of the page's storage, hash
-routing, no mobile gate, service worker or install banner, and an unlocked session that survives
-closing the popup (the vault key is kept in memory-only `chrome.storage.session` and wiped
-15 minutes after the popup was last open). The same page also runs as Chrome's side panel
-(Settings → *Open in side panel*; `?view=side-panel`): the popup is fixed at 380×600 — Chrome's
-height limit — while the side panel takes the window's full height. The extension's pages may connect only to the Massa
-nodes and the explorer API (CSP in `src/extension/manifest.json`).
+**Browser extension (in progress).** The same code also builds as a Manifest V3 browser
+extension, one package per browser family: `npm run build:extension` writes
+`dist/extension/chromium` (Chrome, Edge, Brave, Opera, Vivaldi, Arc) and
+`dist/extension/firefox` (Firefox desktop and Android). They hold the same files; only
+`manifest.json` differs — `src/extension/manifest.json` has every key and the build keeps each
+browser's own (Chromium: `side_panel`, background `service_worker`; Firefox: `sidebar_action`,
+background `scripts`, `browser_specific_settings`). To try it:
+
+- Chrome / Edge / Brave: `chrome://extensions` (Edge: `edge://extensions`) → *Developer mode* →
+  *Load unpacked* → pick `dist/extension/chromium`.
+- Firefox: `about:debugging#/runtime/this-firefox` → *Load Temporary Add-on…* → pick
+  `dist/extension/firefox/manifest.json` (stays until Firefox restarts).
+
+What differs from the web app is swapped in at build time: `src/app/platform-providers.ts` (web)
+is replaced by `src/extension/platform-providers.ts` — `chrome.storage` instead of the page's
+storage, hash routing, no mobile gate, service worker or install banner, and an unlocked session
+that survives closing the popup (the vault key is kept in memory-only `chrome.storage.session`
+and wiped 15 minutes after the popup was last open). The same page runs in three views
+(Settings → *Open in full screen* / *Open in side panel*; `html[data-view]`, styled in
+`src/extension/views.scss`): the toolbar popup, fixed at 380×600 (the browsers' height limit);
+the side panel (`?view=side-panel` — Chrome's side panel or Firefox's sidebar), full window
+height; and a full-screen browser tab (`?view=tab`): a centered 720 px column, with dialogs in
+place of bottom sheets. What a browser offers is detected, not assumed
+(`src/extension/browser-views.ts`): no side panel where neither API exists, and on a phone
+(Firefox for Android) the popup is already full screen, so it offers no other view. The
+extension's pages may connect only to the Massa nodes and the explorer API (CSP in
+`src/extension/manifest.json`).
 
 **Installable app.** The service worker runs in production builds only (`npm run build`), and
 browsers offer installation only over HTTPS (or on `localhost`).

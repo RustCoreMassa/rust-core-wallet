@@ -68,6 +68,8 @@ if (extension) {
     alarms: { create: async () => {}, clear: async () => true, onAlarm: { addListener() {} } },
     windows: { getCurrent: async () => ({ id: 1 }) },
     sidePanel: { open: async () => {} },
+    tabs: { create: async () => ({}) },
+    runtime: { getURL: (path) => `chrome-extension://smoke/${path}` },
   };
 }
 

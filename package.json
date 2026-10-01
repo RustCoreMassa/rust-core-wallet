@@ -9,7 +9,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "smoke": "node --no-warnings scripts/smoke-boot.mjs",
-    "smoke:extension": "node --no-warnings scripts/smoke-boot.mjs dist/extension/browser --extension"
+    "smoke:extension": "node --no-warnings scripts/smoke-boot.mjs dist/extension/chromium --extension"
   },
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
