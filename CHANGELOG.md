@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-10-02
+
 ### Added
 
 - The browser extension links to its source code from the browser's extension page (homepage).
@@ -115,6 +117,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.1.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.1
 [1.1.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.0
 [1.0.3]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.3
 [1.0.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.2
