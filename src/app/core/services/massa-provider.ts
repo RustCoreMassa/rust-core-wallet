@@ -26,6 +26,24 @@ export interface SignedMessage {
   readonly signature: string;
 }
 
+/** A smart-contract call, as a dApp asks for it (amounts in nanoMAS). */
+export interface ContractCallParams {
+  readonly target: string;
+  readonly func: string;
+  readonly parameter: Uint8Array;
+  readonly coins: bigint;
+  readonly fee: bigint;
+  /** Left out, the gas is estimated by simulating the call first. */
+  readonly maxGas?: bigint;
+}
+
+/** A call run read-only against the current chain state: nothing is signed or sent. */
+export interface CallSimulation {
+  /** The contract's error if the call would fail; null if it would go through. */
+  readonly error: string | null;
+  readonly gasCost: bigint;
+}
+
 export interface GeneratedAccount {
   readonly privateKey: string;
   readonly address: string;
@@ -86,6 +104,9 @@ export interface MassaProvider {
   // ---- dApps ------------------------------------------------------------------
   /** Signs `data` with the key's account, exactly as massa-web3's `Provider.sign` does. */
   signMessage(privateKey: string, data: Uint8Array): Promise<SignedMessage>;
+  /** Runs `call` read-only as `caller` would — what would happen, without sending anything. */
+  simulateCall(caller: string, call: ContractCallParams): Promise<CallSimulation>;
+  callContract(privateKey: string, call: ContractCallParams): Promise<OperationResult>;
 }
 
 /** The chain executed the operation and it failed — nothing changed except the fee. */

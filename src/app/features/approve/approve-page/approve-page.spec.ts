@@ -1,7 +1,9 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ApprovalView } from '../../../../extension/dapp/approval';
+import { Args } from '@massalabs/massa-web3';
 import { toBase64 } from '../../../../extension/dapp/protocol';
+import { TOKEN_REGISTRY } from '../../../core/models/token.model';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { DAPP_APPROVALS, DappApprovals } from '../../../core/platform/dapp-approvals';
 import { OperationFailedError } from '../../../core/services/massa-provider';
@@ -44,6 +46,9 @@ function fakeStore() {
     dappTransfer: vi.fn(async () => 'O1sent'),
     dappRolls: vi.fn(async () => 'O1roll'),
     dappSign: vi.fn(async () => ({ publicKey: 'P1key', signature: '1sig' })),
+    validateDappCall: vi.fn(),
+    simulateDappCall: vi.fn(async () => ({ error: null as string | null, gasCost: 2_100_000n })),
+    dappCall: vi.fn(async () => 'O1call'),
   };
 }
 
@@ -149,13 +154,75 @@ describe('ApprovePage', () => {
     expect(approvals.resolve).not.toHaveBeenCalled();
   });
 
-  it('blocks contract calls for now', async () => {
-    const { page, approvals } = await setup([
-      view({ method: 'callSC', params: { target: CONTRACT, func: 'swap' }, address: MAIN }),
-    ]);
-    expect(page.blocker()).toMatch(/aren't supported yet/);
-    await page.approve();
-    expect(approvals.resolve).not.toHaveBeenCalled();
+  describe('contract calls', () => {
+    const USDC = TOKEN_REGISTRY['USDC.e'].contract;
+    const transferParams = {
+      target: USDC,
+      func: 'transfer',
+      parameter: toBase64(new Args().addString(OUTSIDER).addU256(12_500_000n).serialize()),
+      coins: '10000000',
+    };
+
+    it('runs the call read-only first, then sends exactly that call', async () => {
+      const { fixture, page, approvals, store } = await setup([
+        view({ method: 'callSC', params: transferParams, address: SAVINGS }),
+      ]);
+      const [walletId, simulated] = store.simulateDappCall.mock.calls[0] as unknown as [
+        string,
+        { target: string; func: string; coins: bigint },
+      ];
+      expect(walletId).toBe('b');
+      expect(simulated).toMatchObject({ target: USDC, func: 'transfer', coins: 10_000_000n });
+      // What the call does, in words
+      expect(fixture.nativeElement.textContent).toContain('Send 12.5 USDC.e');
+      await page.approve();
+      expect(store.dappCall).toHaveBeenCalledWith('b', simulated);
+      expect(approvals.resolve).toHaveBeenCalledWith('ap1', { operationId: 'O1call' });
+    });
+
+    it('keeps Approve off when the test run fails, and explains it plainly', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { fixture, page, approvals, store } = await setup(
+        [view({ method: 'callSC', params: transferParams, address: SAVINGS })],
+        (store) =>
+          store.simulateDappCall.mockResolvedValue({
+            error: 'readonly call failed: VM Error … VM instance error: error: Transfer fail',
+            gasCost: 0n,
+          }),
+      );
+      expect(page.blocker()).toBe(
+        'The contract rejected this call in a test run, so it would fail.',
+      );
+      expect(fixture.nativeElement.textContent).not.toContain('VM Error');
+      await page.approve();
+      expect(store.dappCall).not.toHaveBeenCalled();
+      expect(approvals.resolve).not.toHaveBeenCalled();
+    });
+
+    it('waits for the test run before Approve can be used', async () => {
+      let finish!: (value: { error: null; gasCost: bigint }) => void;
+      const { page, store } = await setup(
+        [view({ method: 'callSC', params: transferParams, address: SAVINGS })],
+        (store) =>
+          store.simulateDappCall.mockReturnValue(
+            new Promise((resolve) => (finish = resolve)) as never,
+          ),
+      );
+      await page.approve();
+      expect(store.dappCall).not.toHaveBeenCalled();
+      finish({ error: null, gasCost: 2_100_000n });
+      await new Promise((r) => setTimeout(r, 0));
+      await page.approve();
+      expect(store.dappCall).toHaveBeenCalled();
+    });
+
+    it("warns about a call it can't read", async () => {
+      const { fixture } = await setup([
+        view({ method: 'callSC', params: { target: CONTRACT, func: 'mint' }, address: MAIN }),
+      ]);
+      expect(fixture.nativeElement.textContent).toContain("can't read what this call does");
+      expect(fixture.nativeElement.textContent).toContain('Unknown contract');
+    });
   });
 
   it('keeps the request when sending fails before anything went out', async () => {

@@ -12,6 +12,8 @@ import { MnsDomain } from '../models/nft.model';
 import { NetworkStore } from '../state/network-store';
 import { waitExecuted } from './operation-execution';
 import {
+  CallSimulation,
+  ContractCallParams,
   GeneratedAccount,
   MassaProvider,
   OperationResult,
@@ -155,6 +157,33 @@ export class Web3MassaProvider implements MassaProvider {
     const account = await Account.fromPrivateKey(privateKey);
     const signature = await account.sign(data);
     return { publicKey: account.publicKey.toString(), signature: signature.toString() };
+  }
+
+  async simulateCall(caller: string, call: ContractCallParams): Promise<CallSimulation> {
+    const result = await this.publicProvider().readSC({
+      target: call.target,
+      func: call.func,
+      parameter: call.parameter,
+      coins: call.coins,
+      fee: call.fee,
+      maxGas: call.maxGas,
+      caller,
+    });
+    return { error: result.info.error || null, gasCost: BigInt(result.info.gasCost) };
+  }
+
+  async callContract(privateKey: string, call: ContractCallParams): Promise<OperationResult> {
+    const provider = await this.providerFor(privateKey);
+    return waitExecuted(
+      await provider.callSC({
+        target: call.target,
+        func: call.func,
+        parameter: call.parameter,
+        coins: call.coins,
+        fee: call.fee,
+        maxGas: call.maxGas,
+      }),
+    );
   }
 
   private async providerFor(privateKey: string) {

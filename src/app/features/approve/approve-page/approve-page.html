@@ -20,6 +20,15 @@
 
     <h1 class="approve-title">{{ title() }}</h1>
 
+    @if (callInfo(); as info) {
+    @if (info.summary) {
+    <div class="approve-summary">{{ info.summary }}</div>
+    }
+    @for (warning of info.warnings; track warning) {
+    <div class="approve-warning">{{ warning }}</div>
+    }
+    }
+
     @if (request()?.method === 'connect') {
     <div class="field-label">Account to share</div>
     <app-dropdown inputId="approve-account" [options]="accountOptions()" [(value)]="chosenId" />
@@ -30,6 +39,9 @@
     <pre class="approve-message" [class.hex]="m.hex">{{ m.text }}</pre>
     }
 
+    @if (checking()) {
+    <div class="approve-checking"><div class="spinner"></div><span>Checking with the network…</span></div>
+    }
     @if (blocker()) {
     <div class="error-text">{{ blocker() }}</div>
     }
@@ -43,7 +55,7 @@
       confirmLabel="Approve"
       [busyLabel]="request()?.method === 'sign' ? 'Signing…' : 'Sending…'"
       [busy]="phase() === 'busy'"
-      [disabled]="!!blocker() || !account()"
+      [disabled]="!!blocker() || checking() || !account()"
       (confirmed)="approve()"
       (cancelled)="reject()"
     />

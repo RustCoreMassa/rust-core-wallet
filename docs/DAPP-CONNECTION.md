@@ -260,7 +260,14 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   id and never switch the active wallet (it's saved in the session cache the popup restores);
   amounts are exact units. An operation that failed on-chain still goes back to the site with its
   id; anything that failed before sending keeps the request open.
-- [ ] Approval view — `callSC`: simulation (`readSC`) and decoding of known calls
+- [x] Approval view — `callSC`: run read-only first as the connected account (`readSC`,
+  `simulateCall`), Approve off while checking and when the test run fails (plain message via
+  `rejectedCallMessage`, raw VM error to the console only); `core/utils/describe-call.ts` decodes
+  MRC-20 `transfer` / `increaseAllowance` / `decreaseAllowance` / `transferFrom` on the supported
+  tokens and Dusa V2 router swaps (mainnet), only when the parameters decode completely; warns
+  about unlimited allowances, unknown spenders, swaps paying another address and unreadable calls.
+  Fee = the site's, never below 0.01 MAS; gas limit within the network's bounds. Verified with
+  read-only calls on mainnet only.
 - [ ] Settings → Connected sites
 - [ ] Test dApp page (buildnet)
 - [ ] wallet-provider PR

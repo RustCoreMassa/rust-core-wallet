@@ -1,4 +1,4 @@
-import { toUserMessage } from './user-error';
+import { rejectedCallMessage, toUserMessage } from './user-error';
 
 describe('toUserMessage', () => {
   beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => undefined));
@@ -61,5 +61,20 @@ describe('toUserMessage', () => {
     const err = new Error('VM Error at ~lib/x.ts:1');
     toUserMessage(err);
     expect(console.error).toHaveBeenCalledWith('[wallet error]', err);
+  });
+});
+
+describe('rejectedCallMessage', () => {
+  beforeEach(() => vi.spyOn(console, 'error').mockImplementation(() => undefined));
+
+  it('explains a failed test run in plain words, never with the raw VM error', () => {
+    const raw =
+      'readonly call failed: VM Error in ReadOnlyExecutionTarget::FunctionCall context: VM execution error: VM instance error: error: Transfer fail';
+    expect(rejectedCallMessage(raw)).toBe(
+      'The contract rejected this call in a test run, so it would fail.',
+    );
+    expect(rejectedCallMessage('VM Error … Storage__NotEnoughCoinsSent: 1200000')).toMatch(
+      /storage cost/,
+    );
   });
 });

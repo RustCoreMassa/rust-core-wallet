@@ -10,9 +10,10 @@ import {
   ROLL_PRICE_MAS,
 } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
-import { WalletStore } from '../../../core/state/wallet-store';
+import { DappCall, WalletStore, dappCallFee } from '../../../core/state/wallet-store';
+import { CallDescription, describeCall } from '../../../core/utils/describe-call';
 import { formatUnits, toUnits } from '../../../core/utils/token-amount';
-import { toUserMessage } from '../../../core/utils/user-error';
+import { rejectedCallMessage, toUserMessage } from '../../../core/utils/user-error';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 
@@ -59,6 +60,8 @@ export class ApprovePage {
   protected readonly error = signal<string | null>(null);
   /** Why the request can't be approved as asked (e.g. not enough MAS); Approve stays off. */
   protected readonly blocker = signal<string | null>(null);
+  /** The wallet's checks (and a contract call's test run) are still running; Approve waits. */
+  protected readonly checking = signal(false);
   /** Shown after an answer that needs a word (the operation failed, the site went away). */
   protected readonly notice = signal<string | null>(null);
   /** For `connect`: the account the user chooses to share. */
@@ -76,6 +79,14 @@ export class ApprovePage {
     return view.address === null
       ? (accounts.find((a) => a.id === this.chosenId()) ?? null)
       : (accounts.find((a) => a.address === view.address) ?? null);
+  });
+
+  /** For `callSC`: what the call does, as far as the wallet can read it. */
+  protected readonly callInfo = computed<CallDescription | null>(() => {
+    const request = this.request();
+    const account = this.account();
+    if (request?.method !== 'callSC' || !account) return null;
+    return describeCall(request, account.address, this.store.network());
   });
 
   protected readonly title = computed(() => {
@@ -129,14 +140,23 @@ export class ApprovePage {
           fee,
         );
         break;
-      case 'callSC':
+      case 'callSC': {
+        const info = this.callInfo();
         rows.push(
-          { label: 'Contract', value: request.target, mono: true },
+          { label: 'Contract', value: info?.contract ?? 'Unknown contract' },
+          { label: 'Address', value: request.target, mono: true },
           { label: 'Function', value: request.func },
-          { label: 'Coins sent', value: `${formatUnits(request.coins, MAS)} MAS` },
-          { label: 'Parameters', value: `${request.parameter.length} bytes` },
+          ...(info?.rows ?? []),
         );
+        if (request.coins > 0n) {
+          rows.push({ label: 'MAS sent', value: `${formatUnits(request.coins, MAS)} MAS` });
+        }
+        rows.push({
+          label: 'Network fee',
+          value: `${formatUnits(dappCallFee(dappCall(request)), MAS)} MAS`,
+        });
         break;
+      }
     }
     return rows;
   });
@@ -168,7 +188,8 @@ export class ApprovePage {
     const view = this.view();
     const request = this.request();
     const account = this.account();
-    if (!view || !request || !account || this.blocker() || this.phase() !== 'review') return;
+    if (!view || !request || !account || this.blocker() || this.checking()) return;
+    if (this.phase() !== 'review') return;
     this.phase.set('busy');
     this.error.set(null);
 
@@ -216,6 +237,7 @@ export class ApprovePage {
     this.phase.set('loading');
     this.error.set(null);
     this.blocker.set(null);
+    this.checking.set(false);
     this.notice.set(null);
     this.request.set(null);
 
@@ -242,21 +264,21 @@ export class ApprovePage {
     await this.check(request);
   }
 
-  /** Runs the wallet's own checks first, so a request that can't go through says so up front. */
+  /**
+   * Runs the wallet's own checks first, so a request that can't go through says so up front —
+   * and a contract call is run read-only (simulated) before it can be approved.
+   */
   private async check(request: DappRequest): Promise<void> {
-    if (request.method === 'connect') return;
+    if (request.method === 'connect' || request.method === 'sign') {
+      if (request.method === 'sign' && !this.account()) this.blockMissingAccount();
+      return;
+    }
     const account = this.account();
     if (!account) {
-      this.blocker.set(
-        "This site is connected to a wallet that's no longer in RustCore Wallet. Reject, then connect again.",
-      );
+      this.blockMissingAccount();
       return;
     }
-    if (request.method === 'callSC') {
-      this.blocker.set("Contract calls aren't supported yet in this version of RustCore Wallet.");
-      return;
-    }
-    if (request.method === 'sign') return;
+    this.checking.set(true);
     try {
       await this.store.prepareDappWallet(account.id);
       if (request.method === 'transfer') {
@@ -264,10 +286,25 @@ export class ApprovePage {
       } else if (request.method === 'buyRolls' || request.method === 'sellRolls') {
         const kind = request.method === 'buyRolls' ? 'buy' : 'sell';
         this.store.validateDappRolls(account.id, kind, request.rolls);
+      } else if (request.method === 'callSC') {
+        const call = dappCall(request);
+        this.store.validateDappCall(account.id, call);
+        const simulation = await this.store.simulateDappCall(account.id, call);
+        if (simulation.error && this.request() === request) {
+          this.blocker.set(rejectedCallMessage(simulation.error));
+        }
       }
     } catch (err) {
       if (this.request() === request) this.blocker.set(toUserMessage(err));
+    } finally {
+      if (this.request() === request) this.checking.set(false);
     }
+  }
+
+  private blockMissingAccount(): void {
+    this.blocker.set(
+      "This site is connected to a wallet that's no longer in RustCore Wallet. Reject, then connect again.",
+    );
   }
 
   private async carryOut(request: DappRequest, account: VaultAccount): Promise<ApprovalResult> {
@@ -284,10 +321,24 @@ export class ApprovePage {
         return { operationId: await this.store.dappRolls(account.id, 'buy', request.rolls) };
       case 'sellRolls':
         return { operationId: await this.store.dappRolls(account.id, 'sell', request.rolls) };
+      case 'callSC':
+        return { operationId: await this.store.dappCall(account.id, dappCall(request)) };
       default:
         throw new Error("This request isn't supported yet");
     }
   }
+}
+
+/** A `callSC` request as the wallet carries it out (fee and gas only when the site set them). */
+function dappCall(request: Extract<DappRequest, { method: 'callSC' }>): DappCall {
+  return {
+    target: request.target,
+    func: request.func,
+    parameter: request.parameter,
+    coins: request.coins,
+    ...(request.fee !== undefined && { fee: request.fee }),
+    ...(request.maxGas !== undefined && { maxGas: request.maxGas }),
+  };
 }
 
 function short(address: string): string {

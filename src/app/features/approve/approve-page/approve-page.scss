@@ -93,3 +93,29 @@
   font-size: 12px;
   color: var(--gray-500);
 }
+
+.approve-summary {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Something the user must read before approving: an unlimited allowance, tokens going
+   elsewhere, a call the wallet can't read. */
+.approve-warning {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 138, 61, 0.1);
+  border: 1px solid rgba(255, 138, 61, 0.35);
+  color: var(--orange);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.approve-checking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--gray-500);
+}

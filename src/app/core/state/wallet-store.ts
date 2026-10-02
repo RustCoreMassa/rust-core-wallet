@@ -14,6 +14,8 @@ import { DusaPrices } from '../services/dusa-prices';
 import { DusaSwap, SWAP_STORAGE_COST_MAS, SwapQuote } from '../services/dusa-swap';
 import { ExplorerApi } from '../services/explorer-api';
 import {
+  CallSimulation,
+  ContractCallParams,
   MASSA_PROVIDER,
   NETWORK_FEE_MAS,
   ROLL_PRICE_MAS,
@@ -107,6 +109,17 @@ export const MIN_SEND_AMOUNT = 0.01;
 const MAS_DECIMALS = TOKEN_REGISTRY.MAS.decimals;
 const FEE_UNITS = toUnits(NETWORK_FEE_MAS, MAS_DECIMALS);
 const ROLL_PRICE_UNITS = toUnits(ROLL_PRICE_MAS, MAS_DECIMALS);
+/** The gas a call may set, as the network allows it (massa-web3 MIN_GAS_CALL / MAX_GAS_CALL). */
+const MIN_GAS_CALL = 2_100_000n;
+const MAX_GAS_CALL = 4_294_167_295n;
+
+/** A dApp's contract call, before the wallet settles its fee. */
+export type DappCall = Omit<ContractCallParams, 'fee'> & { readonly fee?: bigint };
+
+/** The fee a dApp call pays: what the site asked for, never below the wallet's own fee. */
+export function dappCallFee(call: DappCall): bigint {
+  return call.fee !== undefined && call.fee > FEE_UNITS ? call.fee : FEE_UNITS;
+}
 
 /** `a - b` in MAS, exact to the nanoMAS (no float drift like 3.1 - 0.01). */
 function subtractMas(a: number, b: number): number {
@@ -899,6 +912,53 @@ export class WalletStore {
         rollCount: count,
         operationId,
         from: wallet.address,
+      },
+      network,
+    );
+    await this.refreshTouched([id], network);
+    return operationId;
+  }
+
+  validateDappCall(id: string, call: DappCall): void {
+    const wallet = this.loadedWallet(id);
+    if (call.maxGas !== undefined && (call.maxGas < MIN_GAS_CALL || call.maxGas > MAX_GAS_CALL)) {
+      throw new Error(`The gas limit must be between ${MIN_GAS_CALL} and ${MAX_GAS_CALL}`);
+    }
+    assertMasUnits(
+      wallet,
+      call.coins + dappCallFee(call),
+      'Insufficient MAS for the coins this call sends plus the network fee',
+    );
+  }
+
+  /** Runs the call read-only as wallet `id` — what would happen, with nothing signed or sent. */
+  simulateDappCall(id: string, call: DappCall): Promise<CallSimulation> {
+    return this.provider.simulateCall(this.loadedWallet(id).address, {
+      ...call,
+      fee: dappCallFee(call),
+    });
+  }
+
+  /** Calls a smart contract from wallet `id`; resolves with the executed operation's id. */
+  async dappCall(id: string, call: DappCall): Promise<string> {
+    const network = this.network();
+    this.validateDappCall(id, call);
+    const wallet = this.loadedWallet(id);
+
+    const privateKey = this.privateKeyFor(id);
+    const { operationId } = await this.afterWrite([id], network, () =>
+      this.provider.callContract(privateKey, { ...call, fee: dappCallFee(call) }),
+    );
+    this.addHistory(
+      id,
+      {
+        type: 'contract_call',
+        token: 'MAS',
+        amount: fromUnits(call.coins, MAS_DECIMALS),
+        counterparty: shortAddress(call.target),
+        from: wallet.address,
+        to: call.target,
+        operationId,
       },
       network,
     );

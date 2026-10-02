@@ -8,7 +8,7 @@ import { ExplorerApi } from '../services/explorer-api';
 import { MASSA_PROVIDER, MassaProvider, OperationFailedError } from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
 import { AuthStore } from './auth-store';
-import { WalletStore } from './wallet-store';
+import { WalletStore, dappCallFee } from './wallet-store';
 
 const A = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
 const B = 'AU126s93ZxbT4QUJcZYqsAxyMc3wv8nkHJYKYCtgQyEnZ8VGRM99P';
@@ -40,6 +40,8 @@ function fakeProvider() {
     getTotalRolls: vi.fn(async () => 1000),
     getOwnedDomains: vi.fn(async () => []),
     signMessage: vi.fn(async () => ({ publicKey: 'P1key', signature: '1sig' })),
+    simulateCall: vi.fn(async () => ({ error: null as string | null, gasCost: 2_100_000n })),
+    callContract: vi.fn(async () => ({ operationId: 'Ocall' })),
   } satisfies Partial<MassaProvider>;
 }
 
@@ -291,6 +293,60 @@ describe('WalletStore', () => {
       await store.refresh('a');
       await expect(store.dappRolls('a', 'buy', 1n)).resolves.toBe('Oroll');
       expect(provider.buyRolls).toHaveBeenCalledWith('S1a', 1n);
+    });
+
+    describe('contract calls', () => {
+      const CONTRACT = 'AS12UMSUxgpRBB6ArZDJ19arHoxNkkpdfofQGekAiAJqsuE6PEFJy';
+      const call = (extra: object = {}) => ({
+        target: CONTRACT,
+        func: 'swap',
+        parameter: Uint8Array.from([1, 2, 3]),
+        coins: 100_000_000n,
+        ...extra,
+      });
+
+      it("pays the site's fee, never less than the wallet's own", () => {
+        expect(dappCallFee(call())).toBe(10_000_000n);
+        expect(dappCallFee(call({ fee: 1n }))).toBe(10_000_000n);
+        expect(dappCallFee(call({ fee: 50_000_000n }))).toBe(50_000_000n);
+      });
+
+      it('needs the coins plus the fee, to the nanoMAS, and a sane gas limit', () => {
+        // b holds exactly 5 MAS
+        expect(() => store.validateDappCall('b', call({ coins: 4_990_000_000n }))).not.toThrow();
+        expect(() => store.validateDappCall('b', call({ coins: 4_990_000_001n }))).toThrow(
+          /Insufficient MAS/,
+        );
+        expect(() => store.validateDappCall('b', call({ maxGas: 1n }))).toThrow(/gas limit/);
+        expect(() => store.validateDappCall('b', call({ maxGas: 5_000_000_000n }))).toThrow(
+          /gas limit/,
+        );
+      });
+
+      it('simulates as the connected wallet, with the fee it will pay', async () => {
+        await store.simulateDappCall('b', call());
+        expect(provider.simulateCall).toHaveBeenCalledWith(B, { ...call(), fee: 10_000_000n });
+      });
+
+      it('calls from the connected wallet and records it, without switching', async () => {
+        await expect(store.dappCall('b', call({ maxGas: 3_000_000n }))).resolves.toBe('Ocall');
+        expect(provider.callContract).toHaveBeenCalledWith('S1b', {
+          ...call({ maxGas: 3_000_000n }),
+          fee: 10_000_000n,
+        });
+        expect(store.activeWalletId()).toBe('a');
+        expect(store.wallets()['b'].history[0]).toMatchObject({
+          type: 'contract_call',
+          amount: 0.1,
+          to: CONTRACT,
+          operationId: 'Ocall',
+        });
+      });
+
+      it('sends nothing when the checks fail', async () => {
+        await expect(store.dappCall('b', call({ coins: 6_000_000_000n }))).rejects.toThrow();
+        expect(provider.callContract).not.toHaveBeenCalled();
+      });
     });
 
     it("signs with the connected wallet's key", async () => {
