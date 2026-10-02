@@ -17,7 +17,7 @@
 
 <p align="center">
   <b>Open it on your phone:</b>
-  <a href="https://rustcore.deweb.half-red.net"><b>rustcore.massa</b></a>
+  <a href="https://wrustcore.deweb.half-red.net"><b>wrustcore.massa</b></a>
   — live on DeWeb
 </p>
 
@@ -63,8 +63,8 @@ Mainnet (and Buildnet, the test network).
 RustCore Wallet runs in your **phone's browser** — Android or iPhone, any browser. On a computer
 it shows a QR code to open it on your phone instead.
 
-1. **Open it** on your phone: **`rustcore.massa`** — tap
-   [rustcore.deweb.half-red.net](https://rustcore.deweb.half-red.net) or open `rustcore.massa`
+1. **Open it** on your phone: **`wrustcore.massa`** — tap
+   [wrustcore.deweb.half-red.net](https://wrustcore.deweb.half-red.net) or open `wrustcore.massa`
    through any DeWeb gateway or [Massa Station](https://station.massa.network).
 2. **Install it** (recommended): the wallet offers it at the top of the screen.
    - *Android* — tap **Install app**.
@@ -107,9 +107,10 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
 
 **Good to know**
 
-- **`rustcore.massa` is the only official address.** A copy of the wallet on any other address
-  could steal your keys — never enter your PIN or private key anywhere else, and never on a site
-  someone sent you in a message.
+- **`wrustcore.massa` is the only official address of the wallet.** A copy of the wallet on any
+  other address could steal your keys — never enter your PIN or private key anywhere else, and
+  never on a site someone sent you in a message. (`rustcore.massa` is the RustCore website; it
+  never asks for your key or PIN.)
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
 - The wallet hasn't had an independent audit yet (it's on the [roadmap](#roadmap)).
@@ -148,7 +149,7 @@ on the roadmap.
 - [x] Swaps through Dusa
 - [x] `.massa` domains
 - [x] Installable app (Android & iOS)
-- [x] Published on DeWeb (`rustcore.massa`)
+- [x] Published on DeWeb (`wrustcore.massa`)
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations
@@ -165,6 +166,12 @@ on the roadmap.
 
 **Later**
 - [ ] Hardware-wallet support
+
+## Community
+
+Questions, ideas, or want to follow what's next? Join the RustCore community on Telegram:
+**[t.me/rustcore_massa](https://t.me/rustcore_massa)**. Admins never message you first and
+never ask for your private key or PIN — anyone who does is a scammer.
 
 ## Support the project
 

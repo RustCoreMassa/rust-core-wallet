@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The wallet moved to **`wrustcore.massa`**, now its only official address; `rustcore.massa`
+  is the RustCore website.
+
 ## [1.1.1] — 2026-10-02
 
 ### Added
