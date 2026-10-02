@@ -122,11 +122,18 @@ What the stores ask for:
 - **Firefox source code**: AMO reviews readable code, and the bundle is minified, so each upload
   needs the source — the release tag's source archive from GitHub — and these build steps:
   install Node.js from `.nvmrc`, then `npm ci && npm run build:extension`; the result is
-  `dist/extension/firefox`, byte-identical to the zip. Mozilla's linter
-  (`npx web-ext lint --source-dir dist/extension/firefox`) reports no errors; its only warnings
-  are `Function("return this")` fallbacks inside `google-protobuf` and `lodash` (pulled in by
-  `@massalabs/massa-web3`), which look up the global object and are never reached in a browser —
-  `self` is found first — and the extension's CSP forbids running them anyway.
+  `dist/extension/firefox`, byte-identical to the zip. Every file in the source archive is
+  hand-written; the only code the build doesn't take from it comes from the npm packages pinned
+  in `package-lock.json`.
+  - AMO refuses code that is already minified or machine-generated. `@massalabs/massa-web3`
+    bundles a gRPC client the wallet never uses: protoc-generated code plus `google-protobuf` and
+    `grpc-web`, which npm ships minified. `npm ci` runs `scripts/trim-massa-web3.mjs`
+    (postinstall), which lets the bundler drop all of it, and `npm run build:extension` fails if
+    any of it comes back. Mention this in the notes to the reviewer.
+  - Mozilla's linter (`npx web-ext lint --source-dir dist/extension/firefox`) reports no
+    errors. Its one warning is a `Function("return this")` fallback inside `lodash.isequal`
+    (pulled in by massa-web3). It looks up the global object and is never reached in a browser,
+    because `self` is found first; the extension's CSP forbids running it anyway.
 - The Firefox add-on ID is `rustcore-wallet@whisky098` (`browser_specific_settings` in
   `src/extension/manifest.json`). It identifies the add-on on AMO for good — never change it.
 

@@ -4,6 +4,7 @@
   "short_name": "RustCore",
   "version": "0.0.0",
   "description": "Self-custodial wallet for the Massa blockchain.",
+  "homepage_url": "https://github.com/RustCoreMassa/rust-core-wallet",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon-16.png",

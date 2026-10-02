@@ -3,6 +3,7 @@
   "version": "1.1.0",
   "scripts": {
     "ng": "ng",
+    "postinstall": "node scripts/trim-massa-web3.mjs",
     "start": "ng serve",
     "build": "ng build",
     "build:extension": "node scripts/build-extension.mjs",

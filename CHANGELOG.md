@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The browser extension links to its source code from the browser's extension page (homepage).
+
+### Changed
+
+- Smaller app: the unused gRPC client inside the Massa library (generated code plus two
+  pre-minified libraries) is left out of the build. The app's code is less than half its
+  former size (about 0.75 MB instead of 1.9 MB), and the extension now contains no minified
+  third-party code that its source can't account for, as Firefox Add-ons requires.
+
 ## [1.1.0] — 2026-10-01
 
 ### Added

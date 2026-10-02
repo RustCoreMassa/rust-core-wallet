@@ -83,6 +83,15 @@ try {
   errors.push(e);
 }
 await new Promise((r) => setTimeout(r, 1500));
+// Then every other chunk (lazy routes and modals), so an order bug can't hide in code the
+// first screen doesn't load.
+for (const chunk of readdirSync(dir).filter((f) => /^chunk-.*\.js$/.test(f))) {
+  try {
+    await import(pathToFileURL(join(dir, chunk)).href);
+  } catch (e) {
+    errors.push(e);
+  }
+}
 const fatal = errors.filter(
   (e) => e instanceof TypeError || e instanceof ReferenceError || e instanceof SyntaxError,
 );

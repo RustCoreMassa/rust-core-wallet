@@ -45,6 +45,16 @@ if (inline) {
   process.exit(1);
 }
 
+// massa-web3's unused gRPC client (protoc-generated code, plus google-protobuf and grpc-web,
+// both minified on npm) must stay out: AMO reviewers can't read it. scripts/trim-massa-web3.mjs
+// (postinstall) lets the bundler drop it.
+for (const file of readdirSync(angularOut).filter((f) => f.endsWith('.js'))) {
+  if (/\bjspb\b|proto\.massa\./.test(readFileSync(join(angularOut, file), 'utf8'))) {
+    console.error(`${file} contains massa-web3's gRPC code — did scripts/trim-massa-web3.mjs run?`);
+    process.exit(1);
+  }
+}
+
 // One version everywhere: the manifests take package.json's.
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
 const manifest = { ...JSON.parse(readFileSync('src/extension/manifest.json', 'utf8')), version };
