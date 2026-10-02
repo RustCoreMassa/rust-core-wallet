@@ -84,6 +84,11 @@ export class DappPermissions {
     return origins;
   }
 
+  /** Disconnects every site (log out: the wallets they were connected to are gone). */
+  async clear(): Promise<void> {
+    await this.write({});
+  }
+
   private async write(map: PermissionMap): Promise<void> {
     await this.area.set({ [PERMISSIONS_ITEM]: map });
   }

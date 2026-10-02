@@ -14,6 +14,7 @@ import { BackupPhraseModal } from '../../features/modals/backup-phrase-modal/bac
 import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
 import { TxDetailsModal } from '../../features/modals/tx-details-modal/tx-details-modal';
 import { DomainDetailsModal } from '../../features/modals/domain-details-modal/domain-details-modal';
+import { ConnectedSitesModal } from '../../features/modals/connected-sites-modal/connected-sites-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 
@@ -37,6 +38,7 @@ const AUTO_REFRESH_MS = 10_000;
     LogoutModal,
     TxDetailsModal,
     DomainDetailsModal,
+    ConnectedSitesModal,
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',
@@ -56,7 +58,9 @@ export class MainLayout {
     // MNS is prefetched too, so the NFT page opens with data already there.
     void walletStore.refreshAll();
     walletStore.loadDomains().catch((err) => console.warn('Prefetching MNS domains failed', err));
-    walletStore.loadTotalRolls().catch((err) => console.warn('Prefetching total rolls failed', err));
+    walletStore
+      .loadTotalRolls()
+      .catch((err) => console.warn('Prefetching total rolls failed', err));
 
     // Live balances for as long as the unlocked shell is on screen —
     // paused while the tab is hidden, caught up as soon as it's back.

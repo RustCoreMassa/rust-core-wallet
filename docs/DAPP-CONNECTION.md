@@ -268,6 +268,10 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   about unlimited allowances, unknown spenders, swaps paying another address and unreadable calls.
   Fee = the site's, never below 0.01 MAS; gas limit within the network's bounds. Verified with
   read-only calls on mainnet only.
-- [ ] Settings → Connected sites
+- [x] Settings → Connected sites — `features/modals/connected-sites-modal` (+ spec), `CONNECTED_SITES`
+  (`extension/dapp/connected-sites.ts`, + spec): list, change a site's account, disconnect. Removing
+  a wallet disconnects its sites; log out disconnects all. The router tells the sites through
+  the storage events.
+- [ ] Firefox: check the site permission (`permissions.contains`) and offer to grant it
 - [ ] Test dApp page (buildnet)
 - [ ] wallet-provider PR

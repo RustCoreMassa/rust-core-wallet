@@ -3,6 +3,7 @@ import { EnvironmentProviders, Provider, provideAppInitializer } from '@angular/
 import { RouterFeatures, withHashLocation } from '@angular/router';
 import { APP_PLATFORM, EXTENSION_VIEWS, ExtensionViews } from '../app/core/platform/app-platform';
 import { LOCAL_STORE, SESSION_STORE } from '../app/core/platform/app-storage';
+import { CONNECTED_SITES } from '../app/core/platform/connected-sites';
 import { DAPP_APPROVALS } from '../app/core/platform/dapp-approvals';
 import { MOBILE_ONLY, isMobileDevice, readDeviceSignals } from '../app/core/platform/device';
 import { SESSION_KEY_STORE } from '../app/core/services/session-key-store';
@@ -10,6 +11,7 @@ import { canOpenView, detectViewApis, viewFromUrl } from './browser-views';
 import { ChromeSessionKeyStore } from './chrome-session-key-store';
 import { ChromeStorageArea } from './chrome-storage-area';
 import { ChromeDappApprovals } from './dapp/approval-channel';
+import { ChromeConnectedSites } from './dapp/connected-sites';
 
 /*
  * The browser extension's replacement for src/app/platform-providers.ts
@@ -86,4 +88,8 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   { provide: APP_PLATFORM, useValue: 'extension' },
   { provide: EXTENSION_VIEWS, useValue: views },
   { provide: DAPP_APPROVALS, useValue: new ChromeDappApprovals() },
+  {
+    provide: CONNECTED_SITES,
+    useFactory: () => new ChromeConnectedSites(chrome.storage.local, chrome.storage.onChanged),
+  },
 ];

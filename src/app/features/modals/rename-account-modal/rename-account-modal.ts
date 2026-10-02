@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { VaultAccount } from '../../../core/models/vault.model';
+import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { AuthStore } from '../../../core/state/auth-store';
@@ -24,6 +25,8 @@ export class RenameAccountModal {
   private readonly authStore = inject(AuthStore);
   private readonly walletStore = inject(WalletStore);
   private readonly toast = inject(Toast);
+  /** Extension only: sites connected to a removed account are disconnected with it. */
+  private readonly connectedSites = inject(CONNECTED_SITES);
 
   protected readonly account = computed(() => this.modal.payload<VaultAccount>());
   protected readonly name = signal(this.account()?.name ?? '');
@@ -75,6 +78,10 @@ export class RenameAccountModal {
       }
       await this.authStore.removeAccount(account.id);
       this.walletStore.removeWallet(account.id);
+      // The account is gone already; a failure here mustn't read as if removing it failed.
+      await this.connectedSites
+        ?.forgetAccount(account.address)
+        .catch((err) => console.warn('Disconnecting its sites failed', err));
       this.toast.show(`${account.name} removed`);
       this.modal.close();
     } catch (err) {

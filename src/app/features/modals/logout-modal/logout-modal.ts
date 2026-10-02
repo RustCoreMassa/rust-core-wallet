@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { Modal } from '../../../core/services/modal';
 import { AuthStore } from '../../../core/state/auth-store';
 import { NetworkStore } from '../../../core/state/network-store';
@@ -27,6 +28,8 @@ export class LogoutModal {
   private readonly walletStore = inject(WalletStore);
   private readonly networkStore = inject(NetworkStore);
   private readonly router = inject(Router);
+  /** Extension only: no site stays connected to wallets that left the device. */
+  private readonly connectedSites = inject(CONNECTED_SITES);
 
   protected readonly step = signal<Step>('warn');
   protected readonly pin = signal('');
@@ -79,5 +82,8 @@ export class LogoutModal {
     // `activeWallet()`, which throws once the store is empty.
     this.walletStore.reset();
     this.networkStore.reset();
+    await this.connectedSites
+      ?.clear()
+      .catch((err) => console.warn('Disconnecting the sites failed', err));
   }
 }

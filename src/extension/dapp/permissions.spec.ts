@@ -92,6 +92,15 @@ describe('DappPermissions', () => {
     expect(Object.keys(await permissions.all())).toEqual(['https://two.example']);
   });
 
+  it('disconnects every site at once', async () => {
+    const { area } = fakeLocal();
+    const permissions = new DappPermissions(area);
+    await permissions.grant('https://one.example', A);
+    await permissions.grant('https://two.example', B);
+    await permissions.clear();
+    expect(await permissions.all()).toEqual({});
+  });
+
   it('ignores a damaged stored map instead of trusting it', async () => {
     for (const stored of [
       'oops',

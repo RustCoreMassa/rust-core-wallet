@@ -172,10 +172,13 @@ describe('page ⇄ content script ⇄ background', () => {
 
   it('refuses requests that are too large or not cloneable, without bothering the wallet', async () => {
     const { rustcore, ports } = setup();
-    const big = rustcore.request('callSC', { parameter: 'A'.repeat(MAX_MESSAGE_CHARS) });
-    const odd = rustcore.request('sign', { data: () => 1 });
-    await expect(big).rejects.toMatchObject({ code: -32602 });
-    await expect(odd).rejects.toMatchObject({ code: -32602 });
+    // Each awaited as soon as it's made: the second one rejects at once.
+    await expect(
+      rustcore.request('callSC', { parameter: 'A'.repeat(MAX_MESSAGE_CHARS) }),
+    ).rejects.toMatchObject({ code: -32602 });
+    await expect(rustcore.request('sign', { data: () => 1 })).rejects.toMatchObject({
+      code: -32602,
+    });
     expect(ports).toHaveLength(0);
   });
 

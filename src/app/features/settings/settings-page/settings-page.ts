@@ -1,7 +1,9 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
-import { EXTENSION_VIEWS } from '../../../core/platform/app-platform';
+import { APP_PLATFORM, EXTENSION_VIEWS } from '../../../core/platform/app-platform';
+import { APP_VERSION } from '../../../core/platform/app-version';
+import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { AuthStore } from '../../../core/state/auth-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -23,6 +25,18 @@ export class SettingsPage {
   private readonly router = inject(Router);
   /** Extension only: switch between popup, side panel and full-screen tab. */
   protected readonly views = inject(EXTENSION_VIEWS);
+  /** Extension only: sites connected through the dApp bridge. */
+  protected readonly connectedSites = inject(CONNECTED_SITES);
+
+  protected readonly connectedSitesLabel = computed(() => {
+    const count = this.connectedSites?.sites().length ?? 0;
+    return count === 0 ? 'None' : `${count} site${count > 1 ? 's' : ''}`;
+  });
+
+  /** For information only, at the bottom: which build is running. */
+  protected readonly versionLabel = `RustCore Wallet ${APP_VERSION}${
+    inject(APP_PLATFORM) === 'extension' ? ' · browser extension' : ''
+  }`;
 
   protected readonly walletsCountLabel = computed(() => {
     const count = this.authStore.accounts().length;
