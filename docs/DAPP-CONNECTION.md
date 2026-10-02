@@ -79,8 +79,10 @@ interface RustCoreInjected {
 }
 ```
 
-`request` posts `{ channel: 'rustcore:v1', id, method, params }` to the window and resolves on the
-matching reply. It holds no state and no secrets — the page could forge every message it sends
+`request` posts `{ channel: 'rustcore:v1', to: 'wallet', id, method, params }` to the window and
+resolves on the matching `to: 'page'` reply (both scripts share the window, so every message
+says which way it goes). Once defined, `window.rustcore` is read-only and the page gets a
+`rustcore#initialized` event, for scripts that ran first. It holds no state and no secrets — the page could forge every message it sends
 anyway, so nothing here is trusted.
 
 ### 2. `content.js` — isolated world, every https page
@@ -245,7 +247,9 @@ so future native apps could reuse protocol v1 in their own dApp browser.
 
 - [x] Protocol module — `src/extension/dapp/protocol.ts` (+ spec)
 - [x] Permissions store — `src/extension/dapp/permissions.ts` (+ spec)
-- [ ] inpage.js + content.js, manifest, build
+- [x] inpage.js + content.js, manifest, build — `dapp/inpage.ts`, `dapp/content.ts` (+ `bridge.spec`),
+  `npm run smoke:extension` checks a page gets `window.rustcore`. Until the router exists, the
+  background answers every request with 4200 "not available yet".
 - [ ] Background router
 - [ ] Approval view
 - [ ] Settings → Connected sites

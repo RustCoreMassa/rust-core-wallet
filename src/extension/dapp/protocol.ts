@@ -112,35 +112,82 @@ export function needsSignature(method: DappMethod): boolean {
 
 // ------------------------------------------------------------------ messages on the wire
 
+// The page (inpage.js) and the content script share the page's window, so every message says
+// which way it goes: `to: 'wallet'` from the page, `to: 'page'` back to it.
+
 /** Page → content script (window.postMessage). */
 export interface PageRequestMessage {
   readonly channel: typeof CHANNEL;
+  readonly to: 'wallet';
   readonly id: string;
   readonly method: string;
   readonly params?: unknown;
 }
 
 /** Content script → page: the answer to one request. */
-export type PageResponseMessage =
-  | { readonly channel: typeof CHANNEL; readonly id: string; readonly result: unknown }
-  | { readonly channel: typeof CHANNEL; readonly id: string; readonly error: DappErrorData };
+export type PageReplyMessage = { readonly channel: typeof CHANNEL; readonly to: 'page' } & Reply;
 
 export type DappEvent = 'accountChanged' | 'networkChanged' | 'disconnect';
+
+const EVENTS: readonly DappEvent[] = ['accountChanged', 'networkChanged', 'disconnect'];
 
 /** Content script → page: something changed for this site. */
 export interface PageEventMessage {
   readonly channel: typeof CHANNEL;
+  readonly to: 'page';
   readonly event: DappEvent;
   readonly data?: unknown;
 }
+
+/** Name of the runtime port each page's content script opens to the background worker. */
+export const PORT_NAME = 'rustcore:dapp';
+
+/** Content script → background, over the port. The origin is never part of it. */
+export interface PortRequest {
+  readonly id: string;
+  readonly method: string;
+  readonly params?: unknown;
+}
+
+/** The answer to one request: a result or an error. */
+export type Reply =
+  | { readonly id: string; readonly result: unknown }
+  | { readonly id: string; readonly error: DappErrorData };
+
+/** Background → content script: a reply, or an event for this site. */
+export type PortMessage = Reply | { readonly event: DappEvent; readonly data?: unknown };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Is this window message a well-formed request from a page? (Its params are checked later.) */
 export function isPageRequest(data: unknown): data is PageRequestMessage {
-  if (!isRecord(data) || data['channel'] !== CHANNEL) return false;
+  if (!isRecord(data) || data['channel'] !== CHANNEL || data['to'] !== 'wallet') return false;
   const { id, method } = data;
   return typeof id === 'string' && ID.test(id) && typeof method === 'string' && method.length <= 64;
+}
+
+/** Is this window message a reply or event for the page? */
+export function isPageMessage(data: unknown): data is PageReplyMessage | PageEventMessage {
+  if (!isRecord(data) || data['channel'] !== CHANNEL || data['to'] !== 'page') return false;
+  return isPortMessage(data);
+}
+
+/** Is this a well-formed reply or event (as the background sends them)? */
+export function isPortMessage(data: unknown): data is PortMessage {
+  if (!isRecord(data)) return false;
+  if (typeof data['event'] === 'string')
+    return (EVENTS as readonly string[]).includes(data['event']);
+  if (typeof data['id'] !== 'string' || !ID.test(data['id'])) return false;
+  if ('result' in data) return true;
+  const error = data['error'];
+  return (
+    isRecord(error) && typeof error['code'] === 'number' && typeof error['message'] === 'string'
+  );
+}
+
+/** A fresh, unique request id. */
+export function newRequestId(): string {
+  return crypto.randomUUID();
 }
 
 // ------------------------------------------------------------------ parsing params

@@ -5,7 +5,9 @@ import {
   MAX_PARAMETER_BYTES,
   MAX_SIGN_BYTES,
   fromBase64,
+  isPageMessage,
   isPageRequest,
+  isPortMessage,
   needsApproval,
   needsSignature,
   parseRequest,
@@ -29,18 +31,40 @@ function codeOf(method: string, params?: unknown): number | 'ok' {
 const b64 = (bytes: number[]) => toBase64(Uint8Array.from(bytes));
 
 describe('isPageRequest', () => {
-  it('accepts a request on our channel', () => {
-    expect(isPageRequest({ channel: CHANNEL, id: 'a1', method: 'connect' })).toBe(true);
+  const ok = { channel: CHANNEL, to: 'wallet', id: 'a1', method: 'connect' };
+
+  it('accepts a request on our channel, addressed to the wallet', () => {
+    expect(isPageRequest(ok)).toBe(true);
   });
 
-  it('ignores other messages', () => {
+  it('ignores other messages, including our own replies to the page', () => {
     expect(isPageRequest(null)).toBe(false);
     expect(isPageRequest('connect')).toBe(false);
-    expect(isPageRequest({ channel: 'other', id: 'a1', method: 'connect' })).toBe(false);
-    expect(isPageRequest({ channel: CHANNEL, id: '', method: 'connect' })).toBe(false);
-    expect(isPageRequest({ channel: CHANNEL, id: 'a b', method: 'connect' })).toBe(false);
-    expect(isPageRequest({ channel: CHANNEL, id: 'a1', method: 42 })).toBe(false);
-    expect(isPageRequest({ channel: CHANNEL, id: 'a1', method: 'x'.repeat(65) })).toBe(false);
+    expect(isPageRequest({ ...ok, channel: 'other' })).toBe(false);
+    expect(isPageRequest({ ...ok, to: 'page' })).toBe(false);
+    expect(isPageRequest({ ...ok, to: undefined })).toBe(false);
+    expect(isPageRequest({ ...ok, id: '' })).toBe(false);
+    expect(isPageRequest({ ...ok, id: 'a b' })).toBe(false);
+    expect(isPageRequest({ ...ok, method: 42 })).toBe(false);
+    expect(isPageRequest({ ...ok, method: 'x'.repeat(65) })).toBe(false);
+  });
+});
+
+describe('isPortMessage / isPageMessage', () => {
+  it('accepts replies and known events', () => {
+    expect(isPortMessage({ id: 'a1', result: null })).toBe(true);
+    expect(isPortMessage({ id: 'a1', error: { code: 4001, message: 'no' } })).toBe(true);
+    expect(isPortMessage({ event: 'accountChanged', data: 'AU1' })).toBe(true);
+    expect(isPageMessage({ channel: CHANNEL, to: 'page', id: 'a1', result: 1 })).toBe(true);
+  });
+
+  it('rejects anything else', () => {
+    expect(isPortMessage({ id: 'a1' })).toBe(false);
+    expect(isPortMessage({ id: 'a1', error: 'no' })).toBe(false);
+    expect(isPortMessage({ id: 'a b', result: 1 })).toBe(false);
+    expect(isPortMessage({ event: 'somethingElse' })).toBe(false);
+    expect(isPageMessage({ channel: CHANNEL, to: 'wallet', id: 'a1', result: 1 })).toBe(false);
+    expect(isPageMessage({ id: 'a1', result: 1 })).toBe(false);
   });
 });
 

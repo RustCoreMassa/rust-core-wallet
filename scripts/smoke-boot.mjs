@@ -106,6 +106,26 @@ if (!rendered) {
   console.log('BOOT FAILED: modules loaded but <app-root> is empty — the app did not render');
   process.exit(1);
 }
+// The extension also injects two scripts into every https page: a dApp's page must end up with
+// window.rustcore, and the relay must load without errors.
+if (extension) {
+  const page = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://dapp.example/',
+    runScripts: 'outside-only',
+  });
+  page.window.chrome = { runtime: { connect: () => ({}) } };
+  try {
+    page.window.eval(readFileSync(join(dir, 'inpage.js'), 'utf8'));
+    page.window.eval(readFileSync(join(dir, 'content.js'), 'utf8'));
+  } catch (e) {
+    console.log(`BOOT FAILED: a page script failed to load — ${e.constructor.name}: ${e.message}`);
+    process.exit(1);
+  }
+  if (page.window.rustcore?.isRustCore !== true) {
+    console.log('BOOT FAILED: inpage.js did not define window.rustcore');
+    process.exit(1);
+  }
+}
 console.log(
   `BOOT OK — ${main} evaluated and rendered: "${rendered.slice(0, 60)}…"` +
     (errors.length ? ` (${errors.length} non-fatal runtime notices)` : ''),

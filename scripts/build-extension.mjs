@@ -4,8 +4,9 @@
 //   dist/extension/firefox    Firefox (desktop and Android)
 //
 // Both hold the same files — the Angular popup (angular.json → "extension"), the background
-// worker and the icons; only manifest.json differs, each keeping just the keys its browser
-// knows (src/extension/manifest.json holds them all). Load either unpacked from its folder.
+// worker, the dApp-connection scripts injected into web pages and the icons; only manifest.json
+// differs, each keeping just the keys its browser knows (src/extension/manifest.json holds them
+// all). Load either unpacked from its folder.
 // Finally checks the popup is loadable under the extension's CSP.
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, cpSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,12 +20,17 @@ execFileSync('npx', ['ng', 'build', '--configuration', 'production,extension'], 
   stdio: 'inherit',
 });
 
+// Scripts outside Angular, each bundled on its own as a classic script: the background worker
+// (Chromium runs it as a service worker, Firefox as a background script), and the two scripts
+// every https page gets for dApp connections (manifest → content_scripts).
 await build({
-  entryPoints: ['src/extension/background.ts'],
-  outfile: join(angularOut, 'background.js'),
+  entryPoints: {
+    background: 'src/extension/background.ts',
+    inpage: 'src/extension/dapp/inpage-entry.ts',
+    content: 'src/extension/dapp/content-entry.ts',
+  },
+  outdir: angularOut,
   bundle: true,
-  // A classic script: Chromium runs it as the service worker, Firefox as a background
-  // script (manifest → background.service_worker / .scripts).
   format: 'iife',
   target: 'es2022',
   minify: true,
