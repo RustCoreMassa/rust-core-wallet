@@ -28,3 +28,23 @@
   color: var(--gray-500);
   line-height: 1.5;
 }
+
+.access-off {
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 138, 61, 0.1);
+  border: 1px solid rgba(255, 138, 61, 0.35);
+}
+
+.access-off-title {
+  font-weight: 700;
+  color: var(--orange);
+  margin-bottom: 6px;
+}
+
+.access-off-text {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}

@@ -272,6 +272,10 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   (`extension/dapp/connected-sites.ts`, + spec): list, change a site's account, disconnect. Removing
   a wallet disconnects its sites; log out disconnects all. The router tells the sites through
   the storage events.
-- [ ] Firefox: check the site permission (`permissions.contains`) and offer to grant it
+- [x] Site access — `SITE_ACCESS` (`extension/dapp/site-access.ts`, + spec): checks
+  `permissions.contains` (follows `onAdded` / `onRemoved`); when the browser has withdrawn it
+  (Firefox's Permissions tab, Chromium's Site access), Connected sites explains it and asks with
+  `permissions.request` straight from the click, and the Settings row says so. Not yet tried in a
+  real browser.
 - [ ] Test dApp page (buildnet)
 - [ ] wallet-provider PR

@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { CONNECTED_SITES, ConnectedSites } from '../../../core/platform/connected-sites';
+import { SITE_ACCESS } from '../../../core/platform/site-access';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
 import { AuthStore } from '../../../core/state/auth-store';
@@ -24,6 +25,9 @@ export class ConnectedSitesModal {
   private readonly toast = inject(Toast);
 
   protected readonly sites = this.connected.sites;
+  private readonly siteAccess = inject(SITE_ACCESS);
+  /** The browser has withdrawn the extension's access to websites: no site can connect. */
+  protected readonly accessOff = computed(() => this.siteAccess?.granted() === false);
   protected readonly error = signal<string | null>(null);
   /** The site being changed or disconnected, so its controls wait. */
   protected readonly busyOrigin = signal<string | null>(null);
@@ -36,6 +40,17 @@ export class ConnectedSitesModal {
       sublabel: `${a.address.slice(0, 6)}…${a.address.slice(-4)}`,
     })),
   );
+
+  /** Straight from the click — the browser only shows its prompt for a user gesture. */
+  protected allowSites(): void {
+    this.error.set(null);
+    this.siteAccess
+      ?.request()
+      .then((granted) => {
+        if (granted) this.toast.show('Sites can connect to RustCore Wallet again');
+      })
+      .catch((err) => this.error.set(toUserMessage(err)));
+  }
 
   protected isKnown(address: string): boolean {
     return this.auth.accounts().some((a) => a.address === address);

@@ -4,6 +4,7 @@ import { VaultAccount } from '../../../core/models/vault.model';
 import { APP_PLATFORM, EXTENSION_VIEWS } from '../../../core/platform/app-platform';
 import { APP_VERSION } from '../../../core/platform/app-version';
 import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
+import { SITE_ACCESS } from '../../../core/platform/site-access';
 import { AuthStore } from '../../../core/state/auth-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -28,7 +29,10 @@ export class SettingsPage {
   /** Extension only: sites connected through the dApp bridge. */
   protected readonly connectedSites = inject(CONNECTED_SITES);
 
+  private readonly siteAccess = inject(SITE_ACCESS);
+
   protected readonly connectedSitesLabel = computed(() => {
+    if (this.siteAccess?.granted() === false) return 'Site access off — sites can’t connect';
     const count = this.connectedSites?.sites().length ?? 0;
     return count === 0 ? 'None' : `${count} site${count > 1 ? 's' : ''}`;
   });
