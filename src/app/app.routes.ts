@@ -1,5 +1,7 @@
+import { inject } from '@angular/core';
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guard/auth-guard';
+import { DAPP_APPROVALS } from './core/platform/dapp-approvals';
 
 export const routes: Routes = [
   {
@@ -32,6 +34,14 @@ export const routes: Routes = [
           import('./features/settings/settings-page/settings-page').then((m) => m.SettingsPage),
       },
     ],
+  },
+  {
+    // The extension's approval window for dApp requests (docs/DAPP-CONNECTION.md).
+    path: 'approve',
+    canMatch: [() => inject(DAPP_APPROVALS) !== null],
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/approve/approve-page/approve-page').then((m) => m.ApprovePage),
   },
   { path: '**', redirectTo: 'login' },
 ];

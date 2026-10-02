@@ -254,7 +254,13 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   with `runtime.sendMessage` (`rustcore:approval:next` / `:resolve` / `:reject`, `dapp/approval.ts`,
   accepted only from extension pages) and keeps a `rustcore:approval` port open, pinging every
   20 s so the browser doesn't stop the worker (and lose the queue) while the user decides.
-- [ ] Approval view
+- [x] Approval view — connect, sign, transfer, rolls: `features/approve/approve-page` (+ spec),
+  route `/approve` (extension only; the PIN screen returns to it), `DAPP_APPROVALS`
+  (`extension/dapp/approval-channel.ts`). WalletStore `dapp*` methods take the connected wallet's
+  id and never switch the active wallet (it's saved in the session cache the popup restores);
+  amounts are exact units. An operation that failed on-chain still goes back to the site with its
+  id; anything that failed before sending keeps the request open.
+- [ ] Approval view — `callSC`: simulation (`readSC`) and decoding of known calls
 - [ ] Settings → Connected sites
 - [ ] Test dApp page (buildnet)
 - [ ] wallet-provider PR

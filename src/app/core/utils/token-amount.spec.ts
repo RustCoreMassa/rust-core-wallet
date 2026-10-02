@@ -1,4 +1,4 @@
-import { fromUnits, toUnits } from './token-amount';
+import { formatUnits, fromUnits, toUnits } from './token-amount';
 
 describe('toUnits', () => {
   it('converts through the decimal string, keeping 18-decimal precision', () => {
@@ -54,5 +54,20 @@ describe('fromUnits', () => {
     // back it's above the held amount — see WalletStore.spendableUnits.
     const held = 999_797_356_704_803_912n;
     expect(toUnits(fromUnits(held, 18), 18)).toBeGreaterThan(held);
+  });
+});
+
+describe('formatUnits', () => {
+  it('shows every digit, without trailing zeros', () => {
+    expect(formatUnits(1_234_567_891n, 9)).toBe('1.234567891');
+    expect(formatUnits(1_500_000_000n, 9)).toBe('1.5');
+    expect(formatUnits(100_000_000_000n, 9)).toBe('100');
+    expect(formatUnits(1n, 18)).toBe('0.000000000000000001');
+    expect(formatUnits(0n, 9)).toBe('0');
+  });
+
+  it('groups thousands and never rounds big amounts', () => {
+    expect(formatUnits(123_456_789_123_456_789_123n, 9)).toBe('123,456,789,123.456789123');
+    expect(formatUnits(42n, 0)).toBe('42');
   });
 });

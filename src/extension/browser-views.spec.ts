@@ -7,6 +7,7 @@ describe('browser views', () => {
     expect(viewFromUrl('')).toBe('popup');
     expect(viewFromUrl('?view=side-panel')).toBe('side-panel');
     expect(viewFromUrl('?view=tab')).toBe('tab');
+    expect(viewFromUrl('?view=approve')).toBe('approve');
     expect(viewFromUrl('?view=anything-else')).toBe('popup');
   });
 

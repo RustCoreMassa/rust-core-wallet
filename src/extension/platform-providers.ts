@@ -3,11 +3,13 @@ import { EnvironmentProviders, Provider, provideAppInitializer } from '@angular/
 import { RouterFeatures, withHashLocation } from '@angular/router';
 import { APP_PLATFORM, EXTENSION_VIEWS, ExtensionViews } from '../app/core/platform/app-platform';
 import { LOCAL_STORE, SESSION_STORE } from '../app/core/platform/app-storage';
+import { DAPP_APPROVALS } from '../app/core/platform/dapp-approvals';
 import { MOBILE_ONLY, isMobileDevice, readDeviceSignals } from '../app/core/platform/device';
 import { SESSION_KEY_STORE } from '../app/core/services/session-key-store';
 import { canOpenView, detectViewApis, viewFromUrl } from './browser-views';
 import { ChromeSessionKeyStore } from './chrome-session-key-store';
 import { ChromeStorageArea } from './chrome-storage-area';
+import { ChromeDappApprovals } from './dapp/approval-channel';
 
 /*
  * The browser extension's replacement for src/app/platform-providers.ts
@@ -27,6 +29,12 @@ document.documentElement.dataset['view'] = current;
 // On a phone (Firefox for Android) the popup already fills the screen.
 document.documentElement.dataset['device'] = isMobile ? 'mobile' : 'desktop';
 const apis = detectViewApis(isMobile);
+
+// The approval window (opened by the background worker for a dApp request) starts on its own
+// route; the PIN screen sends it back there once unlocked.
+if (current === 'approve' && !location.hash.startsWith('#/approve')) {
+  history.replaceState(null, '', `${location.pathname}${location.search}#/approve`);
+}
 
 // Both side-panel APIs open only straight from a click, so nothing may be
 // awaited before calling them: Chrome's window id is looked up in advance
@@ -77,4 +85,5 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   { provide: MOBILE_ONLY, useValue: false },
   { provide: APP_PLATFORM, useValue: 'extension' },
   { provide: EXTENSION_VIEWS, useValue: views },
+  { provide: DAPP_APPROVALS, useValue: new ChromeDappApprovals() },
 ];

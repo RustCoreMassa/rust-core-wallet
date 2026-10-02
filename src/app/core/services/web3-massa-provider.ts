@@ -16,6 +16,7 @@ import {
   MassaProvider,
   OperationResult,
   ROLL_PRICE_MAS,
+  SignedMessage,
   StakingInfo,
 } from './massa-provider';
 
@@ -147,6 +148,13 @@ export class Web3MassaProvider implements MassaProvider {
     return names
       .map((name, i) => ({ name, target: targets[i] || null }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async signMessage(privateKey: string, data: Uint8Array): Promise<SignedMessage> {
+    // What JsonRpcProvider.sign does, without opening a provider for it.
+    const account = await Account.fromPrivateKey(privateKey);
+    const signature = await account.sign(data);
+    return { publicKey: account.publicKey.toString(), signature: signature.toString() };
   }
 
   private async providerFor(privateKey: string) {

@@ -20,6 +20,12 @@ export interface OperationResult {
   readonly operationId: string;
 }
 
+/** A message signature, as massa-web3's `Provider.sign` returns it (base58 strings). */
+export interface SignedMessage {
+  readonly publicKey: string;
+  readonly signature: string;
+}
+
 export interface GeneratedAccount {
   readonly privateKey: string;
   readonly address: string;
@@ -76,6 +82,10 @@ export interface MassaProvider {
   // ---- Massa Name System ----------------------------------------------------
   /** Domains owned by `address`, each with the address it resolves to. */
   getOwnedDomains(address: string): Promise<MnsDomain[]>;
+
+  // ---- dApps ------------------------------------------------------------------
+  /** Signs `data` with the key's account, exactly as massa-web3's `Provider.sign` does. */
+  signMessage(privateKey: string, data: Uint8Array): Promise<SignedMessage>;
 }
 
 /** The chain executed the operation and it failed — nothing changed except the fee. */

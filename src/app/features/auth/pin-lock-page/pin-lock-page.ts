@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { MASSA_PROVIDER } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
@@ -32,6 +32,9 @@ export class PinLockPage {
   private readonly walletStore = inject(WalletStore);
   private readonly provider = inject(MASSA_PROVIDER);
   private readonly router = inject(Router);
+  /** Where to go once unlocked: the extension's approval window returns to its request. */
+  private readonly destination =
+    inject(ActivatedRoute).snapshot.queryParamMap.get('next') === 'approve' ? '/approve' : '/home';
 
   protected readonly step = signal<Step>(this.authStore.hasVault() ? 'unlock' : 'set-pin');
   protected readonly pin = signal('');
@@ -108,7 +111,7 @@ export class PinLockPage {
       if (ok) {
         // Paint last-known balances/history instantly; the shell refreshes them.
         await this.walletStore.restoreCache();
-        await this.router.navigateByUrl('/home');
+        await this.router.navigateByUrl(this.destination);
         return;
       } else {
         this.error.set('Incorrect PIN');
@@ -198,6 +201,6 @@ export class PinLockPage {
 
   private async completeRegistration(account: VaultAccount): Promise<void> {
     await this.authStore.register(this.firstPin, [account]);
-    this.router.navigateByUrl('/home');
+    this.router.navigateByUrl(this.destination);
   }
 }

@@ -39,6 +39,7 @@ function fakeProvider() {
     sellRolls: vi.fn(async () => ({ operationId: 'Osell' })),
     getTotalRolls: vi.fn(async () => 1000),
     getOwnedDomains: vi.fn(async () => []),
+    signMessage: vi.fn(async () => ({ publicKey: 'P1key', signature: '1sig' })),
   } satisfies Partial<MassaProvider>;
 }
 
@@ -236,6 +237,69 @@ describe('WalletStore', () => {
     it('only allows swaps on mainnet', () => {
       store.setNetwork('buildnet');
       expect(() => store.validateSwap('MAS', 'USDC.e', 1)).toThrow(/Mainnet only/);
+    });
+  });
+
+  describe('dApp requests', () => {
+    // Wallet b holds exactly 5 MAS; the active wallet is a.
+
+    it('sends exactly the units asked for, from the connected wallet, without switching', async () => {
+      const operationId = await store.dappTransfer('b', OUTSIDER, 1_234_567_891n);
+      expect(operationId).toBe('Osent');
+      expect(provider.transferMas).toHaveBeenCalledWith('S1b', OUTSIDER, 1_234_567_891n);
+      expect(store.activeWalletId()).toBe('a');
+      expect(store.wallets()['b'].history[0]).toMatchObject({
+        type: 'send',
+        amount: 1.234567891,
+        from: B,
+        to: OUTSIDER,
+        operationId: 'Osent',
+      });
+    });
+
+    it('keeps the network fee, to the nanoMAS', () => {
+      expect(() => store.validateDappTransfer('b', OUTSIDER, 4_990_000_000n)).not.toThrow();
+      expect(() => store.validateDappTransfer('b', OUTSIDER, 4_990_000_001n)).toThrow(
+        /Insufficient balance/,
+      );
+    });
+
+    it('refuses odd transfers before anything is signed', async () => {
+      expect(() => store.validateDappTransfer('b', B, 1n)).toThrow(/own address/);
+      expect(() => store.validateDappTransfer('b', 'AU123', 1n)).toThrow(/valid Massa address/);
+      expect(() => store.validateDappTransfer('b', OUTSIDER, 0n)).toThrow(/greater than 0/);
+      expect(() => store.validateDappTransfer('gone', OUTSIDER, 1n)).toThrow(/no longer/);
+      await expect(store.dappTransfer('b', OUTSIDER, 6_000_000_000n)).rejects.toThrow();
+      expect(provider.transferMas).not.toHaveBeenCalled();
+    });
+
+    it('changes nothing when the transfer fails on-chain', async () => {
+      const before = store.wallets()['b'];
+      provider.transferMas.mockRejectedValueOnce(new OperationFailedError('Ofail', 'reverted'));
+      await expect(store.dappTransfer('b', OUTSIDER, 1_000_000_000n)).rejects.toThrow(
+        OperationFailedError,
+      );
+      expect(store.wallets()['b'].history).toEqual(before.history);
+    });
+
+    it('checks rolls against the exact balance and the active rolls', async () => {
+      expect(() => store.validateDappRolls('a', 'buy', 0n)).toThrow(/greater than 0/);
+      expect(() => store.validateDappRolls('b', 'buy', 1n)).toThrow(/Insufficient MAS/);
+      expect(() => store.validateDappRolls('a', 'sell', 1n)).toThrow(/Not enough active rolls/);
+      await expect(store.dappRolls('a', 'buy', 0n)).rejects.toThrow(/greater than 0/);
+      chain.mas['S1a'] = 100_010_000_000n; // exactly one roll + the fee
+      await store.refresh('a');
+      await expect(store.dappRolls('a', 'buy', 1n)).resolves.toBe('Oroll');
+      expect(provider.buyRolls).toHaveBeenCalledWith('S1a', 1n);
+    });
+
+    it("signs with the connected wallet's key", async () => {
+      const data = new TextEncoder().encode('hello');
+      await expect(store.dappSign('b', data)).resolves.toEqual({
+        publicKey: 'P1key',
+        signature: '1sig',
+      });
+      expect(provider.signMessage).toHaveBeenCalledWith('S1b', data);
     });
   });
 });

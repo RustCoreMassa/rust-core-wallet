@@ -1,0 +1,56 @@
+<div class="app-screen approve-screen">
+  <header class="approve-head">
+    <img class="approve-logo" src="assets/logo.png" alt="" />
+    <span>RustCore Wallet</span>
+  </header>
+
+  @if (phase() === 'loading') {
+  <div class="approve-loading"><div class="spinner"></div></div>
+  } @else if (phase() === 'notice') {
+  <div class="approve-body">
+    <div class="approve-notice">{{ notice() }}</div>
+    <button class="btn btn-red" type="button" (click)="continue()">Continue</button>
+  </div>
+  } @else if (view(); as v) {
+  <div class="approve-body">
+    <div class="approve-site">
+      <div class="approve-site-label">Request from</div>
+      <div class="approve-origin">{{ v.origin }}</div>
+    </div>
+
+    <h1 class="approve-title">{{ title() }}</h1>
+
+    @if (request()?.method === 'connect') {
+    <div class="field-label">Account to share</div>
+    <app-dropdown inputId="approve-account" [options]="accountOptions()" [(value)]="chosenId" />
+    }
+
+    @if (message(); as m) {
+    <div class="field-label">Message</div>
+    <pre class="approve-message" [class.hex]="m.hex">{{ m.text }}</pre>
+    }
+
+    @if (blocker()) {
+    <div class="error-text">{{ blocker() }}</div>
+    }
+    @if (error()) {
+    <div class="error-text">{{ error() }}</div>
+    }
+
+    <app-confirm-details
+      [rows]="rows()"
+      [note]="note()"
+      confirmLabel="Approve"
+      [busyLabel]="request()?.method === 'sign' ? 'Signing…' : 'Sending…'"
+      [busy]="phase() === 'busy'"
+      [disabled]="!!blocker() || !account()"
+      (confirmed)="approve()"
+      (cancelled)="reject()"
+    />
+
+    @if (v.queued > 0) {
+    <div class="approve-queued">{{ v.queued }} more {{ v.queued === 1 ? 'request' : 'requests' }} waiting</div>
+    }
+  </div>
+  }
+</div>
