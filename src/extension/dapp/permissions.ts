@@ -45,8 +45,7 @@ export class DappPermissions {
   ) {}
 
   async all(): Promise<PermissionMap> {
-    const stored = (await this.area.get(PERMISSIONS_ITEM))[PERMISSIONS_ITEM];
-    return isPermissionMap(stored) ? stored : {};
+    return toPermissionMap((await this.area.get(PERMISSIONS_ITEM))[PERMISSIONS_ITEM]);
   }
 
   async get(origin: string): Promise<SitePermission | null> {
@@ -88,6 +87,11 @@ export class DappPermissions {
   private async write(map: PermissionMap): Promise<void> {
     await this.area.set({ [PERMISSIONS_ITEM]: map });
   }
+}
+
+/** A stored value as a permission map; anything damaged or tampered with counts as empty. */
+export function toPermissionMap(value: unknown): PermissionMap {
+  return isPermissionMap(value) ? value : {};
 }
 
 function isPermissionMap(value: unknown): value is PermissionMap {

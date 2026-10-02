@@ -125,6 +125,34 @@ if (extension) {
     console.log('BOOT FAILED: inpage.js did not define window.rustcore');
     process.exit(1);
   }
+  // The background worker must start and listen for pages, the approval window and storage.
+  const listening = new Set();
+  const event = (name) => ({ addListener: () => listening.add(name) });
+  const worker = {
+    chrome: {
+      alarms: { onAlarm: event('alarms') },
+      runtime: {
+        id: 'smoke',
+        getURL: (p) => `chrome-extension://smoke/${p}`,
+        onConnect: event('connect'),
+        onMessage: event('message'),
+      },
+      storage: { local: {}, session: {}, onChanged: event('storage') },
+      windows: { onRemoved: event('windows') },
+      tabs: { onRemoved: event('tabs') },
+    },
+  };
+  try {
+    new Function('chrome', readFileSync(join(dir, 'background.js'), 'utf8'))(worker.chrome);
+  } catch (e) {
+    console.log(`BOOT FAILED: background.js failed to start — ${e.constructor.name}: ${e.message}`);
+    process.exit(1);
+  }
+  const expected = ['alarms', 'connect', 'message', 'storage'];
+  if (!expected.every((name) => listening.has(name))) {
+    console.log(`BOOT FAILED: background.js listens to ${[...listening]}, expected ${expected}`);
+    process.exit(1);
+  }
 }
 console.log(
   `BOOT OK — ${main} evaluated and rendered: "${rendered.slice(0, 60)}…"` +

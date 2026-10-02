@@ -323,3 +323,44 @@ function bytes(value: unknown, name: string, max: number): Uint8Array {
   if (data.length > max) throw invalid(`${name} is larger than ${max} bytes`);
   return data;
 }
+
+// ------------------------------------------------------------------ networks
+
+export type WalletNetwork = 'mainnet' | 'buildnet';
+
+/** What `network` answers: massa-web3's Network, with bigints as decimal strings. */
+export interface NetworkInfo {
+  readonly name: WalletNetwork;
+  readonly chainId: string;
+  readonly url: string;
+  readonly minimalFee: string;
+}
+
+// The same values as massa-web3's CHAIN_ID and PublicApiUrl (copied: the background worker
+// doesn't bundle massa-web3), and the wallet's own fee per operation (NETWORK_FEE_MAS, 0.01 MAS).
+const NETWORKS: Readonly<Record<WalletNetwork, NetworkInfo>> = {
+  mainnet: {
+    name: 'mainnet',
+    chainId: '77658377',
+    url: 'https://mainnet.massa.net/api/v2',
+    minimalFee: '10000000',
+  },
+  buildnet: {
+    name: 'buildnet',
+    chainId: '77658366',
+    url: 'https://buildnet.massa.net/api/v2',
+    minimalFee: '10000000',
+  },
+};
+
+export function networkInfo(network: WalletNetwork): NetworkInfo {
+  return NETWORKS[network];
+}
+
+/** The wallet's network as the app stores it (core/state/network-store.ts): mainnet unless set. */
+export function walletNetworkOf(stored: unknown): WalletNetwork {
+  return stored === 'buildnet' ? 'buildnet' : 'mainnet';
+}
+
+/** Storage item the app keeps its network in (LOCAL_STORE → chrome.storage.local). */
+export const NETWORK_ITEM = 'massa-wallet:network';

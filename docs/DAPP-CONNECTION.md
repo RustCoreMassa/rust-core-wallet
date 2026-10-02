@@ -248,9 +248,12 @@ so future native apps could reuse protocol v1 in their own dApp browser.
 - [x] Protocol module — `src/extension/dapp/protocol.ts` (+ spec)
 - [x] Permissions store — `src/extension/dapp/permissions.ts` (+ spec)
 - [x] inpage.js + content.js, manifest, build — `dapp/inpage.ts`, `dapp/content.ts` (+ `bridge.spec`),
-  `npm run smoke:extension` checks a page gets `window.rustcore`. Until the router exists, the
-  background answers every request with 4200 "not available yet".
-- [ ] Background router
+  `npm run smoke:extension` checks a page gets `window.rustcore`.
+- [x] Background router — `dapp/router.ts` (+ spec), `dapp/approval-window.ts`, wired in
+  `background.ts`; smoke checks the worker starts and listens. The approval window talks to it
+  with `runtime.sendMessage` (`rustcore:approval:next` / `:resolve` / `:reject`, `dapp/approval.ts`,
+  accepted only from extension pages) and keeps a `rustcore:approval` port open, pinging every
+  20 s so the browser doesn't stop the worker (and lose the queue) while the user decides.
 - [ ] Approval view
 - [ ] Settings → Connected sites
 - [ ] Test dApp page (buildnet)
