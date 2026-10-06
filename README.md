@@ -137,11 +137,11 @@ including RustCore — can recover the funds.
 (0.1 MAS).
 
 **Why doesn't it work on my computer?** It's built for phones. A browser extension for desktop is
-on the roadmap.
+built and in review at the browser stores; it will be listed here once it's published.
 
 ## Roadmap
 
-**Phase 1 — Web wallet** *(current)*
+**Phase 1 — Web wallet** *(live)*
 - [x] Encrypted multi-wallet vault with PIN
 - [x] Send / receive MAS and Massa tokens
 - [x] Transaction history with details
@@ -150,16 +150,19 @@ on the roadmap.
 - [x] `.massa` domains
 - [x] Installable app (Android & iOS)
 - [x] Published on DeWeb (`wrustcore.massa`)
+- [ ] Import custom tokens from Settings
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations
 
-**Phase 2 — Browser extension**
-- [ ] Chrome / Brave / Edge and Firefox extension
+**Phase 2 — Browser extension** *(in progress)*
+- [x] Chromium (Chrome, Edge, Brave) and Firefox builds
+- [x] Popup, side panel and full screen
+- [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
 - [ ] Connect to Massa dApps and sign their transactions, with a review screen
 - [ ] Per-site permissions
 
-**Phase 3 — Mobile apps**
+**Phase 3 — Mobile apps** *(planned)*
 - [ ] iOS and Android apps
 - [ ] Biometric unlock (Face ID / fingerprint)
 - [ ] Notifications for incoming transfers
