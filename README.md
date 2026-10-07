@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.1.1" src="https://img.shields.io/badge/version-1.1.1-brightgreen" />
+  <img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
@@ -38,7 +38,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.1.1** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.2.0** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -102,6 +102,8 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
 - Every transaction that spends funds shows a review screen and is checked first (balance, fee,
   address) — you confirm before anything is signed.
 - Revealing a private key, removing a wallet or logging out asks for your PIN again.
+- In the browser extension, a dApp you connect sees only the wallet you chose for it, and each
+  of its requests opens a review window; you can disconnect sites in Settings → Connected sites.
 - Swaps are sent with a minimum you'll accept, so the exchange cancels them instead of filling
   at a bad price.
 
@@ -162,8 +164,8 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Chromium (Chrome, Edge, Brave) and Firefox builds
 - [x] Popup, side panel and full screen
 - [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
-- [ ] Connect to Massa dApps and sign their transactions, with a review screen
-- [ ] Per-site permissions
+- [x] Connect to Massa dApps and sign their transactions, with a review screen
+- [x] Per-site permissions
 
 **Phase 3 — Mobile apps** *(planned)*
 - [ ] iOS and Android apps

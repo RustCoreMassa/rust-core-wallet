@@ -7,13 +7,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-07
+
+### Added
+
+- **Browser extension: connect to Massa dApps.** A site asks once to connect and sees one
+  wallet of your choice. Every transfer, roll purchase or sale, contract call and message
+  signature it asks for opens a review window in the extension; nothing is signed without your
+  approval. Contract calls are tried first without sending anything, and the wallet explains
+  known token transfers, allowances (with a warning for unlimited ones) and Dusa swaps. Sites
+  can't send raw bytecode or hand the wallet a private key. dApps will find RustCore once
+  `@massalabs/wallet-provider` supports it (in progress).
+- Settings → **Connected sites**: see which sites are connected, change a site's wallet or
+  disconnect it. Removing a wallet or logging out disconnects its sites. If the browser has
+  withdrawn the extension's access to websites, the wallet says so and lets you allow it again.
+- The wallet's version is shown at the bottom of Settings.
+
 ### Changed
 
 - **Browser extension: a password instead of the 6-digit PIN** (at least 8 characters, not only
   digits). If someone copied the browser's data, a PIN could be guessed offline in moments; a
   good password can't. A wallet created with a PIN in the extension asks for a new password at
   the next unlock — the wallets stay as they are. The mobile web wallet keeps its PIN.
-
 - The wallet moved to **`wrustcore.massa`**, now its only official address; `rustcore.massa`
   is the RustCore website.
 
@@ -127,6 +142,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.2.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.2.0
 [1.1.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.1
 [1.1.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.0
 [1.0.3]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.0.3
