@@ -5,6 +5,7 @@ import { APP_PLATFORM, EXTENSION_VIEWS } from '../../../core/platform/app-platfo
 import { APP_VERSION } from '../../../core/platform/app-version';
 import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { SITE_ACCESS } from '../../../core/platform/site-access';
+import { UNLOCK_SECRET, secretNoun } from '../../../core/platform/unlock-secret';
 import { AuthStore } from '../../../core/state/auth-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -30,6 +31,7 @@ export class SettingsPage {
   protected readonly connectedSites = inject(CONNECTED_SITES);
 
   private readonly siteAccess = inject(SITE_ACCESS);
+  protected readonly secretName = secretNoun(inject(UNLOCK_SECRET));
 
   protected readonly connectedSitesLabel = computed(() => {
     if (this.siteAccess?.granted() === false) return 'Site access off — sites can’t connect';

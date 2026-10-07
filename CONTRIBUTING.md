@@ -70,9 +70,10 @@ background `scripts`, `browser_specific_settings`). To try it:
 
 What differs from the web app is swapped in at build time: `src/app/platform-providers.ts` (web)
 is replaced by `src/extension/platform-providers.ts` — `chrome.storage` instead of the page's
-storage, hash routing, no mobile gate, service worker or install banner, and an unlocked session
-that survives closing the popup (the vault key is kept in memory-only `chrome.storage.session`
-and wiped 15 minutes after the popup was last open). The same page runs in three views
+storage, a password instead of the 6-digit PIN (`UNLOCK_SECRET`; a vault made with a PIN moves
+to a password at the next unlock), hash routing, no mobile gate, service worker or install
+banner, and an unlocked session that survives closing the popup (the vault key is kept in
+memory-only `chrome.storage.session` and wiped 15 minutes after the popup was last open). The same page runs in three views
 (Settings → *Open in full screen* / *Open in side panel*; `html[data-view]`, styled in
 `src/extension/views.scss`): the toolbar popup, fixed at 380×600 (the browsers' height limit);
 the side panel (`?view=side-panel` — Chrome's side panel or Firefox's sidebar), full window
@@ -120,9 +121,9 @@ src/app/
 │   ├── state/       AuthStore (vault & session), WalletStore (balances, history,
 │   │                staking, swaps), history merging, NetworkStore
 │   └── utils/       Exact decimal ↔ on-chain amounts, staking rewards, user-facing errors
-├── features/        Screens: PIN/unlock, Home, NFTs & domains, Staking, Settings, modals
+├── features/        Screens: lock screen, Home, NFTs & domains, Staking, Settings, modals
 ├── layout/          App shell, navigation, auto-refresh
-├── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, PIN pad
+├── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, unlock entry
 └── platform-providers.ts   Web-app specifics (replaced in the extension build)
 src/extension/       Browser extension: manifest, background worker, chrome.storage adapters
 ```

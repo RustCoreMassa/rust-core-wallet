@@ -9,6 +9,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Browser extension: a password instead of the 6-digit PIN** (at least 8 characters, not only
+  digits). If someone copied the browser's data, a PIN could be guessed offline in moments; a
+  good password can't. A wallet created with a PIN in the extension asks for a new password at
+  the next unlock — the wallets stay as they are. The mobile web wallet keeps its PIN.
+
 - The wallet moved to **`wrustcore.massa`**, now its only official address; `rustcore.massa`
   is the RustCore website.
 

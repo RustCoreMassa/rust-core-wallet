@@ -5,15 +5,16 @@ import { SESSION_KEY_STORE } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
 
 /**
- * Owns the PIN-gated vault lifecycle: whether a vault exists on this
+ * Owns the vault lifecycle, gated by the unlock secret (the web app's PIN
+ * or the extension's password, see UNLOCK_SECRET): whether a vault exists on this
  * device, whether the current session is unlocked, and — only while
  * unlocked — the decrypted accounts and the derived encryption key
  * needed to re-save the vault after a change (e.g. adding a wallet).
  *
- * The PIN itself never lives in a field on this class. It passes
+ * The secret itself never lives in a field on this class. It passes
  * through `unlock`/`register` as a local parameter and is handed to
  * CryptoVault, which returns a `CryptoKey` — that key is what gets
- * cached in `sessionKey`, never the PIN. A SessionKeyStore may keep that
+ * cached in `sessionKey`, never the secret. A SessionKeyStore may keep that
  * key beyond this page (the extension popup, see `resume`); the web app's
  * keeps nothing.
  *
@@ -23,7 +24,8 @@ import { VaultStorage } from '../services/vault-storage';
  * attacker — that's a property of the PIN length, not of this code.
  * It's the same trade-off real wallets accept for a fast unlock code,
  * resting on the assumption that the encrypted vault blob itself
- * doesn't leak.
+ * doesn't leak — acceptable on a phone; the browser extension, where
+ * that assumption is weaker, uses a password instead.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthStore {
@@ -43,9 +45,9 @@ export class AuthStore {
 
   readonly activeAccount = computed(() => this._accounts()[0] ?? null);
 
-  /** First-time setup: encrypts `accounts` under a fresh PIN and unlocks. */
-  async register(pin: string, accounts: VaultAccount[]): Promise<void> {
-    const { key, salt } = await this.cryptoVault.deriveNewKey(pin, this.sessionKeys.keepsKey);
+  /** First-time setup: encrypts `accounts` under a fresh secret and unlocks. */
+  async register(secret: string, accounts: VaultAccount[]): Promise<void> {
+    const { key, salt } = await this.cryptoVault.deriveNewKey(secret, this.sessionKeys.keepsKey);
     const payload: VaultPayload = { accounts };
     const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
 
@@ -57,17 +59,21 @@ export class AuthStore {
     await this.keepSession(key);
   }
 
-  /** Returns false on a wrong PIN instead of throwing — callers just check the result. */
-  async unlock(pin: string): Promise<boolean> {
+  /** Returns false on a wrong secret instead of throwing — callers just check the result. */
+  async unlock(secret: string): Promise<boolean> {
     const envelope = this.vaultStorage.load();
     if (!envelope) return false;
 
     let key: CryptoKey;
     try {
-      key = await this.cryptoVault.deriveExistingKey(pin, envelope.salt, this.sessionKeys.keepsKey);
+      key = await this.cryptoVault.deriveExistingKey(
+        secret,
+        envelope.salt,
+        this.sessionKeys.keepsKey,
+      );
       await this.open(key);
     } catch {
-      // Wrong PIN (AES-GCM auth tag mismatch) or a corrupted vault.
+      // Wrong secret (AES-GCM auth tag mismatch) or a corrupted vault.
       return false;
     }
     await this.keepSession(key);
@@ -75,7 +81,7 @@ export class AuthStore {
   }
 
   /**
-   * Unlocks without the PIN when the SessionKeyStore still holds this
+   * Unlocks without the secret when the SessionKeyStore still holds this
    * session's key (the extension popup reopened before auto-lock). Always
    * false on the web.
    */
@@ -103,7 +109,7 @@ export class AuthStore {
   /**
    * Full log out: locks the session AND deletes the encrypted vault from
    * this device. Irreversible — the wallets can only come back by
-   * importing their private keys again under a new PIN.
+   * importing their private keys again under a new secret.
    */
   logout(): void {
     this.lock();
@@ -112,16 +118,16 @@ export class AuthStore {
   }
 
   /**
-   * Re-checks a PIN against the stored vault WITHOUT touching session
+   * Re-checks the secret against the stored vault WITHOUT touching session
    * state (`isUnlocked`, `accounts`, `sessionKey` are all left alone).
    * For step-up confirmation before revealing something sensitive
    * (e.g. a private key backup) while already unlocked.
    */
-  async verifyPin(pin: string): Promise<boolean> {
+  async verifySecret(secret: string): Promise<boolean> {
     const envelope = this.vaultStorage.load();
     if (!envelope) return false;
     try {
-      const key = await this.cryptoVault.deriveExistingKey(pin, envelope.salt);
+      const key = await this.cryptoVault.deriveExistingKey(secret, envelope.salt);
       await this.cryptoVault.decrypt(envelope, key);
       return true;
     } catch {
@@ -144,6 +150,23 @@ export class AuthStore {
     await this.sessionKeys
       .save(key)
       .catch((err) => console.warn('Keeping the session failed', err));
+  }
+
+  /**
+   * Re-encrypts the vault under a new secret (new salt, new key) — how the
+   * extension moves a vault made with a PIN to a password. Unlocked only;
+   * the session continues under the new key. Data encrypted under the old
+   * key (the wallet cache) just stops decrypting and is rebuilt.
+   */
+  async changeSecret(secret: string): Promise<void> {
+    if (!this.sessionKey) throw new Error('Vault is locked');
+    const { key, salt } = await this.cryptoVault.deriveNewKey(secret, this.sessionKeys.keepsKey);
+    const payload: VaultPayload = { accounts: this._accounts() };
+    const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
+
+    this.vaultStorage.save({ salt, iv, ciphertext });
+    this.sessionKey = key;
+    await this.keepSession(key);
   }
 
   /** Persists an updated account list under the already-derived session key. */

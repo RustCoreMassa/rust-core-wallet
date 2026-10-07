@@ -46,7 +46,7 @@ Bearby and MetaMask answer `importAccount`, `deleteAccount` and `generateNewAcco
 │   (postMessage)          │   │     │  needs a signature?                              │
 └──────────────────────────┘   │     ▼                                                  │
                                │  approval window: index.html?view=approve              │
-                               │   the Angular app: unlock (PIN) → review → sign → send │
+                               │   the Angular app: unlock → review → sign → send       │
                                └────────────────────────────────────────────────────────┘
 ```
 
@@ -122,7 +122,7 @@ with `chrome.windows.create({ type: 'popup', width: 380, height: 600 })`; on Fir
 which has no `windows` API, as a tab.
 
 1. Fetches the pending request from the background by id.
-2. If locked, asks for the PIN (`AuthStore.resume()` / unlock — the normal lock screen).
+2. If locked, asks for the password (`AuthStore.resume()` / unlock — the normal lock screen).
 3. Shows the request with `app-confirm-details`: the **origin** (large, as the browser reported
    it), account, network, and what will happen (below).
 4. On approve: runs the same `validate*` rules as the wallet's own screens (fee reserved,
@@ -199,7 +199,7 @@ caps; the review shows what will actually be sent.
 - Requests expire (e.g. 10 minutes) and are rejected if the site disconnects or the tab closes.
 - Network: requests are signed on the wallet's current network; if a dApp asks for a specific
   chain id and it differs, the request is rejected (no silent switch).
-- The vault, the PIN and the session key stay where they are today; the background still only
+- The vault, the password and the session key stay where they are today; the background still only
   ends sessions (auto-lock) and never decrypts anything.
 
 ## Scope: the browser extension only
@@ -255,7 +255,7 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   accepted only from extension pages) and keeps a `rustcore:approval` port open, pinging every
   20 s so the browser doesn't stop the worker (and lose the queue) while the user decides.
 - [x] Approval view — connect, sign, transfer, rolls: `features/approve/approve-page` (+ spec),
-  route `/approve` (extension only; the PIN screen returns to it), `DAPP_APPROVALS`
+  route `/approve` (extension only; the lock screen returns to it), `DAPP_APPROVALS`
   (`extension/dapp/approval-channel.ts`). WalletStore `dapp*` methods take the connected wallet's
   id and never switch the active wallet (it's saved in the session cache the popup restores);
   amounts are exact units. An operation that failed on-chain still goes back to the site with its

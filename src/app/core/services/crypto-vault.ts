@@ -16,37 +16,38 @@ export interface Ciphertext {
 }
 
 /**
- * Turns a PIN into vault encryption using the browser's native Web
+ * Turns the unlock secret (the web app's PIN or the extension's password,
+ * see UNLOCK_SECRET) into vault encryption using the browser's native Web
  * Crypto API (`crypto.subtle`) — no third-party crypto library.
  *
- * The PIN itself is never written to storage, and never held onto in
+ * The secret itself is never written to storage, and never held onto in
  * memory either: `deriveNewKey`/`deriveExistingKey` are the only places
  * it's read, and what they return is a non-extractable `CryptoKey` —
  * usable for encrypt/decrypt, but never exportable back to raw bytes.
  * AuthStore holds onto that derived key for the session (so re-saving
- * the vault after adding a wallet doesn't need the PIN again), which is
- * strictly safer than caching the PIN itself would be.
+ * the vault after adding a wallet doesn't need the secret again), which is
+ * strictly safer than caching the secret itself would be.
  *
  * AES-GCM (not AES-CBC) because it's an authenticated mode: decrypting
  * with the wrong key throws instead of silently returning garbage —
- * that's what lets the app treat "decryption failed" as "wrong PIN"
+ * that's what lets the app treat "decryption failed" as "wrong PIN/password"
  * with zero network calls.
  */
 @Injectable({ providedIn: 'root' })
 export class CryptoVault {
   /** Registration: no salt yet, so generate one. */
-  async deriveNewKey(pin: string, extractable = false): Promise<DerivedKey> {
+  async deriveNewKey(secret: string, extractable = false): Promise<DerivedKey> {
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH_BYTES));
-    return { key: await this.deriveKey(pin, salt, extractable), salt: toBase64(salt) };
+    return { key: await this.deriveKey(secret, salt, extractable), salt: toBase64(salt) };
   }
 
   /** Unlock: re-derive using the salt that was stored alongside the vault. */
   async deriveExistingKey(
-    pin: string,
+    secret: string,
     saltBase64: string,
     extractable = false,
   ): Promise<CryptoKey> {
-    return this.deriveKey(pin, fromBase64(saltBase64), extractable);
+    return this.deriveKey(secret, fromBase64(saltBase64), extractable);
   }
 
   async encrypt(plaintext: string, key: CryptoKey): Promise<Ciphertext> {
@@ -59,7 +60,7 @@ export class CryptoVault {
     return { iv: toBase64(iv), ciphertext: toBase64(new Uint8Array(buffer)) };
   }
 
-  /** Throws (DOMException) when `key` doesn't match — treat as wrong PIN. */
+  /** Throws (DOMException) when `key` doesn't match — treat as a wrong PIN/password. */
   async decrypt(payload: Ciphertext, key: CryptoKey): Promise<string> {
     const iv = fromBase64(payload.iv);
     const ciphertext = fromBase64(payload.ciphertext);
@@ -74,11 +75,19 @@ export class CryptoVault {
   /**
    * `extractable` only for a SessionKeyStore that keeps the session alive
    * outside this page (the extension popup) — the web app never asks for it.
+   *
+   * NFC: a password with accents typed on another keyboard or OS may arrive
+   * composed differently (é as one code point or as e + ◌́); both must open the
+   * vault. Digits are the same either way, so existing PIN vaults are unaffected.
    */
-  private async deriveKey(pin: string, salt: Uint8Array, extractable: boolean): Promise<CryptoKey> {
+  private async deriveKey(
+    secret: string,
+    salt: Uint8Array,
+    extractable: boolean,
+  ): Promise<CryptoKey> {
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(pin),
+      new TextEncoder().encode(secret.normalize('NFC')),
       'PBKDF2',
       false,
       ['deriveKey'],

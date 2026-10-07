@@ -10,14 +10,49 @@
   <div class="error-text" style="margin-bottom:16px;">{{ error() }}</div>
   }
 
-  @if (showPinPad()) {
-  <div class="pin-dots">
-    @for (filled of dots(); track $index) {
-    <div class="pin-dot" [class.filled]="filled"></div>
-    }
-  </div>
+  @if (showEntry()) {
+  <app-secret-entry submitLabel="Unlock" [busy]="isBusy()" (submitted)="onSecret($event)" />
+  }
 
-  <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
+  @if (choosingPassword()) {
+  <form class="password-form" (submit)="submitPassword($event)">
+    <label class="field-label" for="new-password-input">Password</label>
+    <input
+      id="new-password-input"
+      class="num-input"
+      name="new-password"
+      autocomplete="new-password"
+      [type]="showPassword() ? 'text' : 'password'"
+      [ngModel]="newPassword()"
+      (ngModelChange)="newPassword.set($event)"
+    />
+    <label class="field-label" for="confirm-password-input">Confirm password</label>
+    <input
+      id="confirm-password-input"
+      class="num-input"
+      name="confirm-password"
+      autocomplete="new-password"
+      [type]="showPassword() ? 'text' : 'password'"
+      [ngModel]="confirmPassword()"
+      (ngModelChange)="confirmPassword.set($event)"
+    />
+    <label class="show-password">
+      <input type="checkbox" [checked]="showPassword()" (change)="showPassword.set(!showPassword())" />
+      Show password
+    </label>
+    <div class="hint">
+      At least {{ minPasswordLength }} characters, not only digits. A few unrelated words make a
+      strong one.
+    </div>
+    <button class="btn btn-red" type="submit" [disabled]="isBusy()">
+      @if (isBusy()) {
+      <div class="spinner"></div>
+      <span>Saving…</span>
+      } @else {
+      <span>{{ step() === 'upgrade' ? 'Save password' : 'Continue' }}</span>
+      }
+    </button>
+  </form>
   }
 
   @if (step() === 'key-choice') {

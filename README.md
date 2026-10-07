@@ -113,6 +113,9 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
   never asks for your key or PIN.)
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
+- The browser extension (in progress) locks the wallet with a **password** instead: at least 8
+  characters, not only digits. On a computer, stored browser data is a common target for
+  malware, and a good password can't be guessed offline the way a PIN can.
 - The wallet hasn't had an independent audit yet (it's on the [roadmap](#roadmap)).
 
 ### Verify it yourself
@@ -123,7 +126,7 @@ See [how to verify a build](docs/RELEASING.md#verifying-a-build).
 
 ## FAQ
 
-**I forgot my PIN.** There is no PIN recovery — the PIN is what encrypts your wallet on the
+**I forgot my PIN (or the extension's password).** There is no recovery — the PIN is what encrypts your wallet on the
 phone, and nobody else has it. Clear this site's data in your browser settings (on iPhone,
 remove the installed app from your home screen), open the wallet again and import your private
 key from your backup.
@@ -174,7 +177,7 @@ built and in review at the browser stores; it will be listed here once it's publ
 
 Questions, ideas, or want to follow what's next? Join the RustCore community on Telegram:
 **[t.me/rustcore_massa](https://t.me/rustcore_massa)**. Admins never message you first and
-never ask for your private key or PIN — anyone who does is a scammer.
+never ask for your private key, PIN or password — anyone who does is a scammer.
 
 ## Support the project
 

@@ -4,22 +4,14 @@
     <button class="modal-close" type="button" (click)="modal.close()">✕</button>
   </div>
 
-  @if (step() === 'confirm-pin') {
-  <div class="hint" style="margin-bottom:16px;">Confirm your PIN before we show this — it's sensitive.</div>
+  @if (step() === 'confirm-secret') {
+  <div class="hint" style="margin-bottom:16px;">Confirm your {{ secretName }} before we show this — it's sensitive.</div>
 
   @if (error()) {
   <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
   }
 
-  <div class="pin-dots" style="justify-content:center;margin-bottom:24px;">
-    @for (filled of dots(); track $index) {
-    <div class="pin-dot" [class.filled]="filled"></div>
-    }
-  </div>
-
-  <div style="display:flex;justify-content:center;">
-    <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
-  </div>
+  <app-secret-entry compact submitLabel="Show key" [busy]="isBusy()" (submitted)="confirmSecret($event)" />
   }
 
   @if (step() === 'reveal') {
