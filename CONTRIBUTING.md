@@ -46,6 +46,7 @@ npm start            # http://localhost:4200
 | `npm run smoke` | Boots the production build in a simulated phone browser (run after `npm run build`) |
 | `npm run build:extension` | Browser extension into `dist/extension/chromium` and `dist/extension/firefox` |
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
+| `npm run test-dapp` | Test page for dApp connections at http://127.0.0.1:4300 (see below) |
 | `npx prettier --write .` | Format the code |
 
 **Mobile only.** RustCore Wallet is a phone app: in a desktop browser the production build shows
@@ -81,6 +82,15 @@ place of bottom sheets. What a browser offers is detected, not assumed
 (Firefox for Android) the popup is already full screen, so it offers no other view. The
 extension's pages may connect only to the Massa nodes and the explorer API (CSP in
 `src/extension/manifest.json`).
+
+**dApp connections** (extension only; design in `docs/DAPP-CONNECTION.md`). To try them, load the
+extension, run `npm run test-dapp` and open http://127.0.0.1:4300 (the extension's scripts run
+on `localhost` / `127.0.0.1` pages, so the page gets `window.rustcore`). It calls every method —
+connect, sign (the signature is verified on the page), transfers, rolls, contract calls on
+buildnet's Wrapped MAS (including one whose simulation must fail) — and runs protocol checks:
+bad requests the wallet must refuse with the right error code. Transfers, rolls and contract
+calls are sent only while the wallet is on **buildnet** (Settings → network); fund the test
+account from the buildnet faucet.
 
 **Installable app.** The service worker runs in production builds only (`npm run build`), and
 browsers offer installation only over HTTPS (or on `localhost`).

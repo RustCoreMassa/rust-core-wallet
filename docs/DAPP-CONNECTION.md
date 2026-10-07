@@ -1,8 +1,8 @@
 # Connecting dApps — architecture
 
-Status: **design, not implemented yet** (branch `dapp-connect`). This document is for developers.
-It describes how Massa dApps will connect to the RustCore Wallet browser extension and ask it to
-sign.
+Status: **implemented on branch `dapp-connect`** (see Progress at the end); the wallet-provider PR
+is next. This document is for developers. It describes how Massa dApps connect to the RustCore
+Wallet browser extension and ask it to sign.
 
 ## Goal
 
@@ -277,5 +277,11 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   (Firefox's Permissions tab, Chromium's Site access), Connected sites explains it and asks with
   `permissions.request` straight from the click, and the Settings row says so. Not yet tried in a
   real browser.
-- [ ] Test dApp page (buildnet)
+- [x] Test dApp page — `scripts/test-dapp/` (`npm run test-dapp`, http://127.0.0.1:4300): every
+  method, signature verified on the page, writes only while the wallet answers `network` with
+  buildnet (checked again before each), WMAS presets on buildnet (wrap, unwrap, transfer,
+  allowance, unlimited allowance, a wrap with 0 coins whose simulation fails — presets checked
+  with buildnet `readSC`), operations followed to finality, 24 protocol checks (expected error
+  codes, run against `parseRequest` in jsdom) and a busy test (4900, then 4001). Not yet tried
+  with the real extension in a browser.
 - [ ] wallet-provider PR

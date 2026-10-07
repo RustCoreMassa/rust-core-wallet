@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RustCore test dApp</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0e0e10;
+        --card: #18181b;
+        --border: #2a2a30;
+        --text: #ececf0;
+        --muted: #9a9aa5;
+        --red: #e5484d;
+        --green: #46a758;
+        --amber: #f5a524;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+      header {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 16px 16px 0;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      h2 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+      p {
+        margin: 0 0 8px;
+        color: var(--muted);
+      }
+      section {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        min-width: 0;
+      }
+      .wide {
+        grid-column: 1 / -1;
+      }
+      .banner {
+        border: 1px solid var(--amber);
+        color: var(--amber);
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-top: 8px;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 4px 12px;
+        margin: 0;
+      }
+      dt {
+        color: var(--muted);
+      }
+      dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+      }
+      label {
+        display: grid;
+        gap: 2px;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      input,
+      textarea {
+        width: 100%;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font:
+          13px ui-monospace,
+          monospace;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      button {
+        background: #26262c;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        border-color: var(--red);
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #log {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-height: 420px;
+        overflow: auto;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+      }
+      #log li {
+        padding: 4px 0;
+        border-top: 1px solid var(--border);
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #log time {
+        color: var(--muted);
+        margin-right: 6px;
+      }
+      .ok {
+        color: var(--green);
+      }
+      .err {
+        color: var(--red);
+      }
+      .info {
+        color: var(--amber);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RustCore test dApp</h1>
+      <p>
+        Calls every <code>window.rustcore</code> method (docs/DAPP-CONNECTION.md). Transfers, rolls
+        and contract calls are sent only while the wallet is on <strong>buildnet</strong>.
+      </p>
+      <div class="banner" id="detect">Looking for RustCore Wallet…</div>
+    </header>
+
+    <main>
+      <section>
+        <h2>Status</h2>
+        <dl>
+          <dt>Extension</dt>
+          <dd id="s-ext">–</dd>
+          <dt>Connected</dt>
+          <dd id="s-connected">–</dd>
+          <dt>Account</dt>
+          <dd id="s-account">–</dd>
+          <dt>Network</dt>
+          <dd id="s-network">–</dd>
+          <dt>MAS</dt>
+          <dd id="s-mas">–</dd>
+          <dt>WMAS</dt>
+          <dd id="s-wmas">–</dd>
+        </dl>
+        <div class="row" style="margin-top: 10px">
+          <button id="refresh">Refresh</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Connection</h2>
+        <p>Connect opens the approval window once per site.</p>
+        <div class="row">
+          <button id="connect">connect</button>
+          <button id="connected">connected</button>
+          <button id="account">account</button>
+          <button id="network">network</button>
+          <button id="disconnect">disconnect</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Sign</h2>
+        <label>
+          Message
+          <textarea id="sign-text" rows="3">Hello from the RustCore test dApp</textarea>
+        </label>
+        <div class="row">
+          <button id="sign-text-btn" data-needs="connected">Sign text</button>
+          <button id="sign-bytes-btn" data-needs="connected">Sign binary bytes</button>
+        </div>
+        <p style="margin-top: 8px">
+          The signature is checked here against the public key and the account.
+        </p>
+      </section>
+
+      <section>
+        <h2>Transfer &amp; rolls</h2>
+        <label>
+          Recipient (AU… or AS…)
+          <input id="to" placeholder="defaults to the connected account" />
+        </label>
+        <label>
+          Amount (MAS)
+          <input id="amount" value="0.01" />
+        </label>
+        <div class="row">
+          <button id="transfer" data-needs="buildnet">transfer</button>
+        </div>
+        <label style="margin-top: 10px">
+          Rolls
+          <input id="rolls" value="1" />
+        </label>
+        <div class="row">
+          <button id="buy-rolls" data-needs="buildnet">buyRolls</button>
+          <button id="sell-rolls" data-needs="buildnet">sellRolls</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Contract calls — WMAS (buildnet)</h2>
+        <p>Presets on buildnet's Wrapped MAS. The approval window simulates each call first.</p>
+        <div class="row">
+          <button id="wmas-deposit" data-needs="buildnet">Wrap 0.1 MAS</button>
+          <button id="wmas-withdraw" data-needs="buildnet">Unwrap 0.05 WMAS</button>
+          <button id="wmas-transfer" data-needs="buildnet">Send 0.01 WMAS to recipient</button>
+          <button id="wmas-allow" data-needs="buildnet">Allow 1 WMAS</button>
+          <button id="wmas-allow-max" data-needs="buildnet">Allow unlimited WMAS</button>
+          <button id="wmas-fail" data-needs="buildnet">Failing call (wrap 0 MAS)</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Contract call — custom</h2>
+        <label>Target (AS…) <input id="c-target" /></label>
+        <label>Function <input id="c-func" /></label>
+        <label>Parameter (hex, serialized Args) <input id="c-param" placeholder="empty" /></label>
+        <label>Coins (MAS) <input id="c-coins" value="0" /></label>
+        <label>Fee (MAS, optional) <input id="c-fee" /></label>
+        <label>Max gas (optional) <input id="c-gas" /></label>
+        <div class="row">
+          <button id="c-call" data-needs="buildnet">callSC</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Protocol checks</h2>
+        <p>
+          Bad requests the wallet must refuse with the right error code, without opening anything.
+          Results go to the log.
+        </p>
+        <div class="row">
+          <button id="checks" data-needs="extension">Run checks</button>
+          <button id="busy" data-needs="connected">Busy test</button>
+        </div>
+        <p style="margin-top: 8px">
+          Busy test: sends two sign requests at once — the second must get 4900; then reject the
+          first in the approval window (4001).
+        </p>
+      </section>
+
+      <section class="wide">
+        <div class="row" style="justify-content: space-between; align-items: center">
+          <h2>Log</h2>
+          <button id="clear">Clear</button>
+        </div>
+        <ul id="log"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

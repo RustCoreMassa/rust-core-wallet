@@ -1,0 +1,11 @@
+// Type-checks the test dApp: npx tsc -p scripts/test-dapp
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "files": ["main.ts"]
+}
