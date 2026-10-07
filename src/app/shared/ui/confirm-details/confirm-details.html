@@ -10,12 +10,12 @@
 @if (busy()) {
 <div class="confirm-note">Waiting for the network to execute it — usually a few seconds.</div>
 } @else {
-<div class="confirm-note">Blockchain operations can't be reversed once confirmed.</div>
+<div class="confirm-note">{{ note() ?? "Blockchain operations can't be reversed once confirmed." }}</div>
 }
 
 <div class="confirm-actions">
   <button class="btn btn-ghost" type="button" [disabled]="busy()" (click)="cancelled.emit()">Cancel</button>
-  <button class="btn btn-red" type="button" [disabled]="busy()" (click)="confirmed.emit()">
+  <button class="btn btn-red" type="button" [disabled]="busy() || disabled()" (click)="confirmed.emit()">
     @if (busy()) {
     <div class="spinner"></div>
     <span>{{ busyLabel() }}</span>

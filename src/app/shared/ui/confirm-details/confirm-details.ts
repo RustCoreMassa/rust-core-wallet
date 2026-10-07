@@ -24,6 +24,10 @@ export class ConfirmDetails {
   readonly confirmLabel = input('Confirm');
   readonly busyLabel = input('Sending…');
   readonly busy = input(false);
+  /** Confirm stays off — e.g. a dApp request the wallet can't carry out as asked. */
+  readonly disabled = input(false);
+  /** Replaces the note under the rows (when not busy). */
+  readonly note = input<string | null>(null);
 
   readonly confirmed = output<void>();
   readonly cancelled = output<void>();

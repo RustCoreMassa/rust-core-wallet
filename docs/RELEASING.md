@@ -11,14 +11,14 @@ new features, patch for fixes. Every version has a section in [CHANGELOG.md](../
 
 ## Publishing a release
 
-1. Bump the version: `npm version 1.1.1 --no-git-tag-version`
+1. Bump the version: `npm version 1.2.0 --no-git-tag-version`
 2. In `CHANGELOG.md`, rename the `## [Unreleased]` section (where changes collect between
-   releases) to `## [1.1.1] — <date>` and add its link at the bottom.
+   releases) to `## [1.2.0] — <date>` and add its link at the bottom.
 3. Commit, then push a matching tag:
 
 ```bash
-git tag v1.1.1
-git push origin master v1.1.1
+git tag v1.2.0
+git push origin master v1.2.0
 ```
 
 Pushing the tag starts the [release workflow](../.github/workflows/release.yml) on GitHub
@@ -75,8 +75,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.1.1.zip -d rust-core-wallet-v1.1.1
-cd rust-core-wallet-v1.1.1
+unzip rust-core-wallet-v1.2.0.zip -d rust-core-wallet-v1.2.0
+cd rust-core-wallet-v1.2.0
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 
@@ -114,7 +114,11 @@ What the stores ask for:
 
 - **Permissions**, to justify in the listing: `storage` (the encrypted vault and preferences),
   `alarms` (auto-lock after 15 minutes), `sidePanel` (Chromium only — the side-panel view).
-  No host permissions, no content scripts.
+  Site access (content scripts on `https://*/*`, plus `http://localhost` / `127.0.0.1` for dApp
+  developers): two small scripts let dApps find the wallet (`window.rustcore`) and pass their
+  requests to it. They read nothing from the page and send nothing anywhere; every request needs
+  the user's approval in the wallet's own window (docs/DAPP-CONNECTION.md). Browsers show this
+  as "read and change your data on all websites", like every injected wallet's.
 - **Data**: none is collected. Firefox's manifest declares it
   (`data_collection_permissions: none`); the Chrome Web Store asks in its Privacy tab.
 - **Privacy policy**: the README's security & privacy section, which lists every network

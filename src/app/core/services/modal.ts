@@ -12,6 +12,7 @@ export type ModalId =
   | 'logout'
   | 'tx-details'
   | 'domain-details'
+  | 'connected-sites'
   | null;
 
 @Injectable({ providedIn: 'root' })

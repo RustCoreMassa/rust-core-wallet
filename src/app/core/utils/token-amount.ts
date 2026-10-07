@@ -44,3 +44,18 @@ function numberToPlainString(n: number): string {
   if (point >= digits.length) return digits + '0'.repeat(point - digits.length);
   return `${digits.slice(0, point)}.${digits.slice(point)}`;
 }
+
+/**
+ * `units` as an exact decimal string — every digit, trailing zeros dropped
+ * ("1.23", not "1.230000000"). For review screens, where a rounded number
+ * could hide what's really being sent.
+ */
+export function formatUnits(units: bigint, decimals: number): string {
+  const negative = units < 0n;
+  const abs = negative ? -units : units;
+  const base = 10n ** BigInt(decimals);
+  const whole = (abs / base).toLocaleString('en-US');
+  const fraction = decimals > 0 ? (abs % base).toString().padStart(decimals, '0') : '';
+  const trimmed = fraction.replace(/0+$/, '');
+  return `${negative ? '-' : ''}${whole}${trimmed ? `.${trimmed}` : ''}`;
+}

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.1.1" src="https://img.shields.io/badge/version-1.1.1-brightgreen" />
+  <img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
@@ -38,7 +38,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.1.1** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.2.0** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -102,6 +102,8 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
 - Every transaction that spends funds shows a review screen and is checked first (balance, fee,
   address) — you confirm before anything is signed.
 - Revealing a private key, removing a wallet or logging out asks for your PIN again.
+- In the browser extension, a dApp you connect sees only the wallet you chose for it, and each
+  of its requests opens a review window; you can disconnect sites in Settings → Connected sites.
 - Swaps are sent with a minimum you'll accept, so the exchange cancels them instead of filling
   at a bad price.
 
@@ -113,6 +115,9 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
   never asks for your key or PIN.)
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
+- The browser extension (in progress) locks the wallet with a **password** instead: at least 8
+  characters, not only digits. On a computer, stored browser data is a common target for
+  malware, and a good password can't be guessed offline the way a PIN can.
 - The wallet hasn't had an independent audit yet (it's on the [roadmap](#roadmap)).
 
 ### Verify it yourself
@@ -123,7 +128,7 @@ See [how to verify a build](docs/RELEASING.md#verifying-a-build).
 
 ## FAQ
 
-**I forgot my PIN.** There is no PIN recovery — the PIN is what encrypts your wallet on the
+**I forgot my PIN (or the extension's password).** There is no recovery — the PIN is what encrypts your wallet on the
 phone, and nobody else has it. Clear this site's data in your browser settings (on iPhone,
 remove the installed app from your home screen), open the wallet again and import your private
 key from your backup.
@@ -159,8 +164,8 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Chromium (Chrome, Edge, Brave) and Firefox builds
 - [x] Popup, side panel and full screen
 - [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
-- [ ] Connect to Massa dApps and sign their transactions, with a review screen
-- [ ] Per-site permissions
+- [x] Connect to Massa dApps and sign their transactions, with a review screen
+- [x] Per-site permissions
 
 **Phase 3 — Mobile apps** *(planned)*
 - [ ] iOS and Android apps
@@ -174,7 +179,7 @@ built and in review at the browser stores; it will be listed here once it's publ
 
 Questions, ideas, or want to follow what's next? Join the RustCore community on Telegram:
 **[t.me/rustcore_massa](https://t.me/rustcore_massa)**. Admins never message you first and
-never ask for your private key or PIN — anyone who does is a scammer.
+never ask for your private key, PIN or password — anyone who does is a scammer.
 
 ## Support the project
 

@@ -1,5 +1,5 @@
 /// <reference types="chrome" />
-import { ExtensionView } from '../app/core/platform/app-platform';
+import { ExtensionView, OpenableView } from '../app/core/platform/app-platform';
 
 /**
  * The extension runs in Chrome, Edge, Brave, Opera and Firefox (desktop and
@@ -18,17 +18,15 @@ export interface BrowserViewApis {
   readonly isMobile: boolean;
 }
 
-export type OpenableView = Exclude<ExtensionView, 'popup'>;
-
 export function canOpenView(view: OpenableView, apis: BrowserViewApis): boolean {
   if (apis.isMobile) return false;
   return view === 'tab' || !!apis.sidePanel || !!apis.sidebarAction;
 }
 
-/** `popup` unless the page was opened with ?view=side-panel / ?view=tab. */
+/** `popup` unless the page was opened with ?view=side-panel / ?view=tab / ?view=approve. */
 export function viewFromUrl(search: string): ExtensionView {
   const view = new URLSearchParams(search).get('view');
-  return view === 'side-panel' || view === 'tab' ? view : 'popup';
+  return view === 'side-panel' || view === 'tab' || view === 'approve' ? view : 'popup';
 }
 
 /** What this browser exposes (Firefox has `browser.*`; its `chrome.*` may lack extras). */

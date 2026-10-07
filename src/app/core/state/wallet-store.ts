@@ -13,7 +13,14 @@ import { WalletState } from '../models/wallet.model';
 import { DusaPrices } from '../services/dusa-prices';
 import { DusaSwap, SWAP_STORAGE_COST_MAS, SwapQuote } from '../services/dusa-swap';
 import { ExplorerApi } from '../services/explorer-api';
-import { MASSA_PROVIDER, NETWORK_FEE_MAS, ROLL_PRICE_MAS } from '../services/massa-provider';
+import {
+  CallSimulation,
+  ContractCallParams,
+  MASSA_PROVIDER,
+  NETWORK_FEE_MAS,
+  ROLL_PRICE_MAS,
+  SignedMessage,
+} from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
 import { fromUnits, toUnits } from '../utils/token-amount';
 import { AuthStore } from './auth-store';
@@ -100,6 +107,19 @@ const MASSA_ADDRESS = /^A[US][1-9A-HJ-NP-Za-km-z]{40,60}$/;
 export const MIN_SEND_AMOUNT = 0.01;
 
 const MAS_DECIMALS = TOKEN_REGISTRY.MAS.decimals;
+const FEE_UNITS = toUnits(NETWORK_FEE_MAS, MAS_DECIMALS);
+const ROLL_PRICE_UNITS = toUnits(ROLL_PRICE_MAS, MAS_DECIMALS);
+/** The gas a call may set, as the network allows it (massa-web3 MIN_GAS_CALL / MAX_GAS_CALL). */
+const MIN_GAS_CALL = 2_100_000n;
+const MAX_GAS_CALL = 4_294_167_295n;
+
+/** A dApp's contract call, before the wallet settles its fee. */
+export type DappCall = Omit<ContractCallParams, 'fee'> & { readonly fee?: bigint };
+
+/** The fee a dApp call pays: what the site asked for, never below the wallet's own fee. */
+export function dappCallFee(call: DappCall): bigint {
+  return call.fee !== undefined && call.fee > FEE_UNITS ? call.fee : FEE_UNITS;
+}
 
 /** `a - b` in MAS, exact to the nanoMAS (no float drift like 3.1 - 0.01). */
 function subtractMas(a: number, b: number): number {
@@ -115,6 +135,11 @@ function assertMasForFee(held: number, required: number, message: string): void 
   ) {
     throw new Error(message);
   }
+}
+
+/** Throws unless the wallet's exact MAS balance covers `required` nanoMAS. */
+function assertMasUnits(wallet: WalletState, required: bigint, message: string): void {
+  if (required > BigInt(wallet.rawBalances.MAS ?? '0')) throw new Error(message);
 }
 
 /**
@@ -784,6 +809,174 @@ export class WalletStore {
       network,
     );
     await this.refreshTouched([wallet.id], network);
+  }
+
+  // ---- dApp requests (the extension's approval window) -------------------------
+
+  /*
+   * A dApp asks on behalf of the account its site is connected to, which may not be the active
+   * wallet. So these take the wallet's id and never switch the active one — that choice is saved
+   * in the session cache, and the popup would reopen on another wallet. Amounts come in exact
+   * smallest units and are sent exactly as asked: no Max clamping, no float round trip.
+   * Validation is the same as the wallet's own screens: the network fee is always kept.
+   */
+
+  /** Reads the wallet from the chain, so a dApp request is checked against fresh balances. */
+  async prepareDappWallet(id: string): Promise<void> {
+    await this.refresh(id);
+    this.loadedWallet(id);
+  }
+
+  validateDappTransfer(id: string, toAddress: string, units: bigint): void {
+    const wallet = this.loadedWallet(id);
+    if (!MASSA_ADDRESS.test(toAddress))
+      throw new Error('The recipient is not a valid Massa address');
+    if (toAddress === wallet.address) throw new Error("The recipient is this wallet's own address");
+    if (units <= 0n) throw new Error('The amount must be greater than 0');
+    assertMasUnits(
+      wallet,
+      units + FEE_UNITS,
+      `Insufficient balance — ${NETWORK_FEE_MAS} MAS is kept for the network fee`,
+    );
+  }
+
+  validateDappRolls(id: string, kind: 'buy' | 'sell', rollCount: bigint): void {
+    const wallet = this.loadedWallet(id);
+    if (rollCount <= 0n) throw new Error('The number of rolls must be greater than 0');
+    if (kind === 'buy') {
+      assertMasUnits(
+        wallet,
+        rollCount * ROLL_PRICE_UNITS + FEE_UNITS,
+        `Insufficient MAS — ${NETWORK_FEE_MAS} MAS is needed for the network fee`,
+      );
+    } else {
+      if (rollCount > BigInt(wallet.rolls.active)) throw new Error('Not enough active rolls');
+      assertMasUnits(wallet, FEE_UNITS, `You need ${NETWORK_FEE_MAS} MAS for the network fee`);
+    }
+  }
+
+  /** Sends exactly `units` nanoMAS from wallet `id`; resolves with the executed operation's id. */
+  async dappTransfer(id: string, toAddress: string, units: bigint): Promise<string> {
+    const network = this.network();
+    this.validateDappTransfer(id, toAddress, units);
+    const wallet = this.loadedWallet(id);
+    const targetId = this.walletList().find((w) => w.address === toAddress && w.id !== id)?.id;
+    const touched = targetId ? [id, targetId] : [id];
+
+    const privateKey = this.privateKeyFor(id);
+    const { operationId } = await this.afterWrite(touched, network, () =>
+      this.provider.transferMas(privateKey, toAddress, units),
+    );
+    const details = {
+      token: 'MAS' as const,
+      amount: fromUnits(units, MAS_DECIMALS),
+      from: wallet.address,
+      to: toAddress,
+      operationId,
+    };
+    this.addHistory(
+      id,
+      { type: 'send', counterparty: shortAddress(toAddress), ...details },
+      network,
+    );
+    if (targetId) {
+      this.addHistory(
+        targetId,
+        { type: 'receive', counterparty: shortAddress(wallet.address), ...details },
+        network,
+      );
+    }
+    await this.refreshTouched(touched, network);
+    return operationId;
+  }
+
+  /** Buys or sells rolls for wallet `id`; resolves with the executed operation's id. */
+  async dappRolls(id: string, kind: 'buy' | 'sell', rollCount: bigint): Promise<string> {
+    const network = this.network();
+    this.validateDappRolls(id, kind, rollCount);
+    const wallet = this.loadedWallet(id);
+
+    const privateKey = this.privateKeyFor(id);
+    const { operationId } = await this.afterWrite([id], network, () =>
+      kind === 'buy'
+        ? this.provider.buyRolls(privateKey, rollCount)
+        : this.provider.sellRolls(privateKey, rollCount),
+    );
+    const count = Number(rollCount);
+    this.addHistory(
+      id,
+      {
+        type: kind === 'buy' ? 'buy_rolls' : 'sell_rolls',
+        token: 'MAS',
+        amount: count * ROLL_PRICE_MAS,
+        rollCount: count,
+        operationId,
+        from: wallet.address,
+      },
+      network,
+    );
+    await this.refreshTouched([id], network);
+    return operationId;
+  }
+
+  validateDappCall(id: string, call: DappCall): void {
+    const wallet = this.loadedWallet(id);
+    if (call.maxGas !== undefined && (call.maxGas < MIN_GAS_CALL || call.maxGas > MAX_GAS_CALL)) {
+      throw new Error(`The gas limit must be between ${MIN_GAS_CALL} and ${MAX_GAS_CALL}`);
+    }
+    assertMasUnits(
+      wallet,
+      call.coins + dappCallFee(call),
+      'Insufficient MAS for the coins this call sends plus the network fee',
+    );
+  }
+
+  /** Runs the call read-only as wallet `id` — what would happen, with nothing signed or sent. */
+  simulateDappCall(id: string, call: DappCall): Promise<CallSimulation> {
+    return this.provider.simulateCall(this.loadedWallet(id).address, {
+      ...call,
+      fee: dappCallFee(call),
+    });
+  }
+
+  /** Calls a smart contract from wallet `id`; resolves with the executed operation's id. */
+  async dappCall(id: string, call: DappCall): Promise<string> {
+    const network = this.network();
+    this.validateDappCall(id, call);
+    const wallet = this.loadedWallet(id);
+
+    const privateKey = this.privateKeyFor(id);
+    const { operationId } = await this.afterWrite([id], network, () =>
+      this.provider.callContract(privateKey, { ...call, fee: dappCallFee(call) }),
+    );
+    this.addHistory(
+      id,
+      {
+        type: 'contract_call',
+        token: 'MAS',
+        amount: fromUnits(call.coins, MAS_DECIMALS),
+        counterparty: shortAddress(call.target),
+        from: wallet.address,
+        to: call.target,
+        operationId,
+      },
+      network,
+    );
+    await this.refreshTouched([id], network);
+    return operationId;
+  }
+
+  /** Signs a dApp's message with wallet `id`'s key. Nothing is sent to the chain. */
+  dappSign(id: string, data: Uint8Array): Promise<SignedMessage> {
+    return this.provider.signMessage(this.privateKeyFor(id), data);
+  }
+
+  /** Wallet `id` on the current network, once its balances are known. */
+  private loadedWallet(id: string): WalletState {
+    const wallet = this.wallets()[id];
+    if (!wallet) throw new Error('This wallet is no longer in RustCore Wallet');
+    if (!wallet.loaded) throw new Error("Couldn't read this wallet's balance — try again");
+    return wallet;
   }
 
   // ---- internal helpers ----------------------------------------------------

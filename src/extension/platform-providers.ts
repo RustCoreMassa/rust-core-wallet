@@ -3,11 +3,18 @@ import { EnvironmentProviders, Provider, provideAppInitializer } from '@angular/
 import { RouterFeatures, withHashLocation } from '@angular/router';
 import { APP_PLATFORM, EXTENSION_VIEWS, ExtensionViews } from '../app/core/platform/app-platform';
 import { LOCAL_STORE, SESSION_STORE } from '../app/core/platform/app-storage';
+import { CONNECTED_SITES } from '../app/core/platform/connected-sites';
+import { DAPP_APPROVALS } from '../app/core/platform/dapp-approvals';
+import { SITE_ACCESS } from '../app/core/platform/site-access';
+import { UNLOCK_SECRET } from '../app/core/platform/unlock-secret';
 import { MOBILE_ONLY, isMobileDevice, readDeviceSignals } from '../app/core/platform/device';
 import { SESSION_KEY_STORE } from '../app/core/services/session-key-store';
 import { canOpenView, detectViewApis, viewFromUrl } from './browser-views';
 import { ChromeSessionKeyStore } from './chrome-session-key-store';
 import { ChromeStorageArea } from './chrome-storage-area';
+import { ChromeDappApprovals } from './dapp/approval-channel';
+import { ChromeConnectedSites } from './dapp/connected-sites';
+import { ChromeSiteAccess } from './dapp/site-access';
 
 /*
  * The browser extension's replacement for src/app/platform-providers.ts
@@ -27,6 +34,12 @@ document.documentElement.dataset['view'] = current;
 // On a phone (Firefox for Android) the popup already fills the screen.
 document.documentElement.dataset['device'] = isMobile ? 'mobile' : 'desktop';
 const apis = detectViewApis(isMobile);
+
+// The approval window (opened by the background worker for a dApp request) starts on its own
+// route; the lock screen sends it back there once unlocked.
+if (current === 'approve' && !location.hash.startsWith('#/approve')) {
+  history.replaceState(null, '', `${location.pathname}${location.search}#/approve`);
+}
 
 // Both side-panel APIs open only straight from a click, so nothing may be
 // awaited before calling them: Chrome's window id is looked up in advance
@@ -76,5 +89,13 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   // Desktop browsers too: no mobile-only gate, no service worker, no install banner.
   { provide: MOBILE_ONLY, useValue: false },
   { provide: APP_PLATFORM, useValue: 'extension' },
+  // A desktop browser's storage is a common malware target: a password, not a 6-digit PIN.
+  { provide: UNLOCK_SECRET, useValue: 'password' },
   { provide: EXTENSION_VIEWS, useValue: views },
+  { provide: DAPP_APPROVALS, useValue: new ChromeDappApprovals() },
+  {
+    provide: CONNECTED_SITES,
+    useFactory: () => new ChromeConnectedSites(chrome.storage.local, chrome.storage.onChanged),
+  },
+  { provide: SITE_ACCESS, useFactory: () => new ChromeSiteAccess(chrome.permissions) },
 ];

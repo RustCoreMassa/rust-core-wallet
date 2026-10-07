@@ -71,3 +71,14 @@ export function toUserMessage(err: unknown): string {
   if (isTechnical) return GENERIC;
   return raw; // already user-facing
 }
+
+/**
+ * The approval window runs every dApp contract call read-only first. When that test run fails,
+ * this says why in plain words when a rule knows the cause; the contract's raw error goes to
+ * the console only.
+ */
+export function rejectedCallMessage(raw: string): string {
+  console.error('[call simulation]', raw);
+  const rule = RULES.find((r) => r.test.test(raw));
+  return rule?.message ?? 'The contract rejected this call in a test run, so it would fail.';
+}

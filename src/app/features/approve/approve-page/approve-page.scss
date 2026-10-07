@@ -1,0 +1,121 @@
+.approve-screen {
+  overflow-y: auto;
+}
+
+.approve-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.approve-logo {
+  width: 26px;
+  height: auto;
+}
+
+.approve-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.approve-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The requesting site is the one thing the user must read: large, unabbreviated. */
+.approve-site {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+}
+
+.approve-site-label {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-bottom: 4px;
+}
+
+.approve-origin {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.approve-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 4px 0 0;
+}
+
+.approve-message {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-body);
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approve-message.hex {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.approve-notice {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+.approve-queued {
+  text-align: center;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.approve-summary {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Something the user must read before approving: an unlimited allowance, tokens going
+   elsewhere, a call the wallet can't read. */
+.approve-warning {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 138, 61, 0.1);
+  border: 1px solid rgba(255, 138, 61, 0.35);
+  color: var(--orange);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.approve-checking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--gray-500);
+}

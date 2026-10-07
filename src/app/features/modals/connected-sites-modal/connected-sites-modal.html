@@ -1,0 +1,54 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">Connected sites</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (accessOff()) {
+  <div class="access-off">
+    <div class="access-off-title">Sites can't connect right now</div>
+    <div class="access-off-text">
+      Your browser doesn't let RustCore Wallet run on websites, so no site can find it or ask to
+      connect. Allow it to connect to dApps again.
+    </div>
+    <button class="btn btn-red" type="button" (click)="allowSites()">Allow access to websites</button>
+  </div>
+  }
+
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
+  }
+
+  @for (site of sites(); track site.origin) {
+  <div class="site-card">
+    <div class="site-origin">{{ site.origin }}</div>
+    <div class="site-since">Connected {{ since(site.grantedAt) }}</div>
+
+    <div class="field-label">Account it sees</div>
+    @if (isKnown(site.address)) {
+    <app-dropdown
+      [inputId]="'site-account-' + $index"
+      [options]="accountOptions()"
+      [value]="site.address"
+      (valueChange)="changeAccount(site.origin, $event)"
+    />
+    } @else {
+    <div class="hint">This account is no longer in RustCore Wallet.</div>
+    }
+
+    <button
+      class="btn btn-ghost site-disconnect"
+      type="button"
+      [disabled]="busyOrigin() === site.origin"
+      (click)="disconnect(site.origin)"
+    >
+      Disconnect
+    </button>
+  </div>
+  } @empty {
+  <div class="sites-empty">
+    No site is connected. When a site asks to connect, RustCore Wallet opens a window to ask you
+    first — and you can disconnect it here at any time.
+  </div>
+  }
+</div>

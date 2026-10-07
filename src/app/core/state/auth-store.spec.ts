@@ -48,10 +48,10 @@ describe('AuthStore', () => {
     expect(auth.accounts()).toEqual([main]);
   });
 
-  it('verifies the PIN without touching the session', async () => {
+  it('verifies the secret without touching the session', async () => {
     await auth.register('123456', [main]);
-    expect(await auth.verifyPin('123456')).toBe(true);
-    expect(await auth.verifyPin('111111')).toBe(false);
+    expect(await auth.verifySecret('123456')).toBe(true);
+    expect(await auth.verifySecret('111111')).toBe(false);
     expect(auth.isUnlocked()).toBe(true);
   });
 
@@ -61,6 +61,34 @@ describe('AuthStore', () => {
     auth.lock();
     await auth.unlock('123456');
     expect(auth.accounts().map((a) => a.id)).toEqual(['main', 'two']);
+  });
+
+  it('moves the vault to a new secret, keeping the accounts and the session', async () => {
+    await auth.register('123456', [main, second]);
+    const before = TestBed.inject(VaultStorage).load();
+    await auth.changeSecret('correct horse battery');
+    const after = TestBed.inject(VaultStorage).load();
+    expect(after?.salt).not.toBe(before?.salt);
+    expect(auth.isUnlocked()).toBe(true);
+    // The session goes on under the new key: saving and session data still work.
+    await auth.saveAccounts([main]);
+    expect(await auth.decryptForSession(await auth.encryptForSession('x'))).toBe('x');
+
+    expect(await auth.verifySecret('123456')).toBe(false);
+    expect(await auth.verifySecret('correct horse battery')).toBe(true);
+    auth.lock();
+    expect(await auth.unlock('123456')).toBe(false);
+    expect(await auth.unlock('correct horse battery')).toBe(true);
+    expect(auth.accounts()).toEqual([main]);
+    expect(JSON.stringify(localStorage)).not.toContain('correct horse');
+  });
+
+  it("can't change the secret while locked", async () => {
+    await auth.register('123456', [main]);
+    const before = TestBed.inject(VaultStorage).load();
+    auth.lock();
+    await expect(auth.changeSecret('correct horse battery')).rejects.toThrow(/locked/);
+    expect(TestBed.inject(VaultStorage).load()).toEqual(before);
   });
 
   it('renames with trimming and rejects duplicates (case-insensitive)', async () => {
@@ -140,7 +168,16 @@ describe('AuthStore with a session kept outside the page', () => {
     expect(await popup.resume()).toBe(true);
     expect(popup.accounts()).toEqual([main]);
     await popup.saveAccounts([main, second]);
-    expect(await popup.verifyPin('123456')).toBe(true);
+    expect(await popup.verifySecret('123456')).toBe(true);
+  });
+
+  it('keeps the session under the new key after a change of secret', async () => {
+    const auth = TestBed.inject(AuthStore);
+    await auth.register('123456', [main]);
+    await auth.changeSecret('correct horse battery');
+    const popup = reopen();
+    expect(await popup.resume()).toBe(true);
+    expect(popup.accounts()).toEqual([main]);
   });
 
   it('keeps the session after a PIN unlock too', async () => {

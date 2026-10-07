@@ -57,26 +57,18 @@
   </div>
 
   <button class="btn btn-ghost" type="button" (click)="copyPrivateKey()">Copy private key</button>
-  <button class="btn btn-red" type="button" (click)="step.set('remove-pin')">Continue</button>
+  <button class="btn btn-red" type="button" (click)="step.set('remove-confirm')">Continue</button>
   <button class="btn btn-ghost" type="button" (click)="cancelRemove()">Cancel</button>
   }
 
-  @if (step() === 'remove-pin') {
-  <div class="hint" style="margin-bottom:16px;">Enter your PIN to remove {{ account.name }}.</div>
+  @if (step() === 'remove-confirm') {
+  <div class="hint" style="margin-bottom:16px;">Enter your {{ secretName }} to remove {{ account.name }}.</div>
 
   @if (error()) {
   <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
   }
 
-  <div class="pin-dots" style="justify-content:center;margin-bottom:24px;">
-    @for (filled of dots(); track $index) {
-    <div class="pin-dot" [class.filled]="filled"></div>
-    }
-  </div>
-
-  <div style="display:flex;justify-content:center;">
-    <app-pin-pad (digit)="onDigit($event)" (backspace)="onBackspace()" />
-  </div>
+  <app-secret-entry compact submitLabel="Remove wallet" [busy]="isRemoving()" (submitted)="removeWithSecret($event)" />
 
   <button class="btn btn-ghost" type="button" [disabled]="isRemoving()" (click)="cancelRemove()">Cancel</button>
   }

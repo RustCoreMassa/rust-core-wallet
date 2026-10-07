@@ -46,6 +46,7 @@ npm start            # http://localhost:4200
 | `npm run smoke` | Boots the production build in a simulated phone browser (run after `npm run build`) |
 | `npm run build:extension` | Browser extension into `dist/extension/chromium` and `dist/extension/firefox` |
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
+| `npm run test-dapp` | Test page for dApp connections at http://127.0.0.1:4300 (see below) |
 | `npx prettier --write .` | Format the code |
 
 **Mobile only.** RustCore Wallet is a phone app: in a desktop browser the production build shows
@@ -69,9 +70,10 @@ background `scripts`, `browser_specific_settings`). To try it:
 
 What differs from the web app is swapped in at build time: `src/app/platform-providers.ts` (web)
 is replaced by `src/extension/platform-providers.ts` — `chrome.storage` instead of the page's
-storage, hash routing, no mobile gate, service worker or install banner, and an unlocked session
-that survives closing the popup (the vault key is kept in memory-only `chrome.storage.session`
-and wiped 15 minutes after the popup was last open). The same page runs in three views
+storage, a password instead of the 6-digit PIN (`UNLOCK_SECRET`; a vault made with a PIN moves
+to a password at the next unlock), hash routing, no mobile gate, service worker or install
+banner, and an unlocked session that survives closing the popup (the vault key is kept in
+memory-only `chrome.storage.session` and wiped 15 minutes after the popup was last open). The same page runs in three views
 (Settings → *Open in full screen* / *Open in side panel*; `html[data-view]`, styled in
 `src/extension/views.scss`): the toolbar popup, fixed at 380×600 (the browsers' height limit);
 the side panel (`?view=side-panel` — Chrome's side panel or Firefox's sidebar), full window
@@ -81,6 +83,15 @@ place of bottom sheets. What a browser offers is detected, not assumed
 (Firefox for Android) the popup is already full screen, so it offers no other view. The
 extension's pages may connect only to the Massa nodes and the explorer API (CSP in
 `src/extension/manifest.json`).
+
+**dApp connections** (extension only; design in `docs/DAPP-CONNECTION.md`). To try them, load the
+extension, run `npm run test-dapp` and open http://127.0.0.1:4300 (the extension's scripts run
+on `localhost` / `127.0.0.1` pages, so the page gets `window.rustcore`). It calls every method —
+connect, sign (the signature is verified on the page), transfers, rolls, contract calls on
+buildnet's Wrapped MAS (including one whose simulation must fail) — and runs protocol checks:
+bad requests the wallet must refuse with the right error code. Transfers, rolls and contract
+calls are sent only while the wallet is on **buildnet** (Settings → network); fund the test
+account from the buildnet faucet.
 
 **Installable app.** The service worker runs in production builds only (`npm run build`), and
 browsers offer installation only over HTTPS (or on `localhost`).
@@ -110,9 +121,9 @@ src/app/
 │   ├── state/       AuthStore (vault & session), WalletStore (balances, history,
 │   │                staking, swaps), history merging, NetworkStore
 │   └── utils/       Exact decimal ↔ on-chain amounts, staking rewards, user-facing errors
-├── features/        Screens: PIN/unlock, Home, NFTs & domains, Staking, Settings, modals
+├── features/        Screens: lock screen, Home, NFTs & domains, Staking, Settings, modals
 ├── layout/          App shell, navigation, auto-refresh
-├── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, PIN pad
+├── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, unlock entry
 └── platform-providers.ts   Web-app specifics (replaced in the extension build)
 src/extension/       Browser extension: manifest, background worker, chrome.storage adapters
 ```

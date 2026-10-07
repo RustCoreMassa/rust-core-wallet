@@ -7,8 +7,9 @@ import { WalletStore } from '../state/wallet-store';
  * Blocks the main app shell until the PIN screen has unlocked the
  * session; redirects to /login otherwise. A session kept by the
  * extension (popup reopened before auto-lock) resumes without the PIN.
+ * The extension's approval window goes back to its request once unlocked.
  */
-export const authGuard: CanActivateFn = async () => {
+export const authGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthStore);
   const wallet = inject(WalletStore);
   const router = inject(Router);
@@ -17,5 +18,6 @@ export const authGuard: CanActivateFn = async () => {
     await wallet.restoreCache();
     return true;
   }
-  return router.createUrlTree(['/login']);
+  const queryParams = state.url.startsWith('/approve') ? { next: 'approve' } : {};
+  return router.createUrlTree(['/login'], { queryParams });
 };
