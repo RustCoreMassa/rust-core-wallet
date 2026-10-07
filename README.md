@@ -101,7 +101,8 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
 
 - Every transaction that spends funds shows a review screen and is checked first (balance, fee,
   address) — you confirm before anything is signed.
-- Revealing a private key, removing a wallet or logging out asks for your PIN again.
+- Revealing a private key, removing a wallet or logging out asks for your PIN (or the
+  extension's password) again.
 - In the browser extension, a dApp you connect sees only the wallet you chose for it, and each
   of its requests opens a review window; you can disconnect sites in Settings → Connected sites.
 - Swaps are sent with a minimum you'll accept, so the exchange cancels them instead of filling
@@ -128,10 +129,10 @@ See [how to verify a build](docs/RELEASING.md#verifying-a-build).
 
 ## FAQ
 
-**I forgot my PIN (or the extension's password).** There is no recovery — the PIN is what encrypts your wallet on the
-phone, and nobody else has it. Clear this site's data in your browser settings (on iPhone,
-remove the installed app from your home screen), open the wallet again and import your private
-key from your backup.
+**I forgot my PIN (or the extension's password).** There is no recovery — it's what encrypts
+your wallet on the device, and nobody else has it. Clear this site's data in your browser
+settings (on iPhone, remove the installed app from your home screen; for the extension, remove
+and reinstall it), open the wallet again and import your private key from your backup.
 
 **I lost my private key.** If you can still unlock the wallet, back the key up now under
 *Settings → Backup private key*. Without the key and without access to the app, nobody —
@@ -163,9 +164,11 @@ built and in review at the browser stores; it will be listed here once it's publ
 **Phase 2 — Browser extension** *(in progress)*
 - [x] Chromium (Chrome, Edge, Brave) and Firefox builds
 - [x] Popup, side panel and full screen
-- [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
 - [x] Connect to Massa dApps and sign their transactions, with a review screen
 - [x] Per-site permissions
+- [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
+- [ ] Listed in Massa's wallet library (`@massalabs/wallet-provider`), so dApps find RustCore
+  *([proposed](https://github.com/massalabs/wallet-provider/pull/366))*
 
 **Phase 3 — Mobile apps** *(planned)*
 - [ ] iOS and Android apps
