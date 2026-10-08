@@ -1,6 +1,6 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { TokenSymbol } from '../../../core/models/token.model';
+import { TokenMeta } from '../../../core/models/token.model';
 import { KeyValueStore, LOCAL_STORE } from '../../../core/platform/app-storage';
 import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
@@ -49,21 +49,24 @@ export class HomePage {
   protected readonly showAllTokens = signal(loadShowAll(this.localStore));
 
   /**
-   * Tokens on this network worth under LOW_BALANCE_USD — MAS is never one.
-   * A held token with no Dusa price can't be valued, so only an empty one
-   * counts as low; hiding a real holding just for lacking a price would
-   * be wrong.
+   * Tokens on this network worth under LOW_BALANCE_USD — MAS and tokens the
+   * user added never are. A held token with no Dusa price can't be valued,
+   * so only an empty one counts as low; hiding a real holding just for
+   * lacking a price would be wrong.
    */
   private readonly lowBalanceTokens = computed(() => {
     const balances = this.wallet().balances;
     const prices = this.store.prices();
     return new Set(
-      this.store.availableTokens().filter((s) => {
-        if (s === 'MAS') return false;
-        const balance = balances[s] ?? 0;
-        const price = prices[s];
-        return price === undefined ? balance === 0 : balance * price < LOW_BALANCE_USD;
-      }),
+      this.store
+        .availableTokens()
+        .filter((t) => {
+          if (t.id === 'MAS' || t.custom) return false;
+          const balance = balances[t.id] ?? 0;
+          const price = prices[t.id];
+          return price === undefined ? balance === 0 : balance * price < LOW_BALANCE_USD;
+        })
+        .map((t) => t.id),
     );
   });
 
@@ -73,22 +76,30 @@ export class HomePage {
 
   /**
    * MAS first, then the MRC-20s by USD value, highest first. Tokens
-   * without a Dusa price (value unknown) come after the priced ones;
-   * ties keep registry order. Low-balance tokens only when "show all" is on.
+   * without a Dusa price (value unknown — custom tokens among them) come
+   * after the priced ones; ties keep catalog order (built-in, then custom as
+   * added). Low-balance tokens only when "show all" is on.
    */
-  protected readonly tokenSymbols = computed(() => {
+  protected readonly tokens = computed(() => {
     const low = this.lowBalanceTokens();
     const balances = this.wallet().balances;
     const prices = this.store.prices();
-    const usdValue = (s: TokenSymbol) =>
-      prices[s] === undefined ? -1 : (balances[s] ?? 0) * prices[s];
+    const usdValue = ({ id }: TokenMeta) => {
+      const price = prices[id];
+      return price === undefined ? -1 : (balances[id] ?? 0) * price;
+    };
 
     const [mas, ...others] = this.store
       .availableTokens()
-      .filter((symbol) => this.showAllTokens() || !low.has(symbol));
-    // Array.prototype.sort is stable, so equal values keep registry order.
+      .filter((t) => this.showAllTokens() || !low.has(t.id));
+    // Array.prototype.sort is stable, so equal values keep catalog order.
     return [mas, ...others.sort((a, b) => usdValue(b) - usdValue(a))];
   });
+
+  /** Low-balance toggle: only when there's something besides MAS that could be hidden. */
+  protected readonly hasBuiltinTokens = computed(() =>
+    this.store.availableTokens().some((t) => t.isErc20 && !t.custom),
+  );
 
   protected setTab(tab: HomeTab): void {
     this.activeTab.set(tab);

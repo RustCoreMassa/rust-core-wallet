@@ -9,6 +9,7 @@ import { UNLOCK_SECRET, secretNoun } from '../../../core/platform/unlock-secret'
 import { AuthStore } from '../../../core/state/auth-store';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
+import { TokenCatalog } from '../../../core/state/token-catalog';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { AVATAR_COLORS } from '../../../shared/ui/avatar-colors';
@@ -32,6 +33,12 @@ export class SettingsPage {
 
   private readonly siteAccess = inject(SITE_ACCESS);
   protected readonly secretName = secretNoun(inject(UNLOCK_SECRET));
+
+  private readonly customTokens = inject(TokenCatalog).custom;
+  protected readonly customTokensLabel = computed(() => {
+    const count = this.customTokens().length;
+    return count === 0 ? 'Add an MRC-20 token by its contract' : `${count} on this network`;
+  });
 
   protected readonly connectedSitesLabel = computed(() => {
     if (this.siteAccess?.granted() === false) return 'Site access off — sites can’t connect';

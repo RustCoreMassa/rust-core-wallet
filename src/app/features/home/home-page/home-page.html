@@ -87,22 +87,25 @@
   @if (!wallet().loaded) {
   <div class="empty-state">Loading balances…</div>
   } @else {
-  @for (symbol of tokenSymbols(); track symbol) {
+  @for (token of tokens(); track token.id) {
   <app-token-row
-    [symbol]="symbol"
-    [balance]="wallet().balances[symbol] ?? 0"
-    [price]="store.prices()[symbol] ?? 0"
+    [token]="token"
+    [balance]="wallet().balances[token.id] ?? 0"
+    [price]="store.prices()[token.id] ?? 0"
   />
   }
-  @if (store.availableTokens().length > 1) {
-  <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
-    @if (showAllTokens()) {
-    Hide low balances
-    } @else {
-    Show all tokens@if (hiddenCount() > 0) { ({{ hiddenCount() }} hidden)}
+  <div class="token-actions">
+    @if (hasBuiltinTokens()) {
+    <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
+      @if (showAllTokens()) {
+      Hide low balances
+      } @else {
+      Show all tokens@if (hiddenCount() > 0) { ({{ hiddenCount() }} hidden)}
+      }
+    </button>
     }
-  </button>
-  }
+    <button class="token-toggle" type="button" (click)="modal.open('tokens', 'add')">+ Add a token</button>
+  </div>
   }
   } @else if (!store.isHistoryLoaded()) {
   <div class="empty-state">Loading history…</div>

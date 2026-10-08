@@ -55,8 +55,10 @@ built on four principles:
 | 💲 **Prices** | Token values in USD, read directly from the Dusa exchange. |
 | 📲 **Install it** | Add it to your home screen on Android or iPhone and it opens full screen, like a native app. |
 
-Supported tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b — on Massa
-Mainnet (and Buildnet, the test network).
+Built-in tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b on Massa Mainnet;
+MAS on Buildnet, the test network. **Any other MRC-20 token** can be added by its contract address
+(*Tokens → + Add a token*, or *Settings → Custom tokens*): the wallet reads its name, symbol and
+decimals from the contract, then shows its balance and lets you send it.
 
 ## Getting started
 
@@ -85,6 +87,8 @@ it shows a QR code to open it on your phone instead.
   drops them.
 - A short-lived cache of balances and history, encrypted the same way and deleted when the tab
   closes.
+- The tokens you added by contract address — public information, kept unencrypted so the wallet
+  knows what to show. Logging out deletes the list.
 
 **What goes over the network — the complete list**
 
@@ -114,6 +118,10 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
   other address could steal your keys — never enter your PIN or private key anywhere else, and
   never on a site someone sent you in a message. (`rustcore.massa` is the RustCore website; it
   never asks for your key or PIN.)
+- **Tokens you add yourself aren't checked by RustCore.** Anyone can create a token with any name
+  and symbol, so they're marked *Added by you* and their contract is shown before every send. Add
+  one only from a contract address you got from a source you trust. They have no USD price and
+  can't be swapped in the wallet.
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
 - The browser extension (in progress) locks the wallet with a **password** instead: at least 8

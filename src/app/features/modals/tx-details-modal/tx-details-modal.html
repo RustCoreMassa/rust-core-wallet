@@ -22,7 +22,7 @@
     </div>
     <div class="tx-field">
       <dt>Amount</dt>
-      <dd>{{ tx.amount | number: '1.0-9' }} {{ tx.token }}</dd>
+      <dd>{{ tx.amount | number: '1.0-9' }} {{ tokenSymbol() }}</dd>
     </div>
     @if (tx.rollCount) {
     <div class="tx-field">
@@ -45,6 +45,10 @@
   @if (tx.to) {
   <div class="field-label">To</div>
   <button class="addr-box tx-copy" type="button" (click)="copy(tx.to, 'Address')">{{ tx.to }}</button>
+  }
+  @if (tokenContract(); as contract) {
+  <div class="field-label">Token contract</div>
+  <button class="addr-box tx-copy" type="button" (click)="copy(contract, 'Contract')">{{ contract }}</button>
   }
   @if (tx.operationId) {
   <div class="field-label">Operation ID</div>

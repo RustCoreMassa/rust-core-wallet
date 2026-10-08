@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TOKEN_LIST, TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
+import { TokenId } from '../../../core/models/token.model';
 import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -22,7 +22,7 @@ export class SendModal {
   protected readonly store = inject(WalletStore);
   private readonly toast = inject(Toast);
 
-  protected readonly token = signal<TokenSymbol>('MAS');
+  protected readonly token = signal<TokenId>('MAS');
   protected readonly address = signal('');
   protected readonly amount = signal<number | null>(null);
   protected readonly saveChecked = signal(false);
@@ -31,22 +31,28 @@ export class SendModal {
   protected readonly isSending = signal(false);
 
   /** MAS is always offered; an MRC-20 only when this wallet actually holds some. */
-  protected readonly tokens = computed<TokenSymbol[]>(() => {
+  protected readonly tokens = computed(() => {
     const balances = this.store.activeWallet().balances;
-    return TOKEN_LIST.map((t) => t.symbol).filter((s) => s === 'MAS' || (balances[s] ?? 0) > 0);
+    return this.store.availableTokens().filter((t) => t.id === 'MAS' || (balances[t.id] ?? 0) > 0);
   });
 
-  /** Asset picker entries: icon, symbol, full name, balance. */
-  protected readonly tokenOptions = computed<DropdownOption<TokenSymbol>[]>(() => {
+  /** Asset picker entries: icon, symbol, full name (custom tokens marked), balance. */
+  protected readonly tokenOptions = computed<DropdownOption<TokenId>[]>(() => {
     const balances = this.store.activeWallet().balances;
-    return this.tokens().map((symbol) => ({
-      value: symbol,
-      label: symbol,
-      sublabel: TOKEN_REGISTRY[symbol].name,
-      icon: TOKEN_REGISTRY[symbol].asset,
-      trailing: formatDisplayAmount(balances[symbol] ?? 0),
+    return this.tokens().map((t) => ({
+      value: t.id,
+      label: t.symbol,
+      sublabel: t.custom ? `${t.name} · added by you` : t.name,
+      icon: t.asset || undefined,
+      trailing: formatDisplayAmount(balances[t.id] ?? 0),
     }));
   });
+
+  /** The chosen token; MAS if a custom one was removed while the modal was open. */
+  protected readonly tokenMeta = computed(
+    () => this.tokens().find((t) => t.id === this.token()) ?? this.tokens()[0],
+  );
+  protected readonly symbol = computed(() => this.tokenMeta().symbol);
 
   protected readonly otherWallets = computed(() =>
     this.store.walletList().filter((w) => w.id !== this.store.activeWalletId()),
@@ -89,6 +95,8 @@ export class SendModal {
 
   protected readonly confirmRows = computed<ConfirmRow[]>(() => {
     const token = this.token();
+    const meta = this.tokenMeta();
+    const symbol = meta.symbol;
     const amount = this.amount() ?? 0;
     const wallet = this.store.activeWallet();
     const price = this.store.prices()[token];
@@ -106,16 +114,18 @@ export class SendModal {
       {
         label: 'Amount',
         value:
-          `${fmt(amount)} ${token}` +
+          `${fmt(amount)} ${symbol}` +
           (price
             ? ` (≈ $${(amount * price).toLocaleString('en-US', { maximumFractionDigits: 2 })})`
             : ''),
       },
+      // A custom token's symbol proves nothing — its contract does.
+      ...(meta.custom ? [{ label: 'Token contract', value: meta.contract, mono: true }] : []),
       { label: 'Network fee', value: `${fee} MAS` },
       {
         label: 'Total',
         value:
-          token === 'MAS' ? `${fmt(amount + fee)} MAS` : `${fmt(amount)} ${token} + ${fee} MAS`,
+          token === 'MAS' ? `${fmt(amount + fee)} MAS` : `${fmt(amount)} ${symbol} + ${fee} MAS`,
         strong: true,
       },
       { label: 'Network', value: this.store.network() === 'mainnet' ? 'Mainnet' : 'Buildnet' },
@@ -147,7 +157,7 @@ export class SendModal {
       }
 
       this.toast.show(
-        (result.internal ? 'Sent to your wallet: ' : 'Sent ') + `${amount} ${this.token()}`,
+        (result.internal ? 'Sent to your wallet: ' : 'Sent ') + `${amount} ${this.symbol()}`,
       );
       this.reset();
       this.modal.close();

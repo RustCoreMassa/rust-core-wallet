@@ -1,0 +1,63 @@
+:host {
+  display: contents;
+}
+
+.tokens-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gray-500);
+}
+
+.custom-token {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.custom-token-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border-strong);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.custom-token-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-token-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-token-contract {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.custom-token-remove {
+  width: auto;
+  margin-top: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.tokens-empty {
+  padding: 4px 0 6px;
+  color: var(--gray-500);
+}

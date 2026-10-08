@@ -13,6 +13,7 @@ export type ModalId =
   | 'tx-details'
   | 'domain-details'
   | 'connected-sites'
+  | 'tokens'
   | null;
 
 @Injectable({ providedIn: 'root' })

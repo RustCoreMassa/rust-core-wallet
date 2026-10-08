@@ -1,16 +1,19 @@
 <div class="row">
-  @if (iconFailed()) {
+  @if (showBadge()) {
   <div class="row-icon mas">{{ symbol().slice(0, 4) }}</div>
   } @else {
-  <img class="row-icon" [src]="meta().asset" [alt]="symbol()" (error)="iconFailed.set(true)" />
+  <img class="row-icon" [src]="token().asset" [alt]="symbol()" (error)="iconFailed.set(true)" />
   }
   <div class="row-main">
-    <div class="row-name">{{ meta().name }}</div>
+    <div class="row-name">{{ token().name }}</div>
     <div class="row-sub">
       @if (hasPrice()) {
       {{ priceText() }}
       } @else {
       {{ symbol() }}
+      }
+      @if (token().custom) {
+      <span class="custom-tag">Added by you</span>
       }
     </div>
   </div>

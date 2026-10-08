@@ -1,0 +1,80 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">
+      @switch (step()) {
+      @case ('list') { Custom tokens }
+      @case ('add') { Add a token }
+      @case ('review') { Review token }
+      }
+    </div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @switch (step()) {
+  @case ('list') {
+  <p class="tokens-intro">
+    MRC-20 tokens you added on {{ networkLabel() }} by their contract address. Removing one only
+    hides it — the tokens stay in your wallet on the blockchain.
+  </p>
+  @for (token of custom(); track token.contract) {
+  <div class="custom-token">
+    <div class="custom-token-badge">{{ token.symbol.slice(0, 4) }}</div>
+    <div class="custom-token-main">
+      <div class="custom-token-name">{{ token.symbol }} · {{ token.name }}</div>
+      <div class="custom-token-contract">{{ short(token.contract) }}</div>
+    </div>
+    <button class="btn btn-ghost custom-token-remove" type="button" (click)="remove(token)">Remove</button>
+  </div>
+  } @empty {
+  <div class="tokens-empty">No custom tokens on {{ networkLabel() }} yet.</div>
+  }
+  <button class="btn btn-red" type="button" (click)="startAdd()">Add a token</button>
+  }
+
+  @case ('add') {
+  <label class="field-label" for="token-contract">Token contract address</label>
+  <input
+    id="token-contract"
+    class="num-input"
+    type="text"
+    placeholder="AS..."
+    autocomplete="off"
+    autocapitalize="off"
+    spellcheck="false"
+    [ngModel]="contract()"
+    (ngModelChange)="contract.set($event)"
+    (keydown.enter)="lookUp()"
+  />
+  <p class="hint">
+    On {{ networkLabel() }}. The name, symbol and decimals are read from the token's contract.
+  </p>
+  @if (error()) {
+  <div class="error-text">{{ error() }}</div>
+  }
+  <button class="btn btn-red" type="button" [disabled]="isLooking() || !contract().trim()" (click)="lookUp()">
+    @if (isLooking()) {
+    <div class="spinner"></div>
+    <span>Reading the contract…</span>
+    } @else {
+    <span>Continue</span>
+    }
+  </button>
+  <button class="btn btn-ghost" type="button" [disabled]="isLooking()" (click)="backToList()">Your custom tokens</button>
+  }
+
+  @case ('review') {
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
+  }
+  <app-confirm-details
+    [rows]="reviewRows()"
+    [note]="reviewNote"
+    confirmLabel="Add token"
+    busyLabel="Adding…"
+    [busy]="isAdding()"
+    (confirmed)="add()"
+    (cancelled)="cancelReview()"
+  />
+  }
+  }
+</div>

@@ -1,4 +1,4 @@
-import { TokenSymbol } from './token.model';
+import { TokenId } from './token.model';
 
 export type TransactionType =
   | 'send'
@@ -18,7 +18,8 @@ export type TransactionStatus = 'pending' | 'final' | 'failed';
 export interface TransactionRecord {
   readonly id: string;
   readonly type: TransactionType;
-  readonly token: TokenSymbol;
+  /** TokenId: a built-in token's symbol, a custom token's contract (see TokenCatalog.symbolOf). */
+  readonly token: TokenId;
   readonly amount: number;
   readonly timestamp: number;
   readonly status?: TransactionStatus;
@@ -27,7 +28,7 @@ export interface TransactionRecord {
   /** Network fee paid, in MAS — only for operations this address created. */
   readonly fee?: number;
   /** Set for 'swap' transactions. */
-  readonly toToken?: TokenSymbol;
+  readonly toToken?: TokenId;
   readonly received?: number;
   /** Truncated counterparty address (or a token name for known contracts). */
   readonly counterparty?: string;

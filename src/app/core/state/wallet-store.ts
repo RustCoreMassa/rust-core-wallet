@@ -2,9 +2,12 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { MnsDomain } from '../models/nft.model';
 import { SavedAddress } from '../models/saved-address.model';
 import {
-  TOKEN_LIST,
+  CustomToken,
   TOKEN_REGISTRY,
   TokenBalances,
+  TokenId,
+  TokenMap,
+  TokenMeta,
   TokenPrices,
   TokenSymbol,
 } from '../models/token.model';
@@ -32,16 +35,7 @@ import {
   mergeHistory,
 } from './history-merge';
 import { Network, NetworkStore } from './network-store';
-
-/**
- * The MRC-20 contract addresses in TOKEN_REGISTRY are mainnet deployments;
- * on buildnet only native MAS is read.
- */
-const MRC20_TOKENS = TOKEN_LIST.filter((t) => t.isErc20);
-const TOKENS_BY_NETWORK: Readonly<Record<Network, typeof MRC20_TOKENS>> = {
-  mainnet: MRC20_TOKENS,
-  buildnet: [],
-};
+import { TokenCatalog } from './token-catalog';
 
 /** Token prices are re-read from Dusa at most this often. */
 const PRICES_REFRESH_MS = 60_000;
@@ -181,6 +175,7 @@ export class WalletStore {
   private readonly cache = inject(WalletCache);
   private readonly dusa = inject(DusaPrices);
   private readonly dusaSwap = inject(DusaSwap);
+  private readonly catalog = inject(TokenCatalog);
 
   private readonly _walletsByNetwork = signal<WalletsByNetwork>(emptyWallets());
   private readonly _activeWalletId = signal<string>('');
@@ -214,11 +209,8 @@ export class WalletStore {
     return wallet;
   });
 
-  /** Every token that exists on the current network, registry order. */
-  readonly availableTokens = computed<readonly TokenSymbol[]>(() => [
-    'MAS',
-    ...TOKENS_BY_NETWORK[this.network()].map((t) => t.symbol),
-  ]);
+  /** Every token shown on the current network: MAS, built-in MRC-20s, custom ones. */
+  readonly availableTokens = this.catalog.tokens;
 
   /** Active wallet's history, cut where it's still incomplete (see `historyCutoff`). */
   readonly visibleHistory = computed(() => {
@@ -248,7 +240,7 @@ export class WalletStore {
   readonly portfolioValueUsd = computed(() => {
     const balances = this.activeWallet().balances;
     const prices = this._prices();
-    return (Object.keys(balances) as TokenSymbol[]).reduce(
+    return Object.keys(balances).reduce(
       (sum, token) => sum + (balances[token] ?? 0) * (prices[token] ?? 0),
       0,
     );
@@ -363,9 +355,10 @@ export class WalletStore {
     }
   }
 
-  /** Drops every wallet, history entry and saved address — used on log out. */
+  /** Drops every wallet, history entry, saved address and custom token — used on log out. */
   reset(): void {
     this._walletsByNetwork.set(emptyWallets());
+    this.catalog.clear();
     this._activeWalletId.set('');
     this._addressBook.set([]);
     this._refreshingIds.set(new Set());
@@ -430,7 +423,7 @@ export class WalletStore {
    * balance minus the network fee, for MRC-20s the whole token balance
    * (their fee is paid in MAS).
    */
-  maxSendable(token: TokenSymbol): number {
+  maxSendable(token: TokenId): number {
     const held = this.activeWallet().balances[token] ?? 0;
     return token === 'MAS' ? subtractMas(held, NETWORK_FEE_MAS) : held;
   }
@@ -470,6 +463,32 @@ export class WalletStore {
     }
   }
 
+  // ---- custom tokens -------------------------------------------------------
+
+  /**
+   * Adds a token the user reviewed (from `TokenCatalog.lookup`), then reads
+   * the active wallet's balances so it shows its real amount, not a 0.
+   */
+  async addCustomToken(network: Network, token: CustomToken): Promise<void> {
+    this.catalog.add(network, token);
+    if (this.network() !== network) return;
+    await this.refresh().catch((err) => console.warn('Wallet refresh failed', err));
+  }
+
+  /** Stops showing a custom token — its balance stays on the chain, re-adding shows it again. */
+  removeCustomToken(network: Network, contract: string): void {
+    this.catalog.remove(network, contract);
+    this._walletsByNetwork.update((all) => {
+      const wallets: Record<string, WalletState> = {};
+      for (const [id, w] of Object.entries(all[network])) {
+        const { [contract]: _balance, ...balances } = w.balances;
+        const { [contract]: _raw, ...rawBalances } = w.rawBalances;
+        wallets[id] = { ...w, balances, rawBalances };
+      }
+      return { ...all, [network]: wallets };
+    });
+  }
+
   saveAddress(name: string, address: string): void {
     this._addressBook.update((book) => [...book, { name, address }]);
   }
@@ -494,7 +513,7 @@ export class WalletStore {
     const wallet = this.wallets()[id];
     if (!wallet) return;
     const privateKey = this.privateKeyFor(id);
-    const tokenList = TOKENS_BY_NETWORK[network];
+    const tokenList = this.catalog.mrc20On(network);
     const historyKey = `${network}:${id}`;
     const readHistory =
       network === 'mainnet' &&
@@ -527,21 +546,23 @@ export class WalletStore {
         id,
         (w) => {
           const balances: TokenBalances = { ...w.balances };
-          const rawBalances: Partial<Record<TokenSymbol, string>> = { ...w.rawBalances };
+          const rawBalances: TokenMap<string> = { ...w.rawBalances };
           if (mas.status === 'fulfilled') {
             balances.MAS = fromUnits(mas.value, TOKEN_REGISTRY.MAS.decimals);
             rawBalances.MAS = mas.value.toString();
           }
           tokens.forEach((result, i) => {
             if (result.status !== 'fulfilled') return;
-            const { symbol, decimals } = tokenList[i];
+            const { id, decimals } = tokenList[i];
+            // A custom token removed while this read was in flight stays removed.
+            if (!this.catalog.mrc20On(network).some((t) => t.id === id)) return;
             // Sparse: only tokens actually held get a key.
             if (result.value > 0n) {
-              balances[symbol] = fromUnits(result.value, decimals);
-              rawBalances[symbol] = result.value.toString();
+              balances[id] = fromUnits(result.value, decimals);
+              rawBalances[id] = result.value.toString();
             } else {
-              delete balances[symbol];
-              delete rawBalances[symbol];
+              delete balances[id];
+              delete rawBalances[id];
             }
           });
           return {
@@ -575,8 +596,9 @@ export class WalletStore {
   // ---- pre-flight checks (the UI runs these before asking to confirm) -------
 
   /** Throws a user-facing message when the transfer can't go through. */
-  validateSend(token: TokenSymbol, toAddress: string, amount: number): void {
+  validateSend(token: TokenId, toAddress: string, amount: number): void {
     const wallet = this.activeWallet();
+    const meta = this.tokenMeta(token);
     if (!MASSA_ADDRESS.test(toAddress)) throw new Error('Enter a valid Massa address');
     if (toAddress === wallet.address) throw new Error("That's this wallet's own address");
     if (!(amount >= MIN_SEND_AMOUNT)) throw new Error(`Minimum amount is ${MIN_SEND_AMOUNT}`);
@@ -591,7 +613,7 @@ export class WalletStore {
       if (amount > (wallet.balances[token] ?? 0)) throw new Error('Insufficient balance');
       assertMasForFee(masHeld, 0, `You need ${NETWORK_FEE_MAS} MAS for the network fee`);
     }
-    if (toUnits(amount, TOKEN_REGISTRY[token].decimals) === 0n) {
+    if (toUnits(amount, meta.decimals) === 0n) {
       throw new Error('Amount is too small');
     }
   }
@@ -677,8 +699,8 @@ export class WalletStore {
    * checked `amount` against the displayed balance, so anything above the
    * exact balance is only that rounding — clamp it.
    */
-  private spendableUnits(token: TokenSymbol, amount: number): bigint {
-    const units = toUnits(amount, TOKEN_REGISTRY[token].decimals);
+  private spendableUnits(token: TokenId, amount: number): bigint {
+    const units = toUnits(amount, this.tokenMeta(token).decimals);
     const raw = this.activeWallet().rawBalances[token];
     const held = raw !== undefined ? BigInt(raw) : null;
     return held !== null && units > held ? held : units;
@@ -694,15 +716,11 @@ export class WalletStore {
    * nothing locally (the chain is re-read anyway in case it went through).
    */
 
-  async send(
-    token: TokenSymbol,
-    toAddress: string,
-    amount: number,
-  ): Promise<{ internal: boolean }> {
+  async send(token: TokenId, toAddress: string, amount: number): Promise<{ internal: boolean }> {
     const network = this.network();
     const wallet = this.activeWallet();
     this.validateSend(token, toAddress, amount);
-    const meta = TOKEN_REGISTRY[token];
+    const meta = this.tokenMeta(token);
     const units = this.spendableUnits(token, amount);
     const targetId = this.walletList().find(
       (w) => w.address === toAddress && w.id !== wallet.id,
@@ -980,6 +998,13 @@ export class WalletStore {
   }
 
   // ---- internal helpers ----------------------------------------------------
+
+  /** A token on the current network — throws if a custom one was removed meanwhile. */
+  private tokenMeta(id: TokenId): TokenMeta {
+    const meta = this.catalog.meta(id);
+    if (!meta) throw new Error('This token is no longer in your token list');
+    return meta;
+  }
 
   private refreshPricesInBackground(): void {
     this.refreshPrices().catch((err) => console.warn('Dusa price refresh failed', err));

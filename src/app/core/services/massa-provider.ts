@@ -44,6 +44,13 @@ export interface CallSimulation {
   readonly gasCost: bigint;
 }
 
+/** An MRC-20 token's metadata, raw as its contract stores it (not yet checked for display). */
+export interface TokenInfo {
+  readonly name: string;
+  readonly symbol: string;
+  readonly decimals: number;
+}
+
 export interface GeneratedAccount {
   readonly privateKey: string;
   readonly address: string;
@@ -82,6 +89,12 @@ export interface MassaProvider {
 
   // ---- MRC-20 tokens ------------------------------------------------------
   getTokenBalance(privateKey: string, contractAddress: string): Promise<bigint>;
+  /**
+   * The token's name, symbol and decimals — or `null` when the address holds
+   * no MRC-20 token on the current network (no such contract, another kind of
+   * contract, a user address). Rejects only when the network can't be read.
+   */
+  getTokenInfo(contractAddress: string): Promise<TokenInfo | null>;
   transferToken(
     privateKey: string,
     contractAddress: string,
