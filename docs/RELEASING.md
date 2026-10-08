@@ -11,14 +11,14 @@ new features, patch for fixes. Every version has a section in [CHANGELOG.md](../
 
 ## Publishing a release
 
-1. Bump the version: `npm version 1.2.0 --no-git-tag-version`
+1. Bump the version: `npm version 1.3.0 --no-git-tag-version`
 2. In `CHANGELOG.md`, rename the `## [Unreleased]` section (where changes collect between
-   releases) to `## [1.2.0] — <date>` and add its link at the bottom.
+   releases) to `## [1.3.0] — <date>` and add its link at the bottom.
 3. Commit, then push a matching tag:
 
 ```bash
-git tag v1.2.0
-git push origin master v1.2.0
+git tag v1.3.0
+git push origin master v1.3.0
 ```
 
 Pushing the tag starts the [release workflow](../.github/workflows/release.yml) on GitHub
@@ -75,8 +75,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.2.0.zip -d rust-core-wallet-v1.2.0
-cd rust-core-wallet-v1.2.0
+unzip rust-core-wallet-v1.3.0.zip -d rust-core-wallet-v1.3.0
+cd rust-core-wallet-v1.3.0
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 
