@@ -64,8 +64,8 @@ Every file matches; the extension has no `ngsw.json`.
 ## Deploying to DeWeb
 
 The wallet is hosted on [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized
-web, as **`wrustcore.massa`** (Massa's official gateway: https://wrustcore.massa.net). Each release
-replaces the site's files there. What gets uploaded is the **folder** with the built app — `index.html` at its root plus the
+web, as **`wrustcore.massa`** (Massa's official gateway: https://wrustcore.massa.network). Each
+release replaces the site's files there. What gets uploaded is the **folder** with the built app — `index.html` at its root plus the
 scripts, styles, icons and assets next to it.
 
 A GitHub Release can only hold files, so the release carries that folder as

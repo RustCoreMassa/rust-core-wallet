@@ -1,7 +1,7 @@
 import { InjectionToken } from '@angular/core';
 
 /** The wallet's official gateway: the same on-chain site (`wrustcore.massa`) as every other. */
-export const OFFICIAL_URL = 'https://wrustcore.massa.net';
+export const OFFICIAL_URL = 'https://wrustcore.massa.network';
 
 /**
  * Gateways that served the wallet before Massa's official one. Browser storage
