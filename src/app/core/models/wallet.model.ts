@@ -1,4 +1,4 @@
-import { TokenBalances, TokenSymbol } from './token.model';
+import { TokenBalances, TokenMap } from './token.model';
 import { MnsDomain } from './nft.model';
 import { HistoryPaging, TransactionRecord } from './transaction.model';
 
@@ -43,7 +43,7 @@ export interface WalletState {
    * Max amount rounded up in the last digits would exceed what's held — so
    * spends are clamped against these (see WalletStore.spendableUnits).
    */
-  readonly rawBalances: Partial<Record<TokenSymbol, string>>;
+  readonly rawBalances: TokenMap<string>;
   readonly rolls: RollsState;
   /** `null` until first read from the chain. */
   readonly staking: StakingStats | null;

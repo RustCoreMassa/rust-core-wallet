@@ -87,14 +87,14 @@
   @if (!wallet().loaded) {
   <div class="empty-state">Loading balances…</div>
   } @else {
-  @for (symbol of tokenSymbols(); track symbol) {
+  @for (token of tokens(); track token.id) {
   <app-token-row
-    [symbol]="symbol"
-    [balance]="wallet().balances[symbol] ?? 0"
-    [price]="store.prices()[symbol] ?? 0"
+    [token]="token"
+    [balance]="wallet().balances[token.id] ?? 0"
+    [price]="store.prices()[token.id] ?? 0"
   />
   }
-  @if (store.availableTokens().length > 1) {
+  @if (hasBuiltinTokens()) {
   <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
     @if (showAllTokens()) {
     Hide low balances

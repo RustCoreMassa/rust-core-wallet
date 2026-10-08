@@ -1,23 +1,22 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, input, signal } from '@angular/core';
-import { TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
+import { Component, computed, input } from '@angular/core';
+import { TokenMeta } from '../../../core/models/token.model';
 import { AmountPipe } from '../../pipes/amount-pipe';
+import { TokenIcon } from '../token-icon/token-icon';
 
 @Component({
   selector: 'app-token-row',
-  imports: [CurrencyPipe, AmountPipe],
+  imports: [CurrencyPipe, AmountPipe, TokenIcon],
   templateUrl: './token-row.html',
   styleUrl: './token-row.scss',
 })
 export class TokenRow {
-  readonly symbol = input.required<TokenSymbol>();
+  readonly token = input.required<TokenMeta>();
   readonly balance = input.required<number>();
   /** USD price from Dusa; 0 for tokens without Dusa liquidity — the row then hides it. */
   readonly price = input<number>(0);
 
-  protected readonly meta = computed(() => TOKEN_REGISTRY[this.symbol()]);
-  /** Set when the icon image fails to load — the row falls back to a symbol badge. */
-  protected readonly iconFailed = signal(false);
+  protected readonly symbol = computed(() => this.token().symbol);
   protected readonly hasPrice = computed(() => this.price() > 0);
   protected readonly usdValue = computed(() => this.balance() * this.price());
 

@@ -1,0 +1,73 @@
+:host {
+  display: contents;
+}
+
+.tokens-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gray-500);
+}
+
+.custom-token {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.custom-token-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-token-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-token-contract {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.custom-token-action {
+  width: auto;
+  margin-top: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--gray-500);
+}
+
+/* Live preview next to the link. */
+.icon-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-field .num-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tokens-empty {
+  padding: 4px 0 6px;
+  color: var(--gray-500);
+}

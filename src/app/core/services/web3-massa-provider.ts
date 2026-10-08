@@ -1,11 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Account,
+  Args,
   JsonRpcPublicProvider,
   MNS,
   MRC20,
   Mas,
+  U8,
   Web3Provider,
+  bytesToStr,
   rpcTypes,
 } from '@massalabs/massa-web3';
 import { MnsDomain } from '../models/nft.model';
@@ -20,6 +23,7 @@ import {
   ROLL_PRICE_MAS,
   SignedMessage,
   StakingInfo,
+  TokenInfo,
 } from './massa-provider';
 
 /**
@@ -75,6 +79,31 @@ export class Web3MassaProvider implements MassaProvider {
     const provider = await this.providerFor(privateKey);
     const token = new MRC20(provider, contractAddress);
     return token.balanceOf(provider.address);
+  }
+
+  async getTokenInfo(contractAddress: string): Promise<TokenInfo | null> {
+    const provider = this.publicProvider();
+    // What MRC20.name()/symbol()/decimals() read — in one call, and with a
+    // missing entry coming back as null instead of an error we can't tell
+    // apart from an RPC failure.
+    const [name, symbol, decimals] = await provider.readStorage(
+      contractAddress,
+      ['NAME', 'SYMBOL', 'DECIMALS'],
+      true,
+    );
+    if (!name || !symbol || decimals?.length !== 1) return null;
+    // Any contract can store those three keys; a token also answers balanceOf.
+    const probe = await provider.readSC({
+      target: contractAddress,
+      func: 'balanceOf',
+      parameter: new Args().addString(contractAddress).serialize(),
+    });
+    if (probe.info.error || probe.value.length !== 32) return null;
+    return {
+      name: bytesToStr(name),
+      symbol: bytesToStr(symbol),
+      decimals: Number(U8.fromBytes(decimals)),
+    };
   }
 
   async transferToken(

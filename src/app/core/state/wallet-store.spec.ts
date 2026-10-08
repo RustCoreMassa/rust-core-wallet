@@ -8,6 +8,7 @@ import { ExplorerApi } from '../services/explorer-api';
 import { MASSA_PROVIDER, MassaProvider, OperationFailedError } from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
 import { AuthStore } from './auth-store';
+import { TokenCatalog } from './token-catalog';
 import { WalletStore, dappCallFee } from './wallet-store';
 
 const A = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
@@ -42,6 +43,7 @@ function fakeProvider() {
     signMessage: vi.fn(async () => ({ publicKey: 'P1key', signature: '1sig' })),
     simulateCall: vi.fn(async () => ({ error: null as string | null, gasCost: 2_100_000n })),
     callContract: vi.fn(async () => ({ operationId: 'Ocall' })),
+    getTokenInfo: vi.fn(async () => ({ name: 'Wrapped Massa', symbol: 'WMAS', decimals: 9 })),
   } satisfies Partial<MassaProvider>;
 }
 
@@ -239,6 +241,58 @@ describe('WalletStore', () => {
     it('only allows swaps on mainnet', () => {
       store.setNetwork('buildnet');
       expect(() => store.validateSwap('MAS', 'USDC.e', 1)).toThrow(/Mainnet only/);
+    });
+  });
+
+  describe('custom tokens', () => {
+    /** A 9-decimal token on buildnet (where no built-in MRC-20 exists). */
+    const WMAS = 'AS12FW5Rs5YN2zdpEnqwj4iHUUPt9R4Eqjq2qtpJFNKW3mn33RuLU';
+
+    async function addWmas(): Promise<void> {
+      store.setNetwork('buildnet');
+      chain.tokens['S1a'] = { [WMAS]: 2_500_000_000n }; // 2.5 WMAS
+      const { network, token } = await TestBed.inject(TokenCatalog).lookup(WMAS);
+      await store.addCustomToken(network, token);
+    }
+
+    it('reads the balance of an added token, keyed by its contract', async () => {
+      await addWmas();
+      const wallet = store.wallets()['a'];
+      expect(wallet.balances[WMAS]).toBe(2.5);
+      expect(wallet.rawBalances[WMAS]).toBe('2500000000');
+      expect(store.availableTokens().map((t) => t.id)).toEqual(['MAS', WMAS]);
+    });
+
+    it('sends it with its own decimals and records it under its contract', async () => {
+      await addWmas();
+      await store.send(WMAS, OUTSIDER, 1.25);
+      expect(provider.transferToken).toHaveBeenCalledWith('S1a', WMAS, OUTSIDER, 1_250_000_000n);
+      expect(store.wallets()['a'].history[0]).toMatchObject({ type: 'send', token: WMAS });
+    });
+
+    it('stops reading and showing a removed token, and refuses to send it', async () => {
+      await addWmas();
+      store.removeCustomToken('buildnet', WMAS);
+      expect(store.wallets()['a'].balances[WMAS]).toBeUndefined();
+      expect(store.wallets()['a'].rawBalances[WMAS]).toBeUndefined();
+
+      provider.getTokenBalance.mockClear();
+      await store.refresh('a');
+      expect(provider.getTokenBalance).not.toHaveBeenCalled();
+      expect(() => store.validateSend(WMAS, OUTSIDER, 1)).toThrow(/no longer in your token list/);
+    });
+
+    it('keeps a token added on buildnet off mainnet', async () => {
+      await addWmas();
+      store.setNetwork('mainnet');
+      expect(store.availableTokens().some((t) => t.id === WMAS)).toBe(false);
+      expect(() => store.validateSend(WMAS, OUTSIDER, 1)).toThrow(/no longer in your token list/);
+    });
+
+    it('forgets custom tokens on log out', async () => {
+      await addWmas();
+      store.reset();
+      expect(TestBed.inject(TokenCatalog).custom()).toEqual([]);
     });
   });
 

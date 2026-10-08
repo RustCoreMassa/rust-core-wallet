@@ -71,6 +71,8 @@ export class Dropdown<T extends string = string> {
   readonly inputId = input<string>();
 
   protected readonly open = signal(false);
+  /** Icons that didn't load (a custom token's remote link) — shown without one. */
+  protected readonly failedIcons = signal<ReadonlySet<string>>(new Set());
   protected readonly position = signal<MenuPosition | null>(null);
   protected readonly selected = computed(() =>
     this.options().find((o) => o.value === this.value()),
@@ -127,5 +129,9 @@ export class Dropdown<T extends string = string> {
       bottom: openBelow ? null : window.innerHeight - rect.top + MENU_GAP,
       maxHeight: Math.min(MENU_MAX_HEIGHT, openBelow ? spaceBelow : spaceAbove),
     };
+  }
+
+  protected iconFailed(icon: string): void {
+    this.failedIcons.update((failed) => new Set(failed).add(icon));
   }
 }

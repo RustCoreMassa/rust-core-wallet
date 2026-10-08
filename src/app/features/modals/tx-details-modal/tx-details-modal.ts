@@ -3,6 +3,7 @@ import { Component, computed, inject } from '@angular/core';
 import { TransactionRecord, TransactionStatus } from '../../../core/models/transaction.model';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
+import { TokenCatalog } from '../../../core/state/token-catalog';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { HistoryRow } from '../../../shared/ui/history-row/history-row';
 
@@ -28,6 +29,17 @@ export class TxDetailsModal {
   private readonly toast = inject(Toast);
 
   protected readonly tx = computed(() => this.modal.payload<TransactionRecord>());
+
+  private readonly catalog = inject(TokenCatalog);
+  protected readonly tokenSymbol = computed(() => {
+    const token = this.tx()?.token;
+    return token ? this.catalog.symbolOf(token) : '';
+  });
+  /** A custom token's id is its contract address (built-in ids are symbols). */
+  protected readonly tokenContract = computed(() => {
+    const token = this.tx()?.token;
+    return token?.startsWith('AS') ? token : null;
+  });
 
   protected readonly statusLabel = computed(() => {
     const status = this.tx()?.status;

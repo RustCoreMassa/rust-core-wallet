@@ -1,0 +1,32 @@
+@if (url && !hidden()) {
+<aside class="install-card" role="region" aria-labelledby="move-title">
+  <div class="install-head">
+    <img class="install-icon" src="icons/icon-192.png" alt="" />
+    <div class="install-text">
+      <div class="install-title" id="move-title">RustCore Wallet has moved</div>
+      <div class="install-sub">New official address: <b class="move-host">{{ host }}</b></div>
+    </div>
+    <button class="install-close" type="button" aria-label="Later" (click)="hidden.set(true)">✕</button>
+  </div>
+
+  @if (hasVault()) {
+  @if (!showSteps()) {
+  <button class="btn btn-ghost install-action" type="button" (click)="showSteps.set(true)">How to move my wallet</button>
+  } @else {
+  <ol class="install-steps">
+    <li>Here, back up the private key of <b>every</b> wallet: Settings → <b>Backup private key</b>.</li>
+    <li>Open <b>{{ host }}</b>, create a PIN and choose <b>Import a private key</b>.</li>
+    <li>Installed the app? Install it again from the new address.</li>
+  </ol>
+  <p class="install-note">
+    Your wallet is saved in this browser for this address only — it doesn't move by itself.
+    Keep using this page until every wallet is imported there.
+  </p>
+  <a class="btn btn-red install-action" [href]="url" target="_blank" rel="noopener">Open {{ host }}</a>
+  }
+  } @else {
+  <p class="install-note">Don't create a wallet here — create it at the new address.</p>
+  <a class="btn btn-red install-action" [href]="url" rel="noopener">Open {{ host }}</a>
+  }
+</aside>
+}

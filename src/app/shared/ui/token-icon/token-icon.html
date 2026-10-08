@@ -1,0 +1,5 @@
+@if (showBadge()) {
+<div class="row-icon mas">{{ symbol().slice(0, 4) }}</div>
+} @else {
+<img class="row-icon" [src]="src()" [alt]="symbol()" referrerpolicy="no-referrer" (error)="onError()" />
+}

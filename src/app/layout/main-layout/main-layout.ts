@@ -15,6 +15,7 @@ import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
 import { TxDetailsModal } from '../../features/modals/tx-details-modal/tx-details-modal';
 import { DomainDetailsModal } from '../../features/modals/domain-details-modal/domain-details-modal';
 import { ConnectedSitesModal } from '../../features/modals/connected-sites-modal/connected-sites-modal';
+import { TokensModal } from '../../features/modals/tokens-modal/tokens-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 
@@ -39,6 +40,7 @@ const AUTO_REFRESH_MS = 10_000;
     TxDetailsModal,
     DomainDetailsModal,
     ConnectedSitesModal,
+    TokensModal,
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',

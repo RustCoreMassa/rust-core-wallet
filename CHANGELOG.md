@@ -7,6 +7,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-08
+
+### Added
+
+- **Custom tokens.** Add any MRC-20 token by its contract address, on Mainnet or Buildnet
+  (Settings → Custom tokens). The wallet reads the token's name, symbol and decimals from its
+  contract and shows them for review before adding it; its balance then appears with your tokens
+  and you can send it. Added tokens are marked *Added by you*, the
+  Send review shows their contract, and a token can't take the symbol of one RustCore already
+  lists. Removing one only hides it — the tokens stay in your wallet on the blockchain. Custom
+  tokens have no USD price and can't be swapped.
+- **Icons for custom tokens**, from an `https://` or `ipfs://` link (loaded through ipfs.io),
+  set when adding the token or later from Settings → Custom tokens. The icon is loaded from that
+  server each time the token is shown, which the wallet says next to the field (and the README
+  lists among the network destinations).
+
+### Changed
+
+- **The wallet's address is now Massa's official gateway, wrustcore.massa.network.** Opened from the
+  old community gateway (wrustcore.deweb.half-red.net), the wallet shows how to move: back up
+  each private key there, import it at the new address. A browser keeps a wallet only at the
+  address where it was created, so it can't move by itself. The old address no longer offers to
+  install the app, and its desktop QR code points to the new one.
+
 ## [1.2.0] — 2026-10-07
 
 ### Added
@@ -142,6 +166,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.3.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.3.0
 [1.2.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.2.0
 [1.1.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.1
 [1.1.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.0

@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-brightgreen" />
+  <img alt="Version 1.3.0" src="https://img.shields.io/badge/version-1.3.0-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
 
 <p align="center">
   <b>Open it on your phone:</b>
-  <a href="https://wrustcore.deweb.half-red.net"><b>wrustcore.massa</b></a>
+  <a href="https://wrustcore.massa.network"><b>wrustcore.massa</b></a>
   — live on DeWeb
 </p>
 
@@ -38,7 +38,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.2.0** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.3.0** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -55,8 +55,11 @@ built on four principles:
 | 💲 **Prices** | Token values in USD, read directly from the Dusa exchange. |
 | 📲 **Install it** | Add it to your home screen on Android or iPhone and it opens full screen, like a native app. |
 
-Supported tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b — on Massa
-Mainnet (and Buildnet, the test network).
+Built-in tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b on Massa Mainnet;
+MAS on Buildnet, the test network. **Any other MRC-20 token** can be added by its contract address
+(*Settings → Custom tokens*): the wallet reads its name, symbol and decimals from the contract,
+then shows its balance and lets you send it. You can give it an icon from an `https://` or
+`ipfs://` link.
 
 ## Getting started
 
@@ -64,8 +67,8 @@ RustCore Wallet runs in your **phone's browser** — Android or iPhone, any brow
 it shows a QR code to open it on your phone instead.
 
 1. **Open it** on your phone: **`wrustcore.massa`** — tap
-   [wrustcore.deweb.half-red.net](https://wrustcore.deweb.half-red.net) or open `wrustcore.massa`
-   through any DeWeb gateway or [Massa Station](https://station.massa.network).
+   [wrustcore.massa.network](https://wrustcore.massa.network) (Massa's official gateway) or open
+   `wrustcore.massa` through any DeWeb gateway or [Massa Station](https://station.massa.network).
 2. **Install it** (recommended): the wallet offers it at the top of the screen.
    - *Android* — tap **Install app**.
    - *iPhone / iPad* — tap **Share**, then **Add to Home Screen**. Do this **before** creating
@@ -85,6 +88,8 @@ it shows a QR code to open it on your phone instead.
   drops them.
 - A short-lived cache of balances and history, encrypted the same way and deleted when the tab
   closes.
+- The tokens you added by contract address, and the icon links you set for them — kept
+  unencrypted so the wallet knows what to show. Logging out deletes the list.
 
 **What goes over the network — the complete list**
 
@@ -93,6 +98,7 @@ it shows a QR code to open it on your phone instead.
 | The DeWeb gateway you open the wallet from | Delivers the wallet itself, read from the Massa blockchain. |
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa's public nodes: balances, rolls, tokens, prices and swaps, and the transactions you confirm. |
 | `explorer-api.massa.net` | Your transaction history. |
+| Icon links you set for custom tokens (only if you set one) | Loads that icon whenever the token is shown — from the address you entered, or `ipfs.io` for an `ipfs://` link. That server can see your IP address. |
 
 That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.massa.net` and
 `docs.massa.net` open only when you tap them.
@@ -114,6 +120,10 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
   other address could steal your keys — never enter your PIN or private key anywhere else, and
   never on a site someone sent you in a message. (`rustcore.massa` is the RustCore website; it
   never asks for your key or PIN.)
+- **Tokens you add yourself aren't checked by RustCore.** Anyone can create a token with any name
+  and symbol, so they're marked *Added by you* and their contract is shown before every send. Add
+  one only from a contract address you got from a source you trust. They have no USD price and
+  can't be swapped in the wallet.
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
 - The browser extension (in progress) locks the wallet with a **password** instead: at least 8
@@ -141,6 +151,14 @@ including RustCore — can recover the funds.
 **Is there a fee?** RustCore charges nothing. Each transaction pays the Massa network fee
 (0.01 MAS), and swaps also send a small storage deposit required by the Dusa exchange
 (0.1 MAS).
+
+**I used the wallet at wrustcore.deweb.half-red.net — where is it now?** The wallet moved to
+Massa's official gateway, [wrustcore.massa.network](https://wrustcore.massa.network). It's the
+same app, but your browser keeps a wallet only at the address where it was created, so it doesn't
+follow by itself. Open the old address — it shows the steps: back up the private key of every
+wallet (*Settings → Backup private key*), open wrustcore.massa.network, create a PIN and import
+the keys. If you installed the app, install it again from the new address. Your funds are on the blockchain,
+not in the app: nothing is lost as long as you have your keys.
 
 **Why doesn't it work on my computer?** It's built for phones. A browser extension for desktop is
 built and in review at the browser stores; it will be listed here once it's published.

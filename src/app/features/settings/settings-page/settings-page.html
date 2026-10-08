@@ -37,6 +37,16 @@
     <div class="switch" [class.on]="isBuildnet()"></div>
   </button>
 
+  <button class="settings-row" type="button" (click)="modal.open('tokens')">
+    <div>
+      <div class="label">Custom tokens</div>
+      <div class="sub">{{ customTokensLabel() }}</div>
+    </div>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </button>
+
   @if (connectedSites) {
   <button class="settings-row" type="button" (click)="modal.open('connected-sites')">
     <div>

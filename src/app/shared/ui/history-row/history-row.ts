@@ -1,5 +1,6 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { TransactionRecord, TransactionStatus } from '../../../core/models/transaction.model';
+import { TokenCatalog } from '../../../core/state/token-catalog';
 import { formatDisplayAmount } from '../../../core/utils/display-amount';
 
 interface HistoryRowView {
@@ -32,6 +33,7 @@ function timeAgo(timestamp: number): string {
 })
 export class HistoryRow {
   readonly tx = input.required<TransactionRecord>();
+  private readonly catalog = inject(TokenCatalog);
 
   protected readonly timeLabel = computed(() => timeAgo(this.tx().timestamp));
 
@@ -43,35 +45,37 @@ export class HistoryRow {
   protected readonly view = computed<HistoryRowView>(() => {
     const tx = this.tx();
     const amount = formatDisplayAmount(tx.amount);
+    const token = this.catalog.symbolOf(tx.token);
+    const toToken = tx.toToken && this.catalog.symbolOf(tx.toToken);
     switch (tx.type) {
       case 'send':
         return {
           icon: 'down',
           glyph: '↑',
-          title: `Sent ${tx.token}`,
+          title: `Sent ${token}`,
           subtitle: `to ${tx.counterparty ?? ''}`,
-          amountText: `-${amount} ${tx.token}`,
+          amountText: `-${amount} ${token}`,
           amountPositive: false,
         };
       case 'receive':
         return {
           icon: 'up',
           glyph: '↓',
-          title: `Received ${tx.token}`,
+          title: `Received ${token}`,
           subtitle: `from ${tx.counterparty ?? ''}`,
-          amountText: `+${amount} ${tx.token}`,
+          amountText: `+${amount} ${token}`,
           amountPositive: true,
         };
       case 'swap':
         return {
           icon: 'swap',
           glyph: '⇄',
-          title: `Swap ${tx.token} → ${tx.toToken}`,
+          title: `Swap ${token} → ${toToken}`,
           subtitle:
             tx.received !== undefined
-              ? `≈ ${formatDisplayAmount(tx.received)} ${tx.toToken} · Dusa`
+              ? `≈ ${formatDisplayAmount(tx.received)} ${toToken} · Dusa`
               : 'Dusa',
-          amountText: `-${amount} ${tx.token}`,
+          amountText: `-${amount} ${token}`,
           amountPositive: false,
         };
       case 'buy_rolls':

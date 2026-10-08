@@ -1,14 +1,37 @@
+import { iconSource } from '../utils/token-icon';
+
 export type TokenSymbol =
   'MAS' | 'PUR' | 'DUSA' | 'USDC.e' | 'WETH.e' | 'DAI.e' | 'WBTC.e' | 'WETH.b' | 'USDT.b';
 
-export interface TokenMeta {
-  readonly symbol: TokenSymbol;
+/**
+ * A token's key in balances, prices and history: its symbol for a built-in
+ * token, its contract address for one the user added (two custom tokens may
+ * share a symbol, and a symbol proves nothing — the contract does).
+ */
+export type TokenId = string;
+
+export interface TokenMeta<S extends string = string> {
+  readonly id: TokenId;
+  readonly symbol: S;
   readonly name: string;
   readonly decimals: number;
   /** MRC-20 contract address; empty string for the native MAS coin. */
   readonly contract: string;
   readonly isErc20: boolean;
+  /** Icon path or URL; empty for a custom token without one (the UI shows a symbol badge). */
   readonly asset: string;
+  /** Added by the user from its contract address — not vetted by RustCore. */
+  readonly custom?: boolean;
+}
+
+/** An MRC-20 token the user added, as saved per network. */
+export interface CustomToken {
+  readonly contract: string;
+  readonly symbol: string;
+  readonly name: string;
+  readonly decimals: number;
+  /** Icon link the user set (`https://…` or `ipfs://…`, see utils/token-icon.ts). */
+  readonly icon?: string;
 }
 
 /**
@@ -18,8 +41,9 @@ export interface TokenMeta {
  * address. `decimals` are the contracts' own (`decimals()`): USDC.e has 6,
  * WBTC.e 8, the rest 18 — never assume 18.
  */
-export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
+export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta<TokenSymbol>>> = {
   MAS: {
+    id: 'MAS',
     symbol: 'MAS',
     name: 'Massa',
     decimals: 9,
@@ -28,6 +52,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/massa-token.png',
   },
   PUR: {
+    id: 'PUR',
     symbol: 'PUR',
     name: 'Pur',
     decimals: 18,
@@ -36,6 +61,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/PUR.png',
   },
   DUSA: {
+    id: 'DUSA',
     symbol: 'DUSA',
     name: 'Dusa',
     decimals: 18,
@@ -44,6 +70,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/DUSA.png',
   },
   'USDC.e': {
+    id: 'USDC.e',
     symbol: 'USDC.e',
     name: 'USD Coin',
     decimals: 6,
@@ -52,6 +79,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/USDC.png',
   },
   'WETH.e': {
+    id: 'WETH.e',
     symbol: 'WETH.e',
     name: 'Wrapped Ether',
     decimals: 18,
@@ -60,6 +88,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/WETH.png',
   },
   'DAI.e': {
+    id: 'DAI.e',
     symbol: 'DAI.e',
     name: 'Dai',
     decimals: 18,
@@ -68,6 +97,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/DAI.png',
   },
   'WBTC.e': {
+    id: 'WBTC.e',
     symbol: 'WBTC.e',
     name: 'Wrapped BTC',
     decimals: 8,
@@ -76,6 +106,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/BTC.png',
   },
   'WETH.b': {
+    id: 'WETH.b',
     symbol: 'WETH.b',
     name: 'Wrapped Ether',
     decimals: 18,
@@ -84,6 +115,7 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
     asset: 'assets/WETH.png',
   },
   'USDT.b': {
+    id: 'USDT.b',
     symbol: 'USDT.b',
     name: 'Tether USD',
     decimals: 18,
@@ -93,13 +125,21 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta>> = {
   },
 };
 
-export const TOKEN_LIST: readonly TokenMeta[] = Object.values(TOKEN_REGISTRY);
+export const TOKEN_LIST: readonly TokenMeta<TokenSymbol>[] = Object.values(TOKEN_REGISTRY);
+
+/** The meta of a custom token, shaped like a built-in one. */
+export function customTokenMeta({ icon, ...token }: CustomToken): TokenMeta {
+  const asset = icon ? iconSource(icon) : '';
+  return { ...token, id: token.contract, isErc20: true, asset, custom: true };
+}
+
+/** A value per token id; the built-in symbols are spelled out so `.MAS` reads as a property. */
+export type TokenMap<V> = Partial<Record<TokenSymbol, V>> & Partial<Record<TokenId, V>>;
 
 /**
- * Sparse on purpose: a real wallet holds a handful of these tokens at
- * most, never all nine. Absence of a key means "0 / not held", not
- * "unknown" — components should treat `balances[symbol] ?? 0` as the
- * held amount.
+ * Sparse on purpose: a real wallet holds a handful of tokens at most.
+ * Absence of a key means "0 / not held", not "unknown" — components should
+ * treat `balances[id] ?? 0` as the held amount.
  */
-export type TokenBalances = Partial<Record<TokenSymbol, number>>;
-export type TokenPrices = Partial<Record<TokenSymbol, number>>;
+export type TokenBalances = TokenMap<number>;
+export type TokenPrices = TokenMap<number>;
