@@ -1,9 +1,5 @@
 <div class="row">
-  @if (showBadge()) {
-  <div class="row-icon mas">{{ symbol().slice(0, 4) }}</div>
-  } @else {
-  <img class="row-icon" [src]="token().asset" [alt]="symbol()" (error)="iconFailed.set(true)" />
-  }
+  <app-token-icon [src]="token().asset" [symbol]="symbol()" />
   <div class="row-main">
     <div class="row-name">{{ token().name }}</div>
     <div class="row-sub">

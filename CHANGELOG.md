@@ -10,12 +10,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **Custom tokens.** Add any MRC-20 token by its contract address, on Mainnet or Buildnet
-  (Tokens → + Add a token, or Settings → Custom tokens). The wallet reads the token's name,
-  symbol and decimals from its contract and shows them for review before adding it; its balance
-  then appears with your tokens and you can send it. Added tokens are marked *Added by you*, the
+  (Settings → Custom tokens). The wallet reads the token's name, symbol and decimals from its
+  contract and shows them for review before adding it; its balance then appears with your tokens
+  and you can send it. Added tokens are marked *Added by you*, the
   Send review shows their contract, and a token can't take the symbol of one RustCore already
   lists. Removing one only hides it — the tokens stay in your wallet on the blockchain. Custom
   tokens have no USD price and can't be swapped.
+- **Icons for custom tokens**, from an `https://` or `ipfs://` link (loaded through ipfs.io),
+  set when adding the token or later from Settings → Custom tokens. The icon is loaded from that
+  server each time the token is shown, which the wallet says next to the field (and the README
+  lists among the network destinations).
 
 ### Changed
 

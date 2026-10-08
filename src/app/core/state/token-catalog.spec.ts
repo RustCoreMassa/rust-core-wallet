@@ -128,6 +128,34 @@ describe('TokenCatalog', () => {
     expect(create().custom()).toEqual([]);
   });
 
+  it('sets, saves and clears a custom token’s icon', async () => {
+    const catalog = create();
+    const { network, token } = await catalog.lookup(TOKEN);
+    catalog.add(network, token);
+    const cid = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG';
+    catalog.setIcon('mainnet', TOKEN, catalog.parseIcon(`ipfs://${cid}`));
+    expect(catalog.meta(TOKEN)?.asset).toBe(`https://ipfs.io/ipfs/${cid}`);
+    expect(create().custom()[0].icon).toBe(`ipfs://${cid}`);
+
+    const again = create();
+    again.setIcon('mainnet', TOKEN, null);
+    expect(again.meta(TOKEN)?.asset).toBe('');
+    expect('icon' in create().custom()[0]).toBe(false);
+  });
+
+  it('drops a saved icon that is not a valid link, keeping the token', () => {
+    localStorage.setItem(
+      'massa-wallet:custom-tokens',
+      JSON.stringify({
+        mainnet: [{ ...WMAS, contract: TOKEN, icon: 'javascript:alert(1)' }],
+        buildnet: [],
+      }),
+    );
+    const catalog = create();
+    expect(catalog.custom()).toEqual([{ ...WMAS, contract: TOKEN }]);
+    expect(catalog.meta(TOKEN)?.asset).toBe('');
+  });
+
   it('names a removed token by its shortened contract in history', async () => {
     const catalog = create();
     const { network, token } = await catalog.lookup(TOKEN);

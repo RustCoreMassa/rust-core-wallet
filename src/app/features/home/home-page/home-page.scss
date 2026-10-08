@@ -36,16 +36,6 @@
   color: var(--white);
 }
 
-/* "Show all tokens" and "Add a token", side by side under the list. */
-.token-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.token-actions .token-toggle {
-  flex: 1;
-}
-
 .tx-button {
   display: block;
   width: 100%;

@@ -57,8 +57,9 @@ built on four principles:
 
 Built-in tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b on Massa Mainnet;
 MAS on Buildnet, the test network. **Any other MRC-20 token** can be added by its contract address
-(*Tokens → + Add a token*, or *Settings → Custom tokens*): the wallet reads its name, symbol and
-decimals from the contract, then shows its balance and lets you send it.
+(*Settings → Custom tokens*): the wallet reads its name, symbol and decimals from the contract,
+then shows its balance and lets you send it. You can give it an icon from an `https://` or
+`ipfs://` link.
 
 ## Getting started
 
@@ -87,8 +88,8 @@ it shows a QR code to open it on your phone instead.
   drops them.
 - A short-lived cache of balances and history, encrypted the same way and deleted when the tab
   closes.
-- The tokens you added by contract address — public information, kept unencrypted so the wallet
-  knows what to show. Logging out deletes the list.
+- The tokens you added by contract address, and the icon links you set for them — kept
+  unencrypted so the wallet knows what to show. Logging out deletes the list.
 
 **What goes over the network — the complete list**
 
@@ -97,6 +98,7 @@ it shows a QR code to open it on your phone instead.
 | The DeWeb gateway you open the wallet from | Delivers the wallet itself, read from the Massa blockchain. |
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa's public nodes: balances, rolls, tokens, prices and swaps, and the transactions you confirm. |
 | `explorer-api.massa.net` | Your transaction history. |
+| Icon links you set for custom tokens (only if you set one) | Loads that icon whenever the token is shown — from the address you entered, or `ipfs.io` for an `ipfs://` link. That server can see your IP address. |
 
 That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.massa.net` and
 `docs.massa.net` open only when you tap them.

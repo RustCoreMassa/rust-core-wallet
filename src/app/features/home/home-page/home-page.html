@@ -94,18 +94,15 @@
     [price]="store.prices()[token.id] ?? 0"
   />
   }
-  <div class="token-actions">
-    @if (hasBuiltinTokens()) {
-    <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
-      @if (showAllTokens()) {
-      Hide low balances
-      } @else {
-      Show all tokens@if (hiddenCount() > 0) { ({{ hiddenCount() }} hidden)}
-      }
-    </button>
+  @if (hasBuiltinTokens()) {
+  <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
+    @if (showAllTokens()) {
+    Hide low balances
+    } @else {
+    Show all tokens@if (hiddenCount() > 0) { ({{ hiddenCount() }} hidden)}
     }
-    <button class="token-toggle" type="button" (click)="modal.open('tokens', 'add')">+ Add a token</button>
-  </div>
+  </button>
+  }
   }
   } @else if (!store.isHistoryLoaded()) {
   <div class="empty-state">Loading history…</div>

@@ -52,8 +52,14 @@
 </div>
 
 <ng-template #lead let-option>
-  @if (option.icon) {
-  <img class="dropdown-icon" [src]="option.icon" alt="" />
+  @if (option.icon && !failedIcons().has(option.icon)) {
+  <img
+    class="dropdown-icon"
+    [src]="option.icon"
+    alt=""
+    referrerpolicy="no-referrer"
+    (error)="iconFailed(option.icon)"
+  />
   } @else if (option.avatar) {
   <span class="dropdown-avatar" [style.background]="option.avatar.background">{{ option.avatar.text }}</span>
   }

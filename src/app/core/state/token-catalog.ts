@@ -9,6 +9,7 @@ import {
 } from '../models/token.model';
 import { KeyValueStore, LOCAL_STORE } from '../platform/app-storage';
 import { MASSA_PROVIDER, TokenInfo } from '../services/massa-provider';
+import { parseIconLink } from '../utils/token-icon';
 import { Network, NetworkStore } from './network-store';
 
 const STORAGE_KEY = 'massa-wallet:custom-tokens';
@@ -89,15 +90,26 @@ function isCustomToken(value: unknown): value is CustomToken {
   );
 }
 
+/** A saved icon link that doesn't pass (edited storage) is dropped; the token stays. */
+function withCheckedIcon({ icon, ...token }: CustomToken): CustomToken {
+  try {
+    const link = typeof icon === 'string' ? parseIconLink(icon) : null;
+    return link ? { ...token, icon: link } : token;
+  } catch {
+    return token;
+  }
+}
+
 function load(store: KeyValueStore): CustomTokens {
   const empty: CustomTokens = { mainnet: [], buildnet: [] };
+  const valid = (list: unknown) =>
+    (Array.isArray(list) ? list : [])
+      .filter(isCustomToken)
+      .map(withCheckedIcon);
   try {
     const saved = JSON.parse(store.getItem(STORAGE_KEY) ?? 'null') as Partial<CustomTokens> | null;
     if (!saved) return empty;
-    return {
-      mainnet: (Array.isArray(saved.mainnet) ? saved.mainnet : []).filter(isCustomToken),
-      buildnet: (Array.isArray(saved.buildnet) ? saved.buildnet : []).filter(isCustomToken),
-    };
+    return { mainnet: valid(saved.mainnet), buildnet: valid(saved.buildnet) };
   } catch {
     return empty;
   }
@@ -178,6 +190,23 @@ export class TokenCatalog {
   add(network: Network, token: CustomToken): void {
     if (this._custom()[network].some((t) => t.contract === token.contract)) return;
     this.update((all) => ({ ...all, [network]: [...all[network], token] }));
+  }
+
+  /** Checks an icon link as typed (see parseIconLink); `null` when the field is empty. */
+  parseIcon(input: string): string | null {
+    return parseIconLink(input);
+  }
+
+  /** Sets or (with `null`) clears a custom token's icon; `icon` comes from `parseIcon`. */
+  setIcon(network: Network, contract: string, icon: string | null): void {
+    this.update((all) => ({
+      ...all,
+      [network]: all[network].map((t) => {
+        if (t.contract !== contract) return t;
+        const { icon: _old, ...token } = t;
+        return icon ? { ...token, icon } : token;
+      }),
+    }));
   }
 
   remove(network: Network, contract: string): void {

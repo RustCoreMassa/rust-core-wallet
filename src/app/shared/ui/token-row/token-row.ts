@@ -1,11 +1,12 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { TokenMeta } from '../../../core/models/token.model';
 import { AmountPipe } from '../../pipes/amount-pipe';
+import { TokenIcon } from '../token-icon/token-icon';
 
 @Component({
   selector: 'app-token-row',
-  imports: [CurrencyPipe, AmountPipe],
+  imports: [CurrencyPipe, AmountPipe, TokenIcon],
   templateUrl: './token-row.html',
   styleUrl: './token-row.scss',
 })
@@ -16,10 +17,6 @@ export class TokenRow {
   readonly price = input<number>(0);
 
   protected readonly symbol = computed(() => this.token().symbol);
-  /** Set when the icon image fails to load — the row falls back to a symbol badge. */
-  protected readonly iconFailed = signal(false);
-  /** Custom tokens have no icon of their own: a symbol badge. */
-  protected readonly showBadge = computed(() => this.iconFailed() || !this.token().asset);
   protected readonly hasPrice = computed(() => this.price() > 0);
   protected readonly usdValue = computed(() => this.balance() * this.price());
 

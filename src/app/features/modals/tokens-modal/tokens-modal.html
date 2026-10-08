@@ -5,10 +5,33 @@
       @case ('list') { Custom tokens }
       @case ('add') { Add a token }
       @case ('review') { Review token }
+      @case ('icon') { Token icon }
       }
     </div>
     <button class="modal-close" type="button" (click)="modal.close()">✕</button>
   </div>
+
+  <ng-template #iconField>
+    <label class="field-label" for="token-icon">Icon link <span class="optional">(optional)</span></label>
+    <div class="icon-field">
+      <app-token-icon [src]="iconPreview()" [symbol]="editing()?.symbol ?? '?'" />
+      <input
+        id="token-icon"
+        class="num-input"
+        type="url"
+        placeholder="https://… or ipfs://…"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        [ngModel]="iconLink()"
+        (ngModelChange)="iconLink.set($event)"
+      />
+    </div>
+    <p class="hint">
+      The image is loaded from this link each time the token is shown (ipfs:// links through
+      ipfs.io), so that server can see your IP address.
+    </p>
+  </ng-template>
 
   @switch (step()) {
   @case ('list') {
@@ -18,12 +41,13 @@
   </p>
   @for (token of custom(); track token.contract) {
   <div class="custom-token">
-    <div class="custom-token-badge">{{ token.symbol.slice(0, 4) }}</div>
+    <app-token-icon [src]="iconOf(token)" [symbol]="token.symbol" />
     <div class="custom-token-main">
       <div class="custom-token-name">{{ token.symbol }} · {{ token.name }}</div>
       <div class="custom-token-contract">{{ short(token.contract) }}</div>
     </div>
-    <button class="btn btn-ghost custom-token-remove" type="button" (click)="remove(token)">Remove</button>
+    <button class="btn btn-ghost custom-token-action" type="button" (click)="editIcon(token)">Icon</button>
+    <button class="btn btn-ghost custom-token-action" type="button" (click)="remove(token)">Remove</button>
   </div>
   } @empty {
   <div class="tokens-empty">No custom tokens on {{ networkLabel() }} yet.</div>
@@ -48,6 +72,7 @@
   <p class="hint">
     On {{ networkLabel() }}. The name, symbol and decimals are read from the token's contract.
   </p>
+  <ng-container *ngTemplateOutlet="iconField" />
   @if (error()) {
   <div class="error-text">{{ error() }}</div>
   }
@@ -63,6 +88,12 @@
   }
 
   @case ('review') {
+  @if (found(); as f) {
+  <div class="review-head">
+    <app-token-icon [src]="iconOf(f.token)" [symbol]="f.token.symbol" />
+    <div class="custom-token-name">{{ f.token.symbol }} · {{ f.token.name }}</div>
+  </div>
+  }
   @if (error()) {
   <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
   }
@@ -75,6 +106,20 @@
     (confirmed)="add()"
     (cancelled)="cancelReview()"
   />
+  }
+
+  @case ('icon') {
+  @if (editing(); as token) {
+  <p class="tokens-intro">{{ token.symbol }} · {{ token.name }} — {{ short(token.contract) }}</p>
+  }
+  <ng-container *ngTemplateOutlet="iconField" />
+  @if (error()) {
+  <div class="error-text">{{ error() }}</div>
+  }
+  <button class="btn btn-red" type="button" (click)="saveIcon()">
+    {{ iconLink().trim() ? 'Save icon' : 'Remove icon' }}
+  </button>
+  <button class="btn btn-ghost" type="button" (click)="backToList()">Back</button>
   }
   }
 </div>

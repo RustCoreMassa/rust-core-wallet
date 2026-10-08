@@ -1,3 +1,5 @@
+import { iconSource } from '../utils/token-icon';
+
 export type TokenSymbol =
   'MAS' | 'PUR' | 'DUSA' | 'USDC.e' | 'WETH.e' | 'DAI.e' | 'WBTC.e' | 'WETH.b' | 'USDT.b';
 
@@ -16,7 +18,7 @@ export interface TokenMeta<S extends string = string> {
   /** MRC-20 contract address; empty string for the native MAS coin. */
   readonly contract: string;
   readonly isErc20: boolean;
-  /** Icon path; empty for custom tokens (the UI shows a symbol badge). */
+  /** Icon path or URL; empty for a custom token without one (the UI shows a symbol badge). */
   readonly asset: string;
   /** Added by the user from its contract address — not vetted by RustCore. */
   readonly custom?: boolean;
@@ -28,6 +30,8 @@ export interface CustomToken {
   readonly symbol: string;
   readonly name: string;
   readonly decimals: number;
+  /** Icon link the user set (`https://…` or `ipfs://…`, see utils/token-icon.ts). */
+  readonly icon?: string;
 }
 
 /**
@@ -124,8 +128,9 @@ export const TOKEN_REGISTRY: Readonly<Record<TokenSymbol, TokenMeta<TokenSymbol>
 export const TOKEN_LIST: readonly TokenMeta<TokenSymbol>[] = Object.values(TOKEN_REGISTRY);
 
 /** The meta of a custom token, shaped like a built-in one. */
-export function customTokenMeta(token: CustomToken): TokenMeta {
-  return { ...token, id: token.contract, isErc20: true, asset: '', custom: true };
+export function customTokenMeta({ icon, ...token }: CustomToken): TokenMeta {
+  const asset = icon ? iconSource(icon) : '';
+  return { ...token, id: token.contract, isErc20: true, asset, custom: true };
 }
 
 /** A value per token id; the built-in symbols are spelled out so `.MAS` reads as a property. */
