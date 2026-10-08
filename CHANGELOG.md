@@ -17,6 +17,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lists. Removing one only hides it — the tokens stay in your wallet on the blockchain. Custom
   tokens have no USD price and can't be swapped.
 
+### Changed
+
+- **The wallet's address is now Massa's official gateway, wrustcore.massa.net.** Opened from the
+  old community gateway (wrustcore.deweb.half-red.net), the wallet shows how to move: back up
+  each private key there, import it at the new address. A browser keeps a wallet only at the
+  address where it was created, so it can't move by itself. The old address no longer offers to
+  install the app, and its desktop QR code points to the new one.
+
 ## [1.2.0] — 2026-10-07
 
 ### Added

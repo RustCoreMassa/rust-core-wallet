@@ -17,7 +17,7 @@
 
 <p align="center">
   <b>Open it on your phone:</b>
-  <a href="https://wrustcore.deweb.half-red.net"><b>wrustcore.massa</b></a>
+  <a href="https://wrustcore.massa.net"><b>wrustcore.massa</b></a>
   — live on DeWeb
 </p>
 
@@ -66,8 +66,8 @@ RustCore Wallet runs in your **phone's browser** — Android or iPhone, any brow
 it shows a QR code to open it on your phone instead.
 
 1. **Open it** on your phone: **`wrustcore.massa`** — tap
-   [wrustcore.deweb.half-red.net](https://wrustcore.deweb.half-red.net) or open `wrustcore.massa`
-   through any DeWeb gateway or [Massa Station](https://station.massa.network).
+   [wrustcore.massa.net](https://wrustcore.massa.net) (Massa's official gateway) or open
+   `wrustcore.massa` through any DeWeb gateway or [Massa Station](https://station.massa.network).
 2. **Install it** (recommended): the wallet offers it at the top of the screen.
    - *Android* — tap **Install app**.
    - *iPhone / iPad* — tap **Share**, then **Add to Home Screen**. Do this **before** creating
@@ -149,6 +149,14 @@ including RustCore — can recover the funds.
 **Is there a fee?** RustCore charges nothing. Each transaction pays the Massa network fee
 (0.01 MAS), and swaps also send a small storage deposit required by the Dusa exchange
 (0.1 MAS).
+
+**I used the wallet at wrustcore.deweb.half-red.net — where is it now?** The wallet moved to
+Massa's official gateway, [wrustcore.massa.net](https://wrustcore.massa.net). It's the same app,
+but your browser keeps a wallet only at the address where it was created, so it doesn't follow by
+itself. Open the old address — it shows the steps: back up the private key of every wallet
+(*Settings → Backup private key*), open wrustcore.massa.net, create a PIN and import the keys. If
+you installed the app, install it again from the new address. Your funds are on the blockchain,
+not in the app: nothing is lost as long as you have your keys.
 
 **Why doesn't it work on my computer?** It's built for phones. A browser extension for desktop is
 built and in review at the browser stores; it will be listed here once it's published.
