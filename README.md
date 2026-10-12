@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.0" src="https://img.shields.io/badge/version-1.3.0-brightgreen" />
+  <img alt="Version 1.4.0" src="https://img.shields.io/badge/version-1.4.0-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
@@ -38,7 +38,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.3.0** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.4.0** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -51,7 +51,7 @@ built on four principles:
 | 🔄 **Swap** | Exchange tokens through the [Dusa](https://dusa.io) exchange, with a live quote and protection against price moves. |
 | 🥩 **Stake** | Buy and sell rolls, see whether your wallet is staking, your produced and missed slots, the current APR and your estimated daily reward. |
 | 🧾 **History** | Every transaction of your wallet, with full details and a link to the Massa explorer. |
-| 🌐 **Domains** | See the `.massa` names your wallet owns. |
+| 🌐 **Domains** | See the `.massa` names your wallet owns, and register new ones. |
 | 💲 **Prices** | Token values in USD, read directly from the Dusa exchange. |
 | 📲 **Install it** | Add it to your home screen on Android or iPhone and it opens full screen, like a native app. |
 
@@ -175,7 +175,7 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Installable app (Android & iOS)
 - [x] Published on DeWeb (`wrustcore.massa`)
 - [x] Import custom tokens from Settings
-- [ ] Register new `.massa` domains from the NFTs page
+- [x] Register new `.massa` domains from the NFTs page
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations

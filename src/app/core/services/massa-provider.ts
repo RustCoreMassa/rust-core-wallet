@@ -113,6 +113,25 @@ export interface MassaProvider {
   // ---- Massa Name System ----------------------------------------------------
   /** Domains owned by `address`, each with the address it resolves to. */
   getOwnedDomains(address: string): Promise<MnsDomain[]>;
+  /**
+   * What registering `name` (well formed, without ".massa") sends to the MNS
+   * contract — its fee plus the storage deposit — or `null` when it's taken.
+   */
+  getDomainCost(name: string): Promise<bigint | null>;
+  /** Runs the registration read-only as `caller` — what would happen, with nothing sent. */
+  simulateDomainRegistration(
+    caller: string,
+    name: string,
+    target: string,
+    coins: bigint,
+  ): Promise<CallSimulation>;
+  /** Registers `name` to the key's account (the owner), resolving to `target`. */
+  registerDomain(
+    privateKey: string,
+    name: string,
+    target: string,
+    coins: bigint,
+  ): Promise<OperationResult>;
 
   // ---- dApps ------------------------------------------------------------------
   /** Signs `data` with the key's account, exactly as massa-web3's `Provider.sign` does. */

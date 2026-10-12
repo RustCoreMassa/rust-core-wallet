@@ -18,17 +18,19 @@ export const PENDING_TTL_MS = 10 * 60_000;
  * reports their operation, or after PENDING_TTL_MS if it never does.
  * MRC-20 transfers reach the explorer as a bare `CallSC` (no token, no
  * amount), so when a send we know about matches one by operation id, the
- * known token/amount is kept and only status/time/fee come from chain.
+ * known token/amount (or registered domain) is kept and only status/time/fee come from chain.
  */
 export function mergeHistory(
   existing: readonly TransactionRecord[],
   incoming: readonly TransactionRecord[],
 ): TransactionRecord[] {
-  // Token sends and swaps only (both reach the explorer as a bare CallSC);
-  // a contract call's payouts share its operation id and would otherwise
-  // shadow the record in this map.
+  // Token sends, swaps and domain registrations only (all reach the explorer
+  // as a bare CallSC); a contract call's payouts share its operation id and
+  // would otherwise shadow the record in this map.
   const knownCalls = new Map(
-    existing.filter((r) => r.type === 'send' || r.type === 'swap').map((r) => [r.operationId, r]),
+    existing
+      .filter((r) => r.type === 'send' || r.type === 'swap' || r.type === 'register_domain')
+      .map((r) => [r.operationId, r]),
   );
   const incomingOps = new Set(incoming.map((r) => r.operationId));
 

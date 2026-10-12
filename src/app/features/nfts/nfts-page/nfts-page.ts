@@ -8,7 +8,8 @@ import { avatarColorsFor } from '../../../shared/ui/avatar-colors';
  * MNS domains owned by the active wallet, read on-chain from the Massa
  * Name System contract on the current network. They're cached in
  * WalletStore, so revisiting the page shows them instantly; the chain is
- * re-read in the background only when the cached list is stale.
+ * re-read in the background only when the cached list is stale. New names
+ * are registered from here (RegisterDomainModal).
  *
  * NFTs are shown as "coming soon" until an NFT data source is chosen.
  */
@@ -45,6 +46,10 @@ export class NftsPage {
 
   protected openDomain(domain: MnsDomain): void {
     this.modal.open('domain-details', domain);
+  }
+
+  protected registerDomain(): void {
+    this.modal.open('register-domain');
   }
 
   private load(): void {

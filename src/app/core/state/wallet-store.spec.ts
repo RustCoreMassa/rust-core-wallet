@@ -44,6 +44,12 @@ function fakeProvider() {
     simulateCall: vi.fn(async () => ({ error: null as string | null, gasCost: 2_100_000n })),
     callContract: vi.fn(async () => ({ operationId: 'Ocall' })),
     getTokenInfo: vi.fn(async () => ({ name: 'Wrapped Massa', symbol: 'WMAS', decimals: 9 })),
+    getDomainCost: vi.fn(async (): Promise<bigint | null> => 1_100_000_000n), // 1 + 0.1 MAS
+    simulateDomainRegistration: vi.fn(async () => ({
+      error: null as string | null,
+      gasCost: 2_100_000n,
+    })),
+    registerDomain: vi.fn(async () => ({ operationId: 'Odomain' })),
   } satisfies Partial<MassaProvider>;
 }
 
@@ -217,6 +223,93 @@ describe('WalletStore', () => {
 
     it('cannot sell more rolls than are active', () => {
       expect(() => store.validateSellRolls(1)).toThrow(/Not enough active rolls/);
+    });
+  });
+
+  describe('domain registration', () => {
+    it('prices a free name from the contract and tests it as the active wallet', async () => {
+      const r = await store.prepareDomainRegistration('  Alice.massa ');
+      expect(r).toMatchObject({
+        name: 'alice',
+        network: 'mainnet',
+        walletId: 'a',
+        target: A,
+        coins: 1_100_000_000n,
+        fee: 1,
+        deposit: 0.1,
+      });
+      expect(provider.getDomainCost).toHaveBeenCalledWith('alice');
+      expect(provider.simulateDomainRegistration).toHaveBeenCalledWith(
+        A,
+        'alice',
+        A,
+        1_100_000_000n,
+      );
+    });
+
+    it('refuses a malformed name without reading the chain', async () => {
+      await expect(store.prepareDomainRegistration('a')).rejects.toThrow(/at least 2/);
+      await expect(store.prepareDomainRegistration('al_ice')).rejects.toThrow(/only letters/);
+      await expect(store.prepareDomainRegistration('é' + 'x')).rejects.toThrow(/only letters/);
+      expect(provider.getDomainCost).not.toHaveBeenCalled();
+    });
+
+    it('says when the name is taken', async () => {
+      provider.getDomainCost.mockResolvedValueOnce(null);
+      await expect(store.prepareDomainRegistration('wrustcore')).rejects.toThrow(
+        'wrustcore.massa is already taken',
+      );
+      expect(provider.simulateDomainRegistration).not.toHaveBeenCalled();
+    });
+
+    it('needs the coins plus the network fee', async () => {
+      chain.mas['S1b'] = 1_100_000_000n; // exactly the coins, nothing for the fee
+      await store.refresh('b');
+      store.switchWallet('b');
+      await expect(store.prepareDomainRegistration('alice')).rejects.toThrow(/Insufficient MAS/);
+      chain.mas['S1b'] = 1_110_000_000n;
+      await store.refresh('b');
+      await expect(store.prepareDomainRegistration('alice')).resolves.toBeTruthy();
+    });
+
+    it('refuses what the contract rejects in the test run', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      provider.simulateDomainRegistration.mockResolvedValueOnce({
+        error: 'VM Error … Domain already registered at assembly/contracts/main.ts:201',
+        gasCost: 0n,
+      });
+      await expect(store.prepareDomainRegistration('alice')).rejects.toThrow(
+        'alice.massa is already taken',
+      );
+    });
+
+    it('registers, records it in history and re-reads balance and domains', async () => {
+      const r = await store.prepareDomainRegistration('alice');
+      provider.getOwnedDomains.mockResolvedValueOnce([{ name: 'alice', target: A }] as never);
+      await store.registerDomain(r);
+      expect(provider.registerDomain).toHaveBeenCalledWith('S1a', 'alice', A, 1_100_000_000n);
+      expect(store.wallets()['a'].history[0]).toMatchObject({
+        type: 'register_domain',
+        domain: 'alice',
+        amount: 1.1,
+        operationId: 'Odomain',
+      });
+      expect(store.wallets()['a'].domains).toEqual([{ name: 'alice', target: A }]);
+      expect(provider.getBalance).toHaveBeenLastCalledWith('S1a', false);
+    });
+
+    it('changes nothing when the registration fails on-chain', async () => {
+      const r = await store.prepareDomainRegistration('alice');
+      provider.registerDomain.mockRejectedValueOnce(new OperationFailedError('Odomain', 'x'));
+      await expect(store.registerDomain(r)).rejects.toThrow(OperationFailedError);
+      expect(store.wallets()['a'].history).toEqual([]);
+    });
+
+    it('won’t register on another network than the one it was priced on', async () => {
+      const r = await store.prepareDomainRegistration('alice');
+      store.setNetwork('buildnet');
+      await expect(store.registerDomain(r)).rejects.toThrow(/network changed/);
+      expect(provider.registerDomain).not.toHaveBeenCalled();
     });
   });
 

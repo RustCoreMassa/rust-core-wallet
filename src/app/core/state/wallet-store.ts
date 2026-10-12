@@ -25,6 +25,12 @@ import {
   SignedMessage,
 } from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
+import {
+  MNS_STORAGE_DEPOSIT_MAS,
+  domainNameError,
+  normalizeDomainName,
+  rejectedRegistrationMessage,
+} from '../utils/mns-domain';
 import { fromUnits, toUnits } from '../utils/token-amount';
 import { AuthStore } from './auth-store';
 import {
@@ -109,6 +115,21 @@ const MAX_GAS_CALL = 4_294_167_295n;
 
 /** A dApp's contract call, before the wallet settles its fee. */
 export type DappCall = Omit<ContractCallParams, 'fee'> & { readonly fee?: bigint };
+
+/** A .massa name checked and priced on-chain, ready for the Review step. */
+export interface DomainRegistration {
+  /** Without ".massa". */
+  readonly name: string;
+  readonly network: Network;
+  /** The registering wallet: it becomes the owner, and the name points to its address. */
+  readonly walletId: string;
+  readonly target: string;
+  /** Sent with the call, in nanoMAS: the registration fee plus the storage deposit. */
+  readonly coins: bigint;
+  /** The parts of `coins`, in MAS, for the Review step. */
+  readonly fee: number;
+  readonly deposit: number;
+}
 
 /** The fee a dApp call pays: what the site asked for, never below the wallet's own fee. */
 export function dappCallFee(call: DappCall): bigint {
@@ -827,6 +848,88 @@ export class WalletStore {
       network,
     );
     await this.refreshTouched([wallet.id], network);
+  }
+
+  // ---- .massa domains --------------------------------------------------------
+
+  /**
+   * Checks a name the active wallet wants to register and prices it: well
+   * formed, free (read on-chain), affordable, and accepted by the MNS
+   * contract in a read-only test run as this wallet. Nothing is sent.
+   */
+  async prepareDomainRegistration(input: string): Promise<DomainRegistration> {
+    const network = this.network();
+    const name = normalizeDomainName(input);
+    const nameError = domainNameError(name);
+    if (nameError) throw new Error(nameError);
+    const wallet = this.loadedWallet(this._activeWalletId());
+
+    const coins = await this.provider.getDomainCost(name);
+    if (coins === null) throw new Error(`${name}.massa is already taken`);
+    const depositUnits = toUnits(MNS_STORAGE_DEPOSIT_MAS, MAS_DECIMALS);
+    if (coins < depositUnits) throw new Error("Couldn't read the registration price — try again");
+    const registration: DomainRegistration = {
+      name,
+      network,
+      walletId: wallet.id,
+      target: wallet.address,
+      coins,
+      fee: fromUnits(coins - depositUnits, MAS_DECIMALS),
+      deposit: MNS_STORAGE_DEPOSIT_MAS,
+    };
+    this.validateDomainRegistration(registration);
+
+    const { error } = await this.provider.simulateDomainRegistration(
+      wallet.address,
+      name,
+      wallet.address,
+      coins,
+    );
+    if (error) throw new Error(rejectedRegistrationMessage(error, name));
+    return registration;
+  }
+
+  /** Throws unless the registering wallet still holds the coins plus the network fee. */
+  validateDomainRegistration(registration: DomainRegistration): void {
+    if (registration.network !== this.network()) {
+      throw new Error('The network changed — check the name again');
+    }
+    assertMasUnits(
+      this.loadedWallet(registration.walletId),
+      registration.coins + FEE_UNITS,
+      `Insufficient MAS — registering ${registration.name}.massa costs ` +
+        `${fromUnits(registration.coins, MAS_DECIMALS)} MAS plus the ${NETWORK_FEE_MAS} MAS network fee`,
+    );
+  }
+
+  /** Registers a name prepared by `prepareDomainRegistration`, then re-reads the wallet's domains. */
+  async registerDomain(registration: DomainRegistration): Promise<void> {
+    const { name, network, walletId, target, coins } = registration;
+    this.validateDomainRegistration(registration);
+    const wallet = this.loadedWallet(walletId);
+
+    const { operationId } = await this.afterWrite([walletId], network, () =>
+      this.provider.registerDomain(this.privateKeyFor(walletId), name, target, coins),
+    );
+    this.addHistory(
+      walletId,
+      {
+        type: 'register_domain',
+        token: 'MAS',
+        // What left the wallet; the unused storage deposit comes back as a separate payment.
+        amount: fromUnits(coins, MAS_DECIMALS),
+        domain: name,
+        counterparty: 'Massa Name System',
+        from: wallet.address,
+        operationId,
+      },
+      network,
+    );
+    this.domainsFetchedAt.delete(`${network}:${walletId}`);
+    await this.refreshTouched([walletId], network);
+    if (this.network() === network && this._activeWalletId() === walletId) {
+      await this.loadDomains().catch((err) => console.warn('Loading MNS domains failed', err));
+    }
   }
 
   // ---- dApp requests (the extension's approval window) -------------------------

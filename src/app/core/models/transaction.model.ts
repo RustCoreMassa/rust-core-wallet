@@ -7,7 +7,8 @@ export type TransactionType =
   | 'buy_rolls'
   | 'sell_rolls'
   | 'reward'
-  | 'contract_call';
+  | 'contract_call'
+  | 'register_domain';
 
 /**
  * `pending` — sent from this app, not yet seen by the explorer;
@@ -35,6 +36,8 @@ export interface TransactionRecord {
   /** Full sender / recipient addresses, for the details view. */
   readonly from?: string;
   readonly to?: string;
+  /** The registered name (without ".massa"), for register_domain. */
+  readonly domain?: string;
   /** Number of rolls, for buy_rolls/sell_rolls. */
   readonly rollCount?: number;
   /**
