@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-10-12
+
 ### Added
 
 - **Register `.massa` names.** NFTs → Domains → *Register*: type a name, see its price (set by
@@ -175,6 +177,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.4.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.4.0
 [1.3.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.3.0
 [1.2.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.2.0
 [1.1.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.1.1
