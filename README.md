@@ -174,7 +174,8 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] `.massa` domains
 - [x] Installable app (Android & iOS)
 - [x] Published on DeWeb (`wrustcore.massa`)
-- [ ] Import custom tokens from Settings
+- [x] Import custom tokens from Settings
+- [ ] Register new `.massa` domains from the NFTs page
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations
