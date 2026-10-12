@@ -14,6 +14,7 @@ export type ModalId =
   | 'domain-details'
   | 'connected-sites'
   | 'tokens'
+  | 'register-domain'
   | null;
 
 @Injectable({ providedIn: 'root' })

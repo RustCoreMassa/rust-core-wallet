@@ -51,7 +51,7 @@ built on four principles:
 | 🔄 **Swap** | Exchange tokens through the [Dusa](https://dusa.io) exchange, with a live quote and protection against price moves. |
 | 🥩 **Stake** | Buy and sell rolls, see whether your wallet is staking, your produced and missed slots, the current APR and your estimated daily reward. |
 | 🧾 **History** | Every transaction of your wallet, with full details and a link to the Massa explorer. |
-| 🌐 **Domains** | See the `.massa` names your wallet owns. |
+| 🌐 **Domains** | See the `.massa` names your wallet owns, and register new ones. |
 | 💲 **Prices** | Token values in USD, read directly from the Dusa exchange. |
 | 📲 **Install it** | Add it to your home screen on Android or iPhone and it opens full screen, like a native app. |
 
@@ -175,7 +175,7 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Installable app (Android & iOS)
 - [x] Published on DeWeb (`wrustcore.massa`)
 - [x] Import custom tokens from Settings
-- [ ] Register new `.massa` domains from the NFTs page
+- [x] Register new `.massa` domains from the NFTs page
 - [ ] NFT gallery
 - [ ] Independent security audit
 - [ ] Translations

@@ -24,6 +24,12 @@
       <dt>Amount</dt>
       <dd>{{ tx.amount | number: '1.0-9' }} {{ tokenSymbol() }}</dd>
     </div>
+    @if (tx.domain) {
+    <div class="tx-field">
+      <dt>Domain</dt>
+      <dd>{{ tx.domain }}.massa</dd>
+    </div>
+    }
     @if (tx.rollCount) {
     <div class="tx-field">
       <dt>Rolls</dt>

@@ -6,9 +6,12 @@
       <div class="section-title">Domains</div>
       <div class="section-sub">Massa Name System</div>
     </div>
-    @if (domains(); as domains) {
-    <span class="count-pill">{{ domains.length }}</span>
-    }
+    <div class="section-actions">
+      @if (domains(); as domains) {
+      <span class="count-pill">{{ domains.length }}</span>
+      }
+      <button class="register-btn" type="button" (click)="registerDomain()">+ Register</button>
+    </div>
   </div>
 
   @if (domains(); as domains) {
@@ -30,6 +33,9 @@
   <div class="collect-empty">
     <div class="collect-empty-title">No domains yet</div>
     <div class="collect-empty-sub">.massa names owned by this wallet will show up here.</div>
+    <button class="btn btn-red register-cta" type="button" (click)="registerDomain()">
+      Register a .massa name
+    </button>
   </div>
   }
   } @else if (hasError()) {

@@ -84,6 +84,29 @@ describe('mergeHistory', () => {
     });
   });
 
+  it('keeps the registered domain when the explorer shows the registration as a CallSC', () => {
+    const local = record({
+      id: 't1',
+      operationId: 'O5',
+      local: true,
+      type: 'register_domain',
+      domain: 'alice',
+      amount: 1.1,
+      status: 'pending',
+    });
+    const callSc = record({ id: 'O5', type: 'contract_call', amount: 1.1, status: 'final' });
+    // The unused storage deposit comes back as a payout of the same operation.
+    const refund = record({ id: 'O5_1', operationId: 'O5', type: 'receive', amount: 0.05 });
+    const merged = mergeHistory([local], [callSc, refund]);
+    expect(merged.find((r) => r.id === 'O5')).toMatchObject({
+      type: 'register_domain',
+      domain: 'alice',
+      status: 'final',
+      local: false,
+    });
+    expect(merged.find((r) => r.id === 'O5_1')).toMatchObject({ type: 'receive', amount: 0.05 });
+  });
+
   it('keeps swap details the same way', () => {
     const local = record({
       id: 't1',

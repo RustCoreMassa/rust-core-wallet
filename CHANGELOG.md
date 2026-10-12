@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Register `.massa` names.** NFTs → Domains → *Register*: type a name, see its price (set by
+  the Massa Name System: 2 characters 10,000 MAS, 3 → 1,000, 4 → 100, 5 → 10, 6 or more → 1 MAS,
+  plus a 0.1 MAS storage deposit whose unused part comes back). Review checks on-chain that the
+  name is free and runs the registration as a test first, so you only confirm one that would go
+  through. The wallet becomes the owner and the name points to its address; it shows up in your
+  domains and in History.
+
 ## [1.3.0] — 2026-10-08
 
 ### Added

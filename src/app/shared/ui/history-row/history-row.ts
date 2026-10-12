@@ -106,6 +106,15 @@ export class HistoryRow {
           amountText: tx.amount > 0 ? `-${amount} MAS` : '—',
           amountPositive: false,
         };
+      case 'register_domain':
+        return {
+          icon: 'swap',
+          glyph: '◎',
+          title: `Registered ${tx.domain}.massa`,
+          subtitle: 'Massa Name System',
+          amountText: `-${amount} MAS`,
+          amountPositive: false,
+        };
       case 'reward':
       default:
         return {

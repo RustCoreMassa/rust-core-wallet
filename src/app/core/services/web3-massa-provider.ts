@@ -10,6 +10,7 @@ import {
   Web3Provider,
   bytesToStr,
   rpcTypes,
+  strToBytes,
 } from '@massalabs/massa-web3';
 import { MnsDomain } from '../models/nft.model';
 import { NetworkStore } from '../state/network-store';
@@ -19,12 +20,16 @@ import {
   ContractCallParams,
   GeneratedAccount,
   MassaProvider,
+  NETWORK_FEE_MAS,
   OperationResult,
   ROLL_PRICE_MAS,
   SignedMessage,
   StakingInfo,
   TokenInfo,
 } from './massa-provider';
+
+/** MNS datastore prefix of a name's target (DOMAIN_SEPARATOR_KEY + TARGET_KEY_PREFIX). */
+const MNS_TARGET_KEY_PREFIX = [0x42, 0x02];
 
 /**
  * Real implementation backed by `@massalabs/massa-web3`, bound to
@@ -168,17 +173,67 @@ export class Web3MassaProvider implements MassaProvider {
   }
 
   async getOwnedDomains(address: string): Promise<MnsDomain[]> {
-    const publicProvider = this.publicProvider();
-    const mns =
-      this.networkStore.network() === 'buildnet'
-        ? MNS.buildnet(publicProvider)
-        : MNS.mainnet(publicProvider);
+    const mns = this.mns(this.publicProvider());
     const names = await mns.getOwnedDomains(address);
     if (!names.length) return [];
     const targets = await mns.getTargets(names);
     return names
       .map((name, i) => ({ name, target: targets[i] || null }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getDomainCost(name: string): Promise<bigint | null> {
+    const provider = this.publicProvider();
+    const mns = this.mns(provider);
+    // The entry dnsAlloc itself checks ("Domain already registered"): the
+    // name's target. MNS.resolve can't be used — it returns "" both for a
+    // free name and for any failed read. Speculative (not final), so a name
+    // registered seconds ago already counts as taken.
+    const [target] = await provider.readStorage(
+      mns.address,
+      [Uint8Array.from([...MNS_TARGET_KEY_PREFIX, ...strToBytes(name)])],
+      false,
+    );
+    if (target !== null) return null;
+    return mns.dnsAllocCost(name);
+  }
+
+  simulateDomainRegistration(
+    caller: string,
+    name: string,
+    target: string,
+    coins: bigint,
+  ): Promise<CallSimulation> {
+    return this.simulateCall(caller, this.domainRegistration(name, target, coins));
+  }
+
+  registerDomain(
+    privateKey: string,
+    name: string,
+    target: string,
+    coins: bigint,
+  ): Promise<OperationResult> {
+    return this.callContract(privateKey, this.domainRegistration(name, target, coins));
+  }
+
+  /**
+   * `dnsAlloc(name, target)`: the caller becomes the owner. (massa-web3's
+   * `MNS.alloc(name, owner)` passes its second argument as the target.)
+   */
+  private domainRegistration(name: string, target: string, coins: bigint): ContractCallParams {
+    return {
+      target: this.mns(this.publicProvider()).address,
+      func: 'dnsAlloc',
+      parameter: new Args().addString(name).addString(target).serialize(),
+      coins,
+      fee: Mas.fromString(String(NETWORK_FEE_MAS)),
+    };
+  }
+
+  private mns(provider: JsonRpcPublicProvider): MNS {
+    return this.networkStore.network() === 'buildnet'
+      ? MNS.buildnet(provider)
+      : MNS.mainnet(provider);
   }
 
   async signMessage(privateKey: string, data: Uint8Array): Promise<SignedMessage> {

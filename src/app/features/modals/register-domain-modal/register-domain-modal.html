@@ -1,0 +1,71 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">{{ registration() ? 'Confirm registration' : 'Register a .massa name' }}</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (!registration()) {
+  <label class="field-label" for="domain-name">Name</label>
+  <div class="field-row">
+    <input
+      id="domain-name"
+      class="num-input"
+      type="text"
+      placeholder="yourname"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      maxlength="106"
+      [ngModel]="input()"
+      (ngModelChange)="input.set($event); error.set(null)"
+      (keydown.enter)="review()"
+    />
+    <span class="domain-suffix">.massa</span>
+  </div>
+  @if (nameError(); as nameError) {
+  <div class="error-text">{{ nameError }}</div>
+  } @else if (priceHint(); as priceHint) {
+  <div class="hint">{{ priceHint }} + {{ deposit }} MAS storage deposit + {{ networkFee }} MAS fee</div>
+  }
+
+  <dl class="price-table">
+    <dt>Registration fee</dt>
+    <dd><span>2 characters</span><span>10,000 MAS</span></dd>
+    <dd><span>3 characters</span><span>1,000 MAS</span></dd>
+    <dd><span>4 characters</span><span>100 MAS</span></dd>
+    <dd><span>5 characters</span><span>10 MAS</span></dd>
+    <dd><span>6 or more</span><span>1 MAS</span></dd>
+  </dl>
+  <p class="hint">
+    Letters a–z, digits and hyphens, 2 to 100 characters. The name will point to this wallet's
+    address, and this wallet will own it.
+  </p>
+
+  @if (error()) {
+  <div class="error-text">{{ error() }}</div>
+  }
+
+  <button class="btn btn-red" type="button" [disabled]="isChecking() || !!nameError() || !input().trim()" (click)="review()">
+    @if (isChecking()) {
+    <div class="spinner"></div>
+    <span>Checking the name…</span>
+    } @else {
+    <span>Review</span>
+    }
+  </button>
+  } @else {
+  <app-confirm-details
+    [rows]="confirmRows()"
+    [note]="confirmNote"
+    [busy]="isRegistering()"
+    confirmLabel="Confirm & register"
+    busyLabel="Registering on-chain…"
+    (confirmed)="confirm()"
+    (cancelled)="back()"
+  />
+
+  @if (error()) {
+  <div class="error-text">{{ error() }}</div>
+  }
+  }
+</div>

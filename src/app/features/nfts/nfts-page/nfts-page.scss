@@ -25,6 +25,27 @@
   margin-top: 2px;
 }
 
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.register-btn {
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(255, 45, 66, 0.1);
+  border: 1px solid rgba(255, 45, 66, 0.22);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.register-btn:hover {
+  background: rgba(255, 45, 66, 0.18);
+}
+
 .count-pill {
   min-width: 24px;
   padding: 3px 8px;
@@ -124,6 +145,13 @@ button.domain-row:hover {
 
 .collect-empty-sub {
   font-size: 12px;
+}
+
+.register-cta {
+  width: auto;
+  margin-top: 12px;
+  padding: 10px 16px;
+  font-size: 13.5px;
 }
 
 .coming-soon svg {
