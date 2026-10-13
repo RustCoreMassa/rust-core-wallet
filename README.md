@@ -51,7 +51,7 @@ built on four principles:
 | 🔄 **Swap** | Exchange tokens through the [Dusa](https://dusa.io) exchange, with a live quote and protection against price moves. |
 | 🥩 **Stake** | Buy and sell rolls, see whether your wallet is staking, your produced and missed slots, the current APR and your estimated daily reward. |
 | 🧾 **History** | Every transaction of your wallet, with full details and a link to the Massa explorer. |
-| 🌐 **Domains** | See the `.massa` names your wallet owns, and register new ones. |
+| 🌐 **Domains** | See the `.massa` names your wallet owns, and register new ones — the wallet checks the name is free and shows its price before you confirm. |
 | 💲 **Prices** | Token values in USD, read directly from the Dusa exchange. |
 | 📲 **Install it** | Add it to your home screen on Android or iPhone and it opens full screen, like a native app. |
 
@@ -150,7 +150,9 @@ including RustCore — can recover the funds.
 
 **Is there a fee?** RustCore charges nothing. Each transaction pays the Massa network fee
 (0.01 MAS), and swaps also send a small storage deposit required by the Dusa exchange
-(0.1 MAS).
+(0.1 MAS). Registering a `.massa` name costs the fee set by the Massa Name System — 1 MAS for 6
+or more characters, up to 10,000 MAS for 2 — plus a 0.1 MAS storage deposit whose unused part
+comes back.
 
 **I used the wallet at wrustcore.deweb.half-red.net — where is it now?** The wallet moved to
 Massa's official gateway, [wrustcore.massa.network](https://wrustcore.massa.network). It's the
