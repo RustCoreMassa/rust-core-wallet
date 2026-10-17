@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-10-17
+
 ### Added
 
 - **dApps can set the fee of transfers and rolls** in the extension, as they already could for
@@ -207,6 +209,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.5.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.0
 [1.4.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.4.0
 [1.3.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.3.0
 [1.2.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.2.0
