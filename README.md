@@ -150,7 +150,8 @@ including RustCore — can recover the funds.
 
 **Is there a fee?** RustCore charges nothing. Each transaction pays the Massa network fee
 (0.01 MAS), and swaps also send a small storage deposit required by the Dusa exchange
-(0.1 MAS). Registering a `.massa` name costs the fee set by the Massa Name System — 1 MAS for 6
+(0.1 MAS). The first swap of a token also pays, once, for storing its approval (0.015 MAS on
+Mainnet). Registering a `.massa` name costs the fee set by the Massa Name System — 1 MAS for 6
 or more characters, up to 10,000 MAS for 2 — plus a 0.1 MAS storage deposit whose unused part
 comes back.
 
