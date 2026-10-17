@@ -29,7 +29,6 @@
               "grpc-web",
               "lodash.isequal",
               "qrcode",
-              "secure-random",
               "varint"
             ],
             "inlineStyleLanguage": "scss",

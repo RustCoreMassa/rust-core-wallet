@@ -14,7 +14,12 @@ import {
 import { HistoryStream, TransactionRecord } from '../models/transaction.model';
 import { WalletState } from '../models/wallet.model';
 import { DusaPrices } from '../services/dusa-prices';
-import { DusaSwap, SWAP_STORAGE_COST_MAS, SwapQuote } from '../services/dusa-swap';
+import {
+  APPROVAL_STORAGE_MAS,
+  DusaSwap,
+  SWAP_STORAGE_COST_MAS,
+  SwapQuote,
+} from '../services/dusa-swap';
 import { ExplorerApi } from '../services/explorer-api';
 import {
   CallSimulation,
@@ -140,6 +145,14 @@ export function dappCallFee(call: DappCall): bigint {
 function subtractMas(a: number, b: number): number {
   const diff = toUnits(a, MAS_DECIMALS) - toUnits(b, MAS_DECIMALS);
   return diff > 0n ? fromUnits(diff, MAS_DECIMALS) : 0;
+}
+
+/** Sum in MAS, exact to the nanoMAS (no float drift like 0.1 + 0.02). */
+function addMas(...amounts: number[]): number {
+  return fromUnits(
+    amounts.reduce((sum, a) => sum + toUnits(a, MAS_DECIMALS), 0n),
+    MAS_DECIMALS,
+  );
 }
 
 /** Throws unless the wallet holds `required` MAS on top of the network fee. */
@@ -665,8 +678,9 @@ export class WalletStore {
 
   /**
    * Swap checks: Dusa is mainnet-only; the router takes a 0.1 MAS storage
-   * deposit on top of the network fee — plus a second fee for the token
-   * approval when the input isn't MAS.
+   * deposit on top of the network fee — plus, when the input isn't MAS, a
+   * second fee for the token approval and the storage of a new allowance
+   * entry (sent only on the wallet's first approval of that token).
    */
   validateSwap(from: TokenSymbol, to: TokenSymbol, amount: number): void {
     if (this.network() !== 'mainnet') throw new Error('Swaps are available on Mainnet only');
@@ -682,10 +696,11 @@ export class WalletStore {
       );
     } else {
       if (amount > (balances[from] ?? 0)) throw new Error(`Insufficient ${from}`);
+      const required = addMas(SWAP_STORAGE_COST_MAS, APPROVAL_STORAGE_MAS, NETWORK_FEE_MAS);
       assertMasForFee(
         masHeld,
-        SWAP_STORAGE_COST_MAS + NETWORK_FEE_MAS,
-        `You need ${SWAP_STORAGE_COST_MAS + 2 * NETWORK_FEE_MAS} MAS for the swap deposit and fees`,
+        required,
+        `You need ${addMas(required, NETWORK_FEE_MAS)} MAS for the swap and approval deposits and fees`,
       );
     }
   }

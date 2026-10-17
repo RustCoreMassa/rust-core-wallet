@@ -15,6 +15,11 @@ import { waitExecuted } from './operation-execution';
 /** MAS the router requires with every swap for storage (`SWAP_STORAGE_COST` in the SDK). */
 export const SWAP_STORAGE_COST_MAS = 0.1;
 const SWAP_STORAGE_COST = 100_000_000n; // 0.1 MAS in nanoMAS
+/**
+ * Most MAS a first approval of the router sends for its allowance entry's
+ * storage (`MRC20AllowanceCreationCost`: 0.015 MAS on mainnet), rounded up.
+ */
+export const APPROVAL_STORAGE_MAS = 0.02;
 /** How long a signed swap stays valid on-chain. */
 const SWAP_TTL_MS = 10 * 60_000;
 const BPS = 10_000n;
@@ -124,36 +129,26 @@ export class DusaSwap {
       func: 'findBestPathFromAmountIn',
       parameter: quoteArgs(route, amountIn, false),
     });
-    if (result.info.error || !result.value?.length) throw new Error(result.info.error || 'No quote');
+    if (result.info.error || !result.value?.length)
+      throw new Error(result.info.error || 'No quote');
     return decodeQuote(result.value);
   }
 
-  /** SDK `IERC20.approve`: raise the router's allowance only by what's missing. */
-  private async ensureAllowance(provider: Web3Provider, owner: string, q: SwapQuote): Promise<void> {
-    const token = TOKEN_REGISTRY[q.from].contract;
-    const current = await new MRC20(provider, token).allowance(owner, DUSA.v2Router);
-    if (current >= q.amountIn) return;
-
-    const parameter = new Args().addString(DUSA.v2Router).addU256(q.amountIn - current).serialize();
-    const coins = await this.storageCoins(token, 'increaseAllowance', parameter, owner);
-    await waitExecuted(
-      await provider.callSC({ target: token, func: 'increaseAllowance', parameter, coins }),
-    );
-  }
-
   /**
-   * Coins a call needs for storage, read the way the SDK does: simulate it
-   * without coins and parse `Storage__NotEnoughCoinsSent:<n>` from the error.
+   * SDK `IERC20.approve`: raise the router's allowance only by what's missing.
+   * `MRC20.increaseAllowance` sends the storage cost of the allowance entry
+   * when the wallet has none yet for the router (MRC-20 0.1.0 tokens, such as
+   * WMAS after MIP-0002, revert without it and refund what's unused).
    */
-  private async storageCoins(
-    target: string,
-    func: string,
-    parameter: Uint8Array,
-    caller: string,
-  ): Promise<bigint> {
-    const result = await this.publicProvider.readSC({ target, func, parameter, caller, coins: 0n });
-    const match = result.info.error?.match(/Storage__NotEnoughCoinsSent:\s*(\d+)/);
-    return match ? BigInt(match[1]) : 0n;
+  private async ensureAllowance(
+    provider: Web3Provider,
+    owner: string,
+    q: SwapQuote,
+  ): Promise<void> {
+    const token = new MRC20(provider, TOKEN_REGISTRY[q.from].contract);
+    const current = await token.allowance(owner, DUSA.v2Router);
+    if (current >= q.amountIn) return;
+    await waitExecuted(await token.increaseAllowance(DUSA.v2Router, q.amountIn - current));
   }
 
   /** SDK `TradeV2.swapCallParameters` for EXACT_INPUT. */

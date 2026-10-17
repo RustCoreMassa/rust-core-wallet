@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Ready for Massa's MAIN.5.1 node release** (massa-web3 5.4.0). MAIN.5.1 nodes keep an
+  executed operation in their pool until it is final; the wallet would have read that as still
+  pending and reported a timeout for transactions that went through. Works with MAIN.5.0 and
+  MAIN.5.1, before and after MIP-0002.
+- **The first swap of a token pays the storage of its allowance** (0.015 MAS on Mainnet, shown
+  as "up to 0.02 MAS" in Review), sent when the wallet approves the Dusa router for that token
+  the first time. Tokens following MRC-20 0.1.0 — WMAS once MIP-0002 is active — refuse the
+  approval without it and give back what isn't used. Swapping a token now needs 0.14 MAS
+  (was 0.12).
+
 ## [1.4.0] — 2026-10-12
 
 ### Added

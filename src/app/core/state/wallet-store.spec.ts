@@ -331,6 +331,17 @@ describe('WalletStore', () => {
       expect(dusa.quote).toHaveBeenCalledWith('MAS', 'USDC.e', 50_000_000_000n, 50);
     });
 
+    it('keeps MAS back for the approval and its allowance storage when swapping a token', async () => {
+      chain.mas['S1a'] = 139_999_999n; // 0.14 MAS − 1 nanoMAS
+      await store.refresh('a');
+      expect(() => store.validateSwap('DAI.e', 'USDC.e', 0.5)).toThrow(
+        /You need 0\.14 MAS for the swap and approval deposits and fees/,
+      );
+      chain.mas['S1a'] = 140_000_000n; // 0.1 deposit + 0.02 allowance storage + 2 × 0.01 fees
+      await store.refresh('a');
+      expect(() => store.validateSwap('DAI.e', 'USDC.e', 0.5)).not.toThrow();
+    });
+
     it('only allows swaps on mainnet', () => {
       store.setNetwork('buildnet');
       expect(() => store.validateSwap('MAS', 'USDC.e', 1)).toThrow(/Mainnet only/);

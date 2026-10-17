@@ -1,7 +1,11 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TOKEN_LIST, TOKEN_REGISTRY, TokenSymbol } from '../../../core/models/token.model';
-import { SWAP_STORAGE_COST_MAS, SwapQuote } from '../../../core/services/dusa-swap';
+import {
+  APPROVAL_STORAGE_MAS,
+  SWAP_STORAGE_COST_MAS,
+  SwapQuote,
+} from '../../../core/services/dusa-swap';
 import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -102,6 +106,14 @@ export class SwapModal {
       { label: 'Slippage tolerance', value: `${q.slippageBps / 100}%` },
       { label: 'Route', value: q.path.join(' → ') },
       { label: 'Swap deposit', value: `${SWAP_STORAGE_COST_MAS} MAS (router storage)` },
+      ...(q.from === 'MAS'
+        ? []
+        : [
+            {
+              label: 'Approval deposit',
+              value: `Up to ${APPROVAL_STORAGE_MAS} MAS (first swap of ${q.from} only)`,
+            },
+          ]),
       { label: 'Network fee', value: fees },
     ];
   });
