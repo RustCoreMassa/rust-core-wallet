@@ -129,6 +129,12 @@ What the stores ask for:
   `dist/extension/firefox`, byte-identical to the zip. Every file in the source archive is
   hand-written; the only code the build doesn't take from it comes from the npm packages pinned
   in `package-lock.json`.
+  - Do it for **every** version: answer *Yes* to "Do you need to submit source code?", upload
+    the archive, and put the build steps in *Notes to Reviewers* (the README is for users and
+    doesn't carry them). AMO disables a version uploaded without its source ("Sources missing",
+    as happened to 1.2.0).
+  - Use exactly the `.nvmrc` Node.js version: the build is byte-identical with it, and another
+    version may give different bytes.
   - AMO refuses code that is already minified or machine-generated. `@massalabs/massa-web3`
     bundles a gRPC client the wallet never uses: protoc-generated code plus `google-protobuf` and
     `grpc-web`, which npm ships minified. `npm ci` runs `scripts/trim-massa-web3.mjs`
