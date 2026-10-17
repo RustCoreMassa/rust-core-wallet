@@ -7,6 +7,7 @@ import { ApprovalWindow } from './dapp/approval-window';
 import { DappPermissions, PERMISSIONS_ITEM } from './dapp/permissions';
 import { NETWORK_ITEM, PORT_NAME, walletNetworkOf } from './dapp/protocol';
 import { DappRouter } from './dapp/router';
+import { SiteTabs } from './dapp/site-tabs';
 import { AUTO_LOCK_ALARM, SESSION_KEY_ITEM } from './session-constants';
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -18,11 +19,21 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // ------------------------------------------------------------------ dApp connections
 
 const approvalWindow = new ApprovalWindow(() => router.rejectAll());
+const siteTabs = new SiteTabs(chrome.storage.session);
 const router = new DappRouter({
   permissions: new DappPermissions(chrome.storage.local),
   network: async () =>
     walletNetworkOf((await chrome.storage.local.get(NETWORK_ITEM))[NETWORK_ITEM]),
   showApproval: () => approvalWindow.show(),
+  tabs: siteTabs,
+  // Top frame only: content.js isn't injected into frames.
+  sendToTab: async (tabId, message) => {
+    await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
+  },
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  siteTabs.forget(tabId).catch(() => {});
 });
 
 chrome.runtime.onConnect.addListener((port) => {

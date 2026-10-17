@@ -119,9 +119,14 @@ describe('ApprovePage', () => {
       }),
     ]);
     expect(store.prepareDappWallet).toHaveBeenCalledWith('b');
-    expect(store.validateDappTransfer).toHaveBeenCalledWith('b', OUTSIDER, 1_234_567_891n);
+    expect(store.validateDappTransfer).toHaveBeenCalledWith(
+      'b',
+      OUTSIDER,
+      1_234_567_891n,
+      undefined,
+    );
     await page.approve();
-    expect(store.dappTransfer).toHaveBeenCalledWith('b', OUTSIDER, 1_234_567_891n);
+    expect(store.dappTransfer).toHaveBeenCalledWith('b', OUTSIDER, 1_234_567_891n, undefined);
     expect(approvals.resolve).toHaveBeenCalledWith('ap1', { operationId: 'O1sent' });
   });
 
@@ -133,7 +138,7 @@ describe('ApprovePage', () => {
           throw new Error('Insufficient MAS — 0.01 MAS is needed for the network fee');
         }),
     );
-    expect(store.validateDappRolls).toHaveBeenCalledWith('a', 'buy', 5n);
+    expect(store.validateDappRolls).toHaveBeenCalledWith('a', 'buy', 5n, undefined);
     expect(page.blocker()).toMatch(/Insufficient MAS/);
     const approve = [...fixture.nativeElement.querySelectorAll('button')].find(
       (b: HTMLButtonElement) => b.textContent?.trim() === 'Approve',
@@ -142,6 +147,36 @@ describe('ApprovePage', () => {
     await page.approve();
     expect(store.dappRolls).not.toHaveBeenCalled();
     expect(approvals.resolve).not.toHaveBeenCalled();
+  });
+
+  it("shows and passes on the site's fee when it's above the wallet's own", async () => {
+    const { fixture, page, store } = await setup([
+      view({
+        method: 'transfer',
+        params: { to: OUTSIDER, amount: '1000000000', fee: '50000000' },
+        address: SAVINGS,
+      }),
+    ]);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('0.05 MAS');
+    expect(text).toContain('1.05 MAS'); // total
+    expect(store.validateDappTransfer).toHaveBeenCalledWith(
+      'b',
+      OUTSIDER,
+      1_000_000_000n,
+      50_000_000n,
+    );
+    await page.approve();
+    expect(store.dappTransfer).toHaveBeenCalledWith('b', OUTSIDER, 1_000_000_000n, 50_000_000n);
+  });
+
+  it("never shows a fee below the wallet's own", async () => {
+    const { fixture } = await setup([
+      view({ method: 'sellRolls', params: { rolls: '1', fee: '1' }, address: MAIN }),
+    ]);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('0.01 MAS');
+    expect(text).not.toContain('0.000000001 MAS');
   });
 
   it('blocks a request for an account that is no longer in the wallet', async () => {

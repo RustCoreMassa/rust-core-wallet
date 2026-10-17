@@ -113,7 +113,9 @@ if (extension) {
     url: 'https://dapp.example/',
     runScripts: 'outside-only',
   });
-  page.window.chrome = { runtime: { connect: () => ({}) } };
+  page.window.chrome = {
+    runtime: { id: 'smoke', connect: () => ({}), onMessage: { addListener: () => {} } },
+  };
   try {
     page.window.eval(readFileSync(join(dir, 'inpage.js'), 'utf8'));
     page.window.eval(readFileSync(join(dir, 'content.js'), 'utf8'));
@@ -148,7 +150,7 @@ if (extension) {
     console.log(`BOOT FAILED: background.js failed to start — ${e.constructor.name}: ${e.message}`);
     process.exit(1);
   }
-  const expected = ['alarms', 'connect', 'message', 'storage'];
+  const expected = ['alarms', 'connect', 'message', 'storage', 'tabs'];
   if (!expected.every((name) => listening.has(name))) {
     console.log(`BOOT FAILED: background.js listens to ${[...listening]}, expected ${expected}`);
     process.exit(1);

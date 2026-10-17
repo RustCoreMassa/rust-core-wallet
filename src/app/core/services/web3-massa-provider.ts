@@ -75,9 +75,10 @@ export class Web3MassaProvider implements MassaProvider {
     privateKey: string,
     toAddress: string,
     amount: bigint,
+    fee?: bigint,
   ): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    return waitExecuted(await provider.transfer(toAddress, amount));
+    return waitExecuted(await provider.transfer(toAddress, amount, { fee }));
   }
 
   async getTokenBalance(privateKey: string, contractAddress: string): Promise<bigint> {
@@ -162,14 +163,14 @@ export class Web3MassaProvider implements MassaProvider {
     }
   }
 
-  async buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult> {
+  async buyRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    return waitExecuted(await provider.buyRolls(rollCount));
+    return waitExecuted(await provider.buyRolls(rollCount, { fee }));
   }
 
-  async sellRolls(privateKey: string, rollCount: bigint): Promise<OperationResult> {
+  async sellRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    return waitExecuted(await provider.sellRolls(rollCount));
+    return waitExecuted(await provider.sellRolls(rollCount, { fee }));
   }
 
   async getOwnedDomains(address: string): Promise<MnsDomain[]> {

@@ -260,7 +260,25 @@ function checks(connected: boolean, self: string): Check[] {
       params: { to: self, amount: '0' },
       expect: InvalidParams,
     },
+    {
+      label: 'transfer: unknown key',
+      method: 'transfer',
+      params: { to: self, amount: '1', periodToLive: 10 },
+      expect: InvalidParams,
+    },
+    {
+      label: 'transfer: decimal fee',
+      method: 'transfer',
+      params: { to: self, amount: '1', fee: '0.01' },
+      expect: InvalidParams,
+    },
     { label: 'buyRolls: zero', method: 'buyRolls', params: { rolls: '0' }, expect: InvalidParams },
+    {
+      label: 'account: unexpected params',
+      method: 'account',
+      params: { verbose: true },
+      expect: InvalidParams,
+    },
     { label: 'sign: empty', method: 'sign', params: { data: '' }, expect: InvalidParams },
     {
       label: 'sign: not base64',
@@ -389,11 +407,17 @@ on('sign-text-btn', () =>
 );
 // Not valid UTF-8, so the approval window must show it as hex.
 on('sign-bytes-btn', () => sign(Uint8Array.from([0xff, 0xfe, 0x00, 0x01, 0x80, 0x9f, 0xc0, 0xaf])));
+/** The optional fee field, in nanoMAS, for transfer and rolls. */
+const opFee = () => (value('op-fee') ? { fee: Mas.fromString(value('op-fee')).toString() } : {});
 on('transfer', () =>
-  write('transfer', { to: value('to'), amount: Mas.fromString(value('amount')).toString() }),
+  write('transfer', {
+    to: value('to'),
+    amount: Mas.fromString(value('amount')).toString(),
+    ...opFee(),
+  }),
 );
-on('buy-rolls', () => write('buyRolls', { rolls: value('rolls') }));
-on('sell-rolls', () => write('sellRolls', { rolls: value('rolls') }));
+on('buy-rolls', () => write('buyRolls', { rolls: value('rolls'), ...opFee() }));
+on('sell-rolls', () => write('sellRolls', { rolls: value('rolls'), ...opFee() }));
 on('wmas-deposit', () => wmasCall('deposit', new Args(), Mas.fromString('0.1')));
 on('wmas-withdraw', () =>
   wmasCall('withdraw', new Args().addU64(Mas.fromString('0.05')).addString(account ?? '')),

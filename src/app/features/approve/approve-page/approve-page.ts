@@ -4,13 +4,12 @@ import { DappRequest, parseRequest } from '../../../../extension/dapp/protocol';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { DAPP_APPROVALS, DappApprovals } from '../../../core/platform/dapp-approvals';
 import {
-  NETWORK_FEE_MAS,
   OperationFailedError,
   OperationTimeoutError,
   ROLL_PRICE_MAS,
 } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
-import { DappCall, WalletStore, dappCallFee } from '../../../core/state/wallet-store';
+import { DappCall, WalletStore, dappFee } from '../../../core/state/wallet-store';
 import { CallDescription, describeCall } from '../../../core/utils/describe-call';
 import { formatUnits, toUnits } from '../../../core/utils/token-amount';
 import { rejectedCallMessage, toUserMessage } from '../../../core/utils/user-error';
@@ -20,7 +19,6 @@ import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 type Phase = 'loading' | 'review' | 'busy' | 'notice';
 
 const MAS = 9;
-const FEE_UNITS = toUnits(NETWORK_FEE_MAS, MAS);
 const ROLL_UNITS = toUnits(ROLL_PRICE_MAS, MAS);
 
 const TITLES: Record<DappRequest['method'], string> = {
@@ -106,7 +104,9 @@ export class ApprovePage {
       label: 'Network',
       value: this.store.network() === 'buildnet' ? 'Buildnet' : 'Mainnet',
     });
-    const fee = { label: 'Network fee', value: `${NETWORK_FEE_MAS} MAS` };
+    // What the operation pays: the site's fee, if it set one above the wallet's own.
+    const paid = 'fee' in request ? dappFee(request.fee) : dappFee();
+    const fee = { label: 'Network fee', value: `${formatUnits(paid, MAS)} MAS` };
     switch (request.method) {
       case 'transfer':
         rows.push(
@@ -115,7 +115,7 @@ export class ApprovePage {
           fee,
           {
             label: 'Total',
-            value: `${formatUnits(request.amount + FEE_UNITS, MAS)} MAS`,
+            value: `${formatUnits(request.amount + paid, MAS)} MAS`,
             strong: true,
           },
         );
@@ -126,7 +126,7 @@ export class ApprovePage {
           { label: 'Rolls', value: request.rolls.toString() },
           { label: 'Cost', value: `${formatUnits(cost, MAS)} MAS` },
           fee,
-          { label: 'Total', value: `${formatUnits(cost + FEE_UNITS, MAS)} MAS`, strong: true },
+          { label: 'Total', value: `${formatUnits(cost + paid, MAS)} MAS`, strong: true },
         );
         break;
       }
@@ -151,10 +151,7 @@ export class ApprovePage {
         if (request.coins > 0n) {
           rows.push({ label: 'MAS sent', value: `${formatUnits(request.coins, MAS)} MAS` });
         }
-        rows.push({
-          label: 'Network fee',
-          value: `${formatUnits(dappCallFee(dappCall(request)), MAS)} MAS`,
-        });
+        rows.push(fee);
         break;
       }
     }
@@ -282,10 +279,10 @@ export class ApprovePage {
     try {
       await this.store.prepareDappWallet(account.id);
       if (request.method === 'transfer') {
-        this.store.validateDappTransfer(account.id, request.to, request.amount);
+        this.store.validateDappTransfer(account.id, request.to, request.amount, request.fee);
       } else if (request.method === 'buyRolls' || request.method === 'sellRolls') {
         const kind = request.method === 'buyRolls' ? 'buy' : 'sell';
-        this.store.validateDappRolls(account.id, kind, request.rolls);
+        this.store.validateDappRolls(account.id, kind, request.rolls, request.fee);
       } else if (request.method === 'callSC') {
         const call = dappCall(request);
         this.store.validateDappCall(account.id, call);
@@ -315,12 +312,24 @@ export class ApprovePage {
         return this.store.dappSign(account.id, request.data);
       case 'transfer':
         return {
-          operationId: await this.store.dappTransfer(account.id, request.to, request.amount),
+          operationId: await this.store.dappTransfer(
+            account.id,
+            request.to,
+            request.amount,
+            request.fee,
+          ),
         };
       case 'buyRolls':
-        return { operationId: await this.store.dappRolls(account.id, 'buy', request.rolls) };
-      case 'sellRolls':
-        return { operationId: await this.store.dappRolls(account.id, 'sell', request.rolls) };
+      case 'sellRolls': {
+        const kind = request.method === 'buyRolls' ? 'buy' : 'sell';
+        const operationId = await this.store.dappRolls(
+          account.id,
+          kind,
+          request.rolls,
+          request.fee,
+        );
+        return { operationId };
+      }
       case 'callSC':
         return { operationId: await this.store.dappCall(account.id, dappCall(request)) };
       default:

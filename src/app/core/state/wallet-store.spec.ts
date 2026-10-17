@@ -9,12 +9,14 @@ import { MASSA_PROVIDER, MassaProvider, OperationFailedError } from '../services
 import { WalletCache } from '../services/wallet-cache';
 import { AuthStore } from './auth-store';
 import { TokenCatalog } from './token-catalog';
-import { WalletStore, dappCallFee } from './wallet-store';
+import { WalletStore, dappFee } from './wallet-store';
 
 const A = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
 const B = 'AU126s93ZxbT4QUJcZYqsAxyMc3wv8nkHJYKYCtgQyEnZ8VGRM99P';
 const OUTSIDER = 'AU1Aq3tvikkbBW83jKLTB2UmcfknUMvNjXNyTafNPbSmUdAsjWQ4';
 const DAI = TOKEN_REGISTRY['DAI.e'].contract;
+/** The wallet's own fee per operation, 0.01 MAS. */
+const FEE = 10_000_000n;
 
 const accounts: VaultAccount[] = [
   { id: 'a', name: 'main', address: A, privateKey: 'S1a' },
@@ -331,6 +333,17 @@ describe('WalletStore', () => {
       expect(dusa.quote).toHaveBeenCalledWith('MAS', 'USDC.e', 50_000_000_000n, 50);
     });
 
+    it('keeps MAS back for the approval and its allowance storage when swapping a token', async () => {
+      chain.mas['S1a'] = 139_999_999n; // 0.14 MAS − 1 nanoMAS
+      await store.refresh('a');
+      expect(() => store.validateSwap('DAI.e', 'USDC.e', 0.5)).toThrow(
+        /You need 0\.14 MAS for the swap and approval deposits and fees/,
+      );
+      chain.mas['S1a'] = 140_000_000n; // 0.1 deposit + 0.02 allowance storage + 2 × 0.01 fees
+      await store.refresh('a');
+      expect(() => store.validateSwap('DAI.e', 'USDC.e', 0.5)).not.toThrow();
+    });
+
     it('only allows swaps on mainnet', () => {
       store.setNetwork('buildnet');
       expect(() => store.validateSwap('MAS', 'USDC.e', 1)).toThrow(/Mainnet only/);
@@ -395,7 +408,7 @@ describe('WalletStore', () => {
     it('sends exactly the units asked for, from the connected wallet, without switching', async () => {
       const operationId = await store.dappTransfer('b', OUTSIDER, 1_234_567_891n);
       expect(operationId).toBe('Osent');
-      expect(provider.transferMas).toHaveBeenCalledWith('S1b', OUTSIDER, 1_234_567_891n);
+      expect(provider.transferMas).toHaveBeenCalledWith('S1b', OUTSIDER, 1_234_567_891n, FEE);
       expect(store.activeWalletId()).toBe('a');
       expect(store.wallets()['b'].history[0]).toMatchObject({
         type: 'send',
@@ -411,6 +424,20 @@ describe('WalletStore', () => {
       expect(() => store.validateDappTransfer('b', OUTSIDER, 4_990_000_001n)).toThrow(
         /Insufficient balance/,
       );
+    });
+
+    it("keeps and pays the site's fee when it's above the wallet's own", async () => {
+      // b holds exactly 5 MAS
+      expect(() =>
+        store.validateDappTransfer('b', OUTSIDER, 4_950_000_000n, 50_000_000n),
+      ).not.toThrow();
+      expect(() => store.validateDappTransfer('b', OUTSIDER, 4_950_000_001n, 50_000_000n)).toThrow(
+        /0\.05 MAS is kept for the network fee/,
+      );
+      await store.dappTransfer('b', OUTSIDER, 1n, 50_000_000n);
+      expect(provider.transferMas).toHaveBeenCalledWith('S1b', OUTSIDER, 1n, 50_000_000n);
+      await store.dappTransfer('b', OUTSIDER, 1n, 1n); // below the wallet's fee: raised
+      expect(provider.transferMas).toHaveBeenLastCalledWith('S1b', OUTSIDER, 1n, FEE);
     });
 
     it('refuses odd transfers before anything is signed', async () => {
@@ -439,7 +466,29 @@ describe('WalletStore', () => {
       chain.mas['S1a'] = 100_010_000_000n; // exactly one roll + the fee
       await store.refresh('a');
       await expect(store.dappRolls('a', 'buy', 1n)).resolves.toBe('Oroll');
-      expect(provider.buyRolls).toHaveBeenCalledWith('S1a', 1n);
+      expect(provider.buyRolls).toHaveBeenCalledWith('S1a', 1n, FEE);
+      expect(() => store.validateDappRolls('a', 'buy', 1n, FEE + 1n)).toThrow(/Insufficient MAS/);
+    });
+
+    it("keeps the site's fee when selling rolls", async () => {
+      provider.getStaking.mockResolvedValue({
+        rolls: { active: 2, candidate: 0, deferred: 0 },
+        stats: {
+          activeRolls: 2,
+          produced: 0,
+          missed: 0,
+          nextBlockDraws: 0,
+          nextEndorsementDraws: 0,
+        },
+      });
+      chain.mas['S1b'] = 50_000_000n; // 0.05 MAS
+      await store.refresh('b');
+      expect(() => store.validateDappRolls('b', 'sell', 1n, 50_000_000n)).not.toThrow();
+      expect(() => store.validateDappRolls('b', 'sell', 1n, 50_000_001n)).toThrow(
+        /You need 0\.050000001 MAS for the network fee/,
+      );
+      await store.dappRolls('b', 'sell', 1n, 50_000_000n);
+      expect(provider.sellRolls).toHaveBeenCalledWith('S1b', 1n, 50_000_000n);
     });
 
     describe('contract calls', () => {
@@ -453,9 +502,9 @@ describe('WalletStore', () => {
       });
 
       it("pays the site's fee, never less than the wallet's own", () => {
-        expect(dappCallFee(call())).toBe(10_000_000n);
-        expect(dappCallFee(call({ fee: 1n }))).toBe(10_000_000n);
-        expect(dappCallFee(call({ fee: 50_000_000n }))).toBe(50_000_000n);
+        expect(dappFee()).toBe(FEE);
+        expect(dappFee(1n)).toBe(FEE);
+        expect(dappFee(50_000_000n)).toBe(50_000_000n);
       });
 
       it('needs the coins plus the fee, to the nanoMAS, and a sane gas limit', () => {

@@ -55,17 +55,24 @@ function setup() {
   const win = new FakeWindow();
   const ports: ReturnType<typeof fakePort>[] = [];
   let connectError: Error | null = null;
-  startRelay(win as unknown as ContentWindow, () => {
-    if (connectError) throw connectError;
-    const p = fakePort();
-    ports.push(p);
-    return p.port;
-  });
+  const tabListeners: ((m: unknown) => void)[] = [];
+  startRelay(
+    win as unknown as ContentWindow,
+    () => {
+      if (connectError) throw connectError;
+      const p = fakePort();
+      ports.push(p);
+      return p.port;
+    },
+    (cb) => void tabListeners.push(cb),
+  );
   const rustcore = createRustCore(win as unknown as Window);
   return {
     win,
     rustcore,
     ports,
+    /** A message from the background to this tab (chrome.tabs.sendMessage). */
+    toTab: (m: unknown) => tabListeners.forEach((cb) => cb(m)),
     failConnect: (e: Error | null) => (connectError = e),
     lastPort: () => ports[ports.length - 1],
   };
@@ -145,19 +152,38 @@ describe('page ⇄ content script ⇄ background', () => {
     await expect(second).resolves.toBe('buildnet');
   });
 
-  it('delivers events to subscribers until they unsubscribe', async () => {
-    const { rustcore, lastPort } = setup();
-    rustcore.request('connected');
-    await flush();
+  it('delivers events to subscribers until they unsubscribe — with no port open', async () => {
+    const { rustcore, toTab, ports } = setup();
+    const event = { channel: CHANNEL, origin: 'https://dapp.example', event: 'accountChanged' };
     const seen: unknown[] = [];
     const off = rustcore.on('accountChanged', (d) => seen.push(d));
-    lastPort().reply({ event: 'accountChanged', data: 'AU1new' });
+    toTab({ ...event, data: 'AU1new' });
     await flush();
     off();
-    lastPort().reply({ event: 'accountChanged', data: 'AU1later' });
-    lastPort().reply({ event: 'notAnEvent', data: 'x' });
+    toTab({ ...event, data: 'AU1later' });
+    toTab({ ...event, event: 'notAnEvent', data: 'x' });
     await flush();
     expect(seen).toEqual(['AU1new']);
+    expect(ports).toHaveLength(0);
+  });
+
+  it('passes on only events for this site, sent as tab messages', async () => {
+    const { rustcore, toTab, lastPort } = setup();
+    const seen: unknown[] = [];
+    rustcore.on('disconnect', (d) => seen.push(d ?? 'disconnected'));
+    // The tab showed another site when the background last heard from it.
+    toTab({ channel: CHANNEL, origin: 'https://other.example', event: 'disconnect' });
+    toTab({ channel: 'other', origin: 'https://dapp.example', event: 'disconnect' });
+    toTab({ origin: 'https://dapp.example', event: 'disconnect' });
+    // Events no longer come over the port.
+    rustcore.request('connected');
+    await flush();
+    lastPort().reply({ event: 'disconnect' });
+    await flush();
+    expect(seen).toEqual([]);
+    toTab({ channel: CHANNEL, origin: 'https://dapp.example', event: 'disconnect' });
+    await flush();
+    expect(seen).toEqual(['disconnected']);
   });
 
   it('ignores messages from other windows and other channels', async () => {

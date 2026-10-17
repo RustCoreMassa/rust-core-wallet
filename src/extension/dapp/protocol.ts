@@ -53,9 +53,14 @@ export type DappRequest =
   | { readonly method: 'account' }
   | { readonly method: 'network' }
   | { readonly method: 'sign'; readonly data: Uint8Array }
-  | { readonly method: 'transfer'; readonly to: string; readonly amount: bigint }
-  | { readonly method: 'buyRolls'; readonly rolls: bigint }
-  | { readonly method: 'sellRolls'; readonly rolls: bigint }
+  | {
+      readonly method: 'transfer';
+      readonly to: string;
+      readonly amount: bigint;
+      readonly fee?: bigint;
+    }
+  | { readonly method: 'buyRolls'; readonly rolls: bigint; readonly fee?: bigint }
+  | { readonly method: 'sellRolls'; readonly rolls: bigint; readonly fee?: bigint }
   | {
       readonly method: 'callSC';
       readonly target: string;
@@ -154,8 +159,21 @@ export type Reply =
   | { readonly id: string; readonly result: unknown }
   | { readonly id: string; readonly error: DappErrorData };
 
-/** Background → content script: a reply, or an event for this site. */
-export type PortMessage = Reply | { readonly event: DappEvent; readonly data?: unknown };
+/** Background → content script, over the port: the answer to one of its requests. */
+export type PortMessage = Reply;
+
+/**
+ * Background → the content script of each tab showing a site (chrome.tabs.sendMessage): an event
+ * for that site. Not sent over the port: the port lives only as long as the background worker,
+ * which the browser stops when idle, and a page only opens a new one with its next request.
+ */
+export interface TabEventMessage {
+  readonly channel: typeof CHANNEL;
+  /** The site the event is for; the tab may have moved to another site since. */
+  readonly origin: string;
+  readonly event: DappEvent;
+  readonly data?: unknown;
+}
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -169,14 +187,26 @@ export function isPageRequest(data: unknown): data is PageRequestMessage {
 /** Is this window message a reply or event for the page? */
 export function isPageMessage(data: unknown): data is PageReplyMessage | PageEventMessage {
   if (!isRecord(data) || data['channel'] !== CHANNEL || data['to'] !== 'page') return false;
-  return isPortMessage(data);
+  return typeof data['event'] === 'string' ? isEvent(data['event']) : isPortMessage(data);
 }
 
-/** Is this a well-formed reply or event (as the background sends them)? */
+/** Is this a well-formed event for a tab (as the background sends them)? */
+export function isTabEvent(data: unknown): data is TabEventMessage {
+  return (
+    isRecord(data) &&
+    data['channel'] === CHANNEL &&
+    typeof data['origin'] === 'string' &&
+    isEvent(data['event'])
+  );
+}
+
+function isEvent(value: unknown): value is DappEvent {
+  return typeof value === 'string' && (EVENTS as readonly string[]).includes(value);
+}
+
+/** Is this a well-formed reply (as the background sends them)? */
 export function isPortMessage(data: unknown): data is PortMessage {
   if (!isRecord(data)) return false;
-  if (typeof data['event'] === 'string')
-    return (EVENTS as readonly string[]).includes(data['event']);
   if (typeof data['id'] !== 'string' || !ID.test(data['id'])) return false;
   if ('result' in data) return true;
   const error = data['error'];
@@ -195,7 +225,8 @@ export function newRequestId(): string {
 /**
  * Checks a page's request and converts it to a typed DappRequest. Amounts arrive as decimal
  * strings of smallest units, bytes as base64. Only shape and limits are checked here; balances,
- * fees and the like are checked by the wallet's own rules in the approval view.
+ * fees and the like are checked by the wallet's own rules in the approval view. A key the method
+ * doesn't take is refused rather than ignored: the site would believe it was applied.
  */
 export function parseRequest(method: string, params: unknown): DappRequest {
   if (REFUSED.includes(method)) {
@@ -211,28 +242,30 @@ export function parseRequest(method: string, params: unknown): DappRequest {
     case 'connected':
     case 'account':
     case 'network':
+      if (params !== undefined && params !== null) record(params, []);
       return { method: m };
     case 'sign': {
-      const p = record(params);
+      const p = record(params, ['data']);
       const data = bytes(p['data'], 'data', MAX_SIGN_BYTES);
       if (data.length === 0) throw invalid('data must not be empty');
       return { method: m, data };
     }
     case 'transfer': {
-      const p = record(params);
+      const p = record(params, ['to', 'amount', 'fee']);
       return {
         method: m,
         to: address(p['to'], 'to', 'AU', 'AS'),
         amount: positive(units(p['amount'], 'amount'), 'amount'),
+        ...optionalFee(p),
       };
     }
     case 'buyRolls':
     case 'sellRolls': {
-      const p = record(params);
-      return { method: m, rolls: positive(units(p['rolls'], 'rolls'), 'rolls') };
+      const p = record(params, ['rolls', 'fee']);
+      return { method: m, rolls: positive(units(p['rolls'], 'rolls'), 'rolls'), ...optionalFee(p) };
     }
     case 'callSC': {
-      const p = record(params);
+      const p = record(params, ['target', 'func', 'parameter', 'coins', 'fee', 'maxGas']);
       const func = p['func'];
       if (typeof func !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(func)) {
         throw invalid('func must be a function name');
@@ -247,7 +280,7 @@ export function parseRequest(method: string, params: unknown): DappRequest {
             ? new Uint8Array()
             : bytes(p['parameter'], 'parameter', MAX_PARAMETER_BYTES),
         coins: p['coins'] === undefined ? 0n : units(p['coins'], 'coins'),
-        ...(p['fee'] !== undefined && { fee: units(p['fee'], 'fee') }),
+        ...optionalFee(p),
         ...(p['maxGas'] !== undefined && {
           maxGas: positive(units(p['maxGas'], 'maxGas'), 'maxGas'),
         }),
@@ -285,9 +318,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function record(params: unknown): Record<string, unknown> {
+/** `params` as an object holding only the `allowed` keys. */
+function record(params: unknown, allowed: readonly string[]): Record<string, unknown> {
   if (!isRecord(params)) throw invalid('params must be an object');
+  const unknown = Object.keys(params).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0) {
+    throw invalid(`Unsupported params: ${unknown.slice(0, 5).join(', ').slice(0, 200)}`);
+  }
   return params;
+}
+
+/** The fee a site set, in nanoMAS; the wallet raises it to its own minimum later. */
+function optionalFee(p: Record<string, unknown>): { fee?: bigint } {
+  return p['fee'] === undefined ? {} : { fee: units(p['fee'], 'fee') };
 }
 
 function invalid(message: string): DappError {
