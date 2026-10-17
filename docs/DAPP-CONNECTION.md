@@ -94,7 +94,12 @@ per page:
   `method` string; drops anything else;
 - size limit per message (e.g. 256 KB — enough for a `callSC` parameter);
 - never adds the origin itself: the background takes it from `port.sender` (`origin` /
-  `tab.url`), which the browser fills in and the page can't fake.
+  `tab.url`), which the browser fills in and the page can't fake;
+- opens the port only on the page's first request. The port carries requests and their replies
+  only: it closes whenever the browser stops the idle background worker (~30 s in Chromium), and
+  the page opens a new one only with its next request — so **events come as tab messages**
+  (`chrome.runtime.onMessage`, sent with `chrome.tabs.sendMessage`), and are relayed to the page
+  only if their `origin` is the page's own (the tab may have moved to another site since).
 
 Runs only in top frames (`all_frames: false`): a dApp inside someone else's iframe can't ask.
 
@@ -108,11 +113,17 @@ The existing `background.ts` grows into the bridge's centre (still no Angular in
   stored in clear (they're public on-chain) so a connected site can be answered while the wallet
   is locked; the list is shown and revocable in Settings → Connected sites.
 - **Requests needing the user** (`connect`, signatures) go into a queue, at most one pending per
-  origin and a small global cap; extras are rejected with "busy". Each opens (or reuses) the
+  origin and a small global cap; extras are rejected with "busy". The exception is a second
+  `connect` from a site whose `connect` is already waiting (the same page again, or another tab of
+  the site): it joins the waiting one and gets the same answer. Each opens (or reuses) the
   approval window; closing it rejects the request (`windows.onRemoved`).
 - **Events:** when a site's connected account or the wallet's network changes
-  (`chrome.storage.onChanged`), the background notifies that site's ports. Revoking a site sends
-  `disconnect`.
+  (`chrome.storage.onChanged`, which also wakes a stopped worker), the background sends the event
+  to every tab showing that site with `chrome.tabs.sendMessage` (top frame; no extra permission).
+  It learns a tab when the tab's page opens a port (`port.sender.tab.id`) and keeps
+  `{ [tabId]: origin }` in `chrome.storage.session` under `rustcore:dapp-tabs`, so the list
+  outlives the worker; a closed tab (`tabs.onRemoved`) or one where nothing answers is
+  forgotten. Revoking a site sends `disconnect`.
 - Validates every request's params (types, ranges, string/byte limits) before showing anything.
 
 ### 4. Approval view — the Angular app
@@ -159,12 +170,27 @@ decimal strings, bytes as base64 (as wallet-provider already does for Bearby).
 | `deploySC` | — | — | rejected in v1 |
 | `importAccount`, `deleteAccount`, `generateNewAccount`, `setRpcUrl` | — | — | rejected, like Bearby/MetaMask |
 
+Params (amounts in smallest units, as decimal strings; `?` = optional):
+
+| Method | Params |
+|---|---|
+| `connect`, `disconnect`, `connected`, `account`, `network` | none (`undefined`, `null` or `{}`) |
+| `sign` | `data` (base64, ≤ 16 KB) |
+| `transfer` | `to`, `amount`, `fee?` |
+| `buyRolls`, `sellRolls` | `rolls`, `fee?` |
+| `callSC` | `target`, `func`, `parameter?` (base64), `coins?`, `fee?`, `maxGas?` |
+
+A key the method doesn't take is refused with `-32602` (`Unsupported params: …`) instead of being
+ignored — the site would otherwise believe it was applied (e.g. `periodToLive`, which the wallet
+sets itself).
+
 Errors carry a `code`: `4001` user rejected, `4100` not connected / not allowed, `4200`
 unsupported method, `4900` wallet busy, `-32602` invalid params, `-32603` internal (message from
 `toUserMessage`, never a raw node error).
 
 The dApp chooses `fee`/`maxGas` hints, but the wallet enforces its own minimum fee (0.01 MAS) and
-caps; the review shows what will actually be sent.
+caps: a lower `fee` is raised to 0.01 MAS, a higher one is paid as asked and reserved from the
+balance like the wallet's own. The review shows what will actually be sent.
 
 ## Manifest changes
 
@@ -284,4 +310,9 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   with buildnet `readSC`), operations followed to finality, 24 protocol checks (expected error
   codes, run against `parseRequest` in jsdom) and a busy test (4900, then 4001). Not yet tried
   with the real extension in a browser.
+- [x] Follow-ups from the wallet-provider review (massalabs/wallet-provider#366): optional `fee`
+  on `transfer` / `buyRolls` / `sellRolls` (shown in the review, never below 0.01 MAS); unknown
+  params refused with `-32602`; a repeated `connect` joins the waiting one; events sent to the
+  site's tabs (`dapp/site-tabs.ts`) instead of over ports that close with the idle worker. The
+  test page has a fee field for transfer and rolls and 27 protocol checks.
 - [ ] wallet-provider PR

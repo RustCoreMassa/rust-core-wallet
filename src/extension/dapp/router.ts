@@ -2,23 +2,27 @@
 //
 // One port per page (opened by content.js). The router learns each page's origin from the port's
 // sender, which the browser fills in, answers status requests itself, and queues everything the
-// user must approve for the approval window. It never signs: the approval window (the wallet app)
+// user must approve for the approval window. Events go to the site's tabs (SiteTabs), not over
+// the ports: those close whenever the browser stops the idle worker. It never signs: the approval window (the wallet app)
 // does, and reports back through `resolve`. No Angular and no chrome.* here — background.ts wires
 // it to the browser, the specs to fakes.
 import { ApprovalResult, ApprovalView } from './approval';
 import { DappPermissions, PermissionMap, dappOrigin, toPermissionMap } from './permissions';
 import {
+  CHANNEL,
   DappError,
   DappErrorCode,
   DappErrorData,
   DappEvent,
   DappRequest,
   PortMessage,
+  TabEventMessage,
   WalletNetwork,
   networkInfo,
   newRequestId,
   parseRequest,
 } from './protocol';
+import { SiteTabs } from './site-tabs';
 
 /** A request the user doesn't answer within this time is rejected. */
 export const REQUEST_TTL_MS = 10 * 60_000;
@@ -31,6 +35,7 @@ export interface RouterPort {
     readonly origin?: string;
     readonly url?: string;
     readonly frameId?: number;
+    readonly tab?: { readonly id?: number };
   };
   postMessage(message: PortMessage): void;
   readonly onMessage: { addListener(callback: (message: unknown) => void): void };
@@ -44,14 +49,25 @@ export interface RouterDeps {
   network(): Promise<WalletNetwork>;
   /** Opens the approval window, or brings it to the front. */
   showApproval(): void;
+  /** Tabs showing each site, for events. */
+  readonly tabs: SiteTabs;
+  /** Delivers an event to a tab's content script; rejects if nothing there listens. */
+  sendToTab(tabId: number, message: TabEventMessage): Promise<void>;
   readonly now?: () => number;
+}
+
+/** A page waiting for the answer to its request. */
+interface Waiter {
+  readonly port: RouterPort;
+  readonly requestId: string;
 }
 
 interface Pending {
   readonly approvalId: string;
   readonly origin: string;
-  readonly port: RouterPort;
-  readonly requestId: string;
+  /** Who gets the answer: the page that asked — and, for `connect`, any page of the site that
+   * asked again while the first was waiting. */
+  readonly waiters: Waiter[];
   readonly request: DappRequest;
   readonly params: unknown;
   readonly address: string | null;
@@ -68,8 +84,6 @@ const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{20,200}$/;
 const OPERATION_ID = /^O[1-9A-HJ-NP-Za-km-z]{20,100}$/;
 
 export class DappRouter {
-  /** Open ports per origin, for replies and events. */
-  private readonly ports = new Map<string, Set<RouterPort>>();
   /** Requests waiting for the user, oldest first; the approval window shows the first. */
   private readonly queue: Pending[] = [];
   private readonly now: () => number;
@@ -87,11 +101,14 @@ export class DappRouter {
       port.disconnect();
       return;
     }
-    const set = this.ports.get(origin) ?? new Set();
-    set.add(port);
-    this.ports.set(origin, set);
+    const tabId = port.sender?.tab?.id;
+    if (tabId !== undefined) {
+      this.deps.tabs
+        .remember(tabId, origin)
+        .catch((err) => console.error('Remembering a dApp tab failed', err));
+    }
     port.onMessage.addListener((message) => void this.handle(origin, port, message));
-    port.onDisconnect.addListener(() => this.detach(origin, port));
+    port.onDisconnect.addListener(() => this.detach(port));
   }
 
   // ---------------------------------------------------------------- the approval window's side
@@ -165,28 +182,29 @@ export class DappRouter {
     if (permissionChange) {
       const before = toPermissionMap(permissionChange.oldValue);
       const after = toPermissionMap(permissionChange.newValue);
-      this.permissionsChanged(before, after);
+      await this.permissionsChanged(before, after);
     }
     const networkChange = changes[items.network];
     if (networkChange && networkChange.oldValue !== networkChange.newValue) {
       const info = networkInfo(await this.deps.network());
-      for (const origin of Object.keys(await this.deps.permissions.all())) {
-        this.emit(origin, 'networkChanged', info);
-      }
+      const origins = Object.keys(await this.deps.permissions.all());
+      await Promise.all(origins.map((origin) => this.emit(origin, 'networkChanged', info)));
     }
   }
 
-  private permissionsChanged(before: PermissionMap, after: PermissionMap): void {
+  private async permissionsChanged(before: PermissionMap, after: PermissionMap): Promise<void> {
+    const events: Promise<void>[] = [];
     for (const [origin, old] of Object.entries(before)) {
       const now = after[origin];
       if (!now) {
         this.dropOrigin(origin, unauthorized('The site was disconnected'));
-        this.emit(origin, 'disconnect');
+        events.push(this.emit(origin, 'disconnect'));
       } else if (now.address !== old.address) {
         this.dropOrigin(origin, unauthorized("The site's account changed"));
-        this.emit(origin, 'accountChanged', { address: now.address });
+        events.push(this.emit(origin, 'accountChanged', { address: now.address }));
       }
     }
+    await Promise.all(events);
   }
 
   // ---------------------------------------------------------------- requests from pages
@@ -242,7 +260,14 @@ export class DappRouter {
     params: unknown,
     address: string | null,
   ): typeof QUEUED {
-    if (this.queue.some((p) => p.origin === origin)) {
+    const waiting = this.queue.find((p) => p.origin === origin);
+    if (waiting?.request.method === 'connect' && request.method === 'connect') {
+      // Same question, same answer: the page asked twice, or two pages of the site asked.
+      waiting.waiters.push({ port, requestId });
+      this.deps.showApproval();
+      return QUEUED;
+    }
+    if (waiting) {
       throw new DappError(DappErrorCode.Busy, 'Another request from this site is waiting');
     }
     if (this.queue.length >= MAX_PENDING) {
@@ -256,8 +281,7 @@ export class DappRouter {
     this.queue.push({
       approvalId,
       origin,
-      port,
-      requestId,
+      waiters: [{ port, requestId }],
       request,
       params,
       address,
@@ -280,7 +304,7 @@ export class DappRouter {
   }
 
   private answer(pending: Pending, outcome: { result: unknown } | { error: DappErrorData }): void {
-    post(pending.port, { id: pending.requestId, ...outcome });
+    for (const { port, requestId } of pending.waiters) post(port, { id: requestId, ...outcome });
   }
 
   /** Rejects whatever a site still has waiting (its connection was revoked or changed). */
@@ -291,20 +315,30 @@ export class DappRouter {
     }
   }
 
-  /** A page went away: its waiting requests can't be answered anymore. */
-  private detach(origin: string, port: RouterPort): void {
-    for (const pending of this.queue.filter((p) => p.port === port)) {
-      this.take(pending.approvalId);
+  /** A page went away: it can't get answers anymore; a request nobody waits for is dropped. */
+  private detach(port: RouterPort): void {
+    for (const pending of [...this.queue]) {
+      const left = pending.waiters.filter((w) => w.port !== port);
+      if (left.length === pending.waiters.length) continue;
+      pending.waiters.splice(0, pending.waiters.length, ...left);
+      if (left.length === 0) this.take(pending.approvalId);
     }
-    const set = this.ports.get(origin);
-    set?.delete(port);
-    if (set?.size === 0) this.ports.delete(origin);
   }
 
-  private emit(origin: string, event: DappEvent, data?: unknown): void {
-    for (const port of this.ports.get(origin) ?? []) {
-      post(port, data === undefined ? { event } : { event, data });
-    }
+  /** Tells every tab showing `origin`; tabs that no longer listen are forgotten. */
+  private async emit(origin: string, event: DappEvent, data?: unknown): Promise<void> {
+    const message: TabEventMessage = {
+      channel: CHANNEL,
+      origin,
+      event,
+      ...(data !== undefined && { data }),
+    };
+    const tabs = await this.deps.tabs.of(origin);
+    await Promise.all(
+      tabs.map((tabId) =>
+        this.deps.sendToTab(tabId, message).catch(() => this.deps.tabs.forget(tabId)),
+      ),
+    );
   }
 }
 

@@ -85,7 +85,13 @@ export interface MassaProvider {
 
   // ---- native MAS -------------------------------------------------------
   getBalance(privateKey: string, isFinal?: boolean): Promise<bigint>;
-  transferMas(privateKey: string, toAddress: string, amount: bigint): Promise<OperationResult>;
+  /** `fee` in nanoMAS; massa-web3's default (the network's minimal fee) when left out. */
+  transferMas(
+    privateKey: string,
+    toAddress: string,
+    amount: bigint,
+    fee?: bigint,
+  ): Promise<OperationResult>;
 
   // ---- MRC-20 tokens ------------------------------------------------------
   getTokenBalance(privateKey: string, contractAddress: string): Promise<bigint>;
@@ -107,8 +113,8 @@ export interface MassaProvider {
   getStaking(address: string): Promise<StakingInfo>;
   /** Rolls staked across the whole network (sum over all stakers). */
   getTotalRolls(): Promise<number>;
-  buyRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
-  sellRolls(privateKey: string, rollCount: bigint): Promise<OperationResult>;
+  buyRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult>;
+  sellRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult>;
 
   // ---- Massa Name System ----------------------------------------------------
   /** Domains owned by `address`, each with the address it resolves to. */

@@ -36,7 +36,7 @@ import {
   normalizeDomainName,
   rejectedRegistrationMessage,
 } from '../utils/mns-domain';
-import { fromUnits, toUnits } from '../utils/token-amount';
+import { formatUnits, fromUnits, toUnits } from '../utils/token-amount';
 import { AuthStore } from './auth-store';
 import {
   EMPTY_PAGING,
@@ -136,9 +136,9 @@ export interface DomainRegistration {
   readonly deposit: number;
 }
 
-/** The fee a dApp call pays: what the site asked for, never below the wallet's own fee. */
-export function dappCallFee(call: DappCall): bigint {
-  return call.fee !== undefined && call.fee > FEE_UNITS ? call.fee : FEE_UNITS;
+/** The fee a dApp operation pays: what the site asked for, never below the wallet's own fee. */
+export function dappFee(requested?: bigint): bigint {
+  return requested !== undefined && requested > FEE_UNITS ? requested : FEE_UNITS;
 }
 
 /** `a - b` in MAS, exact to the nanoMAS (no float drift like 3.1 - 0.01). */
@@ -963,45 +963,49 @@ export class WalletStore {
     this.loadedWallet(id);
   }
 
-  validateDappTransfer(id: string, toAddress: string, units: bigint): void {
+  /** `fee`: what the site asked for, if anything (the wallet's own fee is the minimum). */
+  validateDappTransfer(id: string, toAddress: string, units: bigint, fee?: bigint): void {
     const wallet = this.loadedWallet(id);
     if (!MASSA_ADDRESS.test(toAddress))
       throw new Error('The recipient is not a valid Massa address');
     if (toAddress === wallet.address) throw new Error("The recipient is this wallet's own address");
     if (units <= 0n) throw new Error('The amount must be greater than 0');
+    const paid = dappFee(fee);
     assertMasUnits(
       wallet,
-      units + FEE_UNITS,
-      `Insufficient balance — ${NETWORK_FEE_MAS} MAS is kept for the network fee`,
+      units + paid,
+      `Insufficient balance — ${formatUnits(paid, MAS_DECIMALS)} MAS is kept for the network fee`,
     );
   }
 
-  validateDappRolls(id: string, kind: 'buy' | 'sell', rollCount: bigint): void {
+  validateDappRolls(id: string, kind: 'buy' | 'sell', rollCount: bigint, fee?: bigint): void {
     const wallet = this.loadedWallet(id);
+    const paid = dappFee(fee);
+    const feeText = `${formatUnits(paid, MAS_DECIMALS)} MAS`;
     if (rollCount <= 0n) throw new Error('The number of rolls must be greater than 0');
     if (kind === 'buy') {
       assertMasUnits(
         wallet,
-        rollCount * ROLL_PRICE_UNITS + FEE_UNITS,
-        `Insufficient MAS — ${NETWORK_FEE_MAS} MAS is needed for the network fee`,
+        rollCount * ROLL_PRICE_UNITS + paid,
+        `Insufficient MAS — ${feeText} is needed for the network fee`,
       );
     } else {
       if (rollCount > BigInt(wallet.rolls.active)) throw new Error('Not enough active rolls');
-      assertMasUnits(wallet, FEE_UNITS, `You need ${NETWORK_FEE_MAS} MAS for the network fee`);
+      assertMasUnits(wallet, paid, `You need ${feeText} for the network fee`);
     }
   }
 
   /** Sends exactly `units` nanoMAS from wallet `id`; resolves with the executed operation's id. */
-  async dappTransfer(id: string, toAddress: string, units: bigint): Promise<string> {
+  async dappTransfer(id: string, toAddress: string, units: bigint, fee?: bigint): Promise<string> {
     const network = this.network();
-    this.validateDappTransfer(id, toAddress, units);
+    this.validateDappTransfer(id, toAddress, units, fee);
     const wallet = this.loadedWallet(id);
     const targetId = this.walletList().find((w) => w.address === toAddress && w.id !== id)?.id;
     const touched = targetId ? [id, targetId] : [id];
 
     const privateKey = this.privateKeyFor(id);
     const { operationId } = await this.afterWrite(touched, network, () =>
-      this.provider.transferMas(privateKey, toAddress, units),
+      this.provider.transferMas(privateKey, toAddress, units, dappFee(fee)),
     );
     const details = {
       token: 'MAS' as const,
@@ -1027,16 +1031,21 @@ export class WalletStore {
   }
 
   /** Buys or sells rolls for wallet `id`; resolves with the executed operation's id. */
-  async dappRolls(id: string, kind: 'buy' | 'sell', rollCount: bigint): Promise<string> {
+  async dappRolls(
+    id: string,
+    kind: 'buy' | 'sell',
+    rollCount: bigint,
+    fee?: bigint,
+  ): Promise<string> {
     const network = this.network();
-    this.validateDappRolls(id, kind, rollCount);
+    this.validateDappRolls(id, kind, rollCount, fee);
     const wallet = this.loadedWallet(id);
 
     const privateKey = this.privateKeyFor(id);
     const { operationId } = await this.afterWrite([id], network, () =>
       kind === 'buy'
-        ? this.provider.buyRolls(privateKey, rollCount)
-        : this.provider.sellRolls(privateKey, rollCount),
+        ? this.provider.buyRolls(privateKey, rollCount, dappFee(fee))
+        : this.provider.sellRolls(privateKey, rollCount, dappFee(fee)),
     );
     const count = Number(rollCount);
     this.addHistory(
@@ -1062,7 +1071,7 @@ export class WalletStore {
     }
     assertMasUnits(
       wallet,
-      call.coins + dappCallFee(call),
+      call.coins + dappFee(call.fee),
       'Insufficient MAS for the coins this call sends plus the network fee',
     );
   }
@@ -1071,7 +1080,7 @@ export class WalletStore {
   simulateDappCall(id: string, call: DappCall): Promise<CallSimulation> {
     return this.provider.simulateCall(this.loadedWallet(id).address, {
       ...call,
-      fee: dappCallFee(call),
+      fee: dappFee(call.fee),
     });
   }
 
@@ -1083,7 +1092,7 @@ export class WalletStore {
 
     const privateKey = this.privateKeyFor(id);
     const { operationId } = await this.afterWrite([id], network, () =>
-      this.provider.callContract(privateKey, { ...call, fee: dappCallFee(call) }),
+      this.provider.callContract(privateKey, { ...call, fee: dappFee(call.fee) }),
     );
     this.addHistory(
       id,

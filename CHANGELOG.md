@@ -7,8 +7,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **dApps can set the fee of transfers and rolls** in the extension, as they already could for
+  contract calls. The approval window shows the fee that will be paid — never less than the
+  wallet's own 0.01 MAS — and the balance check keeps it.
+
 ### Changed
 
+- **dApp requests with options the wallet doesn't support are refused** (error -32602) instead of
+  having those options silently ignored, so a site never believes a setting was applied.
+- **A site asking to connect twice gets one approval.** A second request to connect while the
+  first is waiting — from the same page or another tab of the site — now waits for the same
+  answer instead of failing with "busy".
 - **Ready for Massa's MAIN.5.1 node release** (massa-web3 5.4.0). MAIN.5.1 nodes keep an
   executed operation in their pool until it is final; the wallet would have read that as still
   pending and reported a timeout for transactions that went through. Works with MAIN.5.0 and
@@ -18,6 +29,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the first time. Tokens following MRC-20 0.1.0 — WMAS once MIP-0002 is active — refuse the
   approval without it and give back what isn't used. Swapping a token now needs 0.14 MAS
   (was 0.12).
+
+### Fixed
+
+- **Connected sites always hear about account and network changes.** The browser stops the
+  extension's background worker when it's idle, which closed the line to the page; a change made
+  after that (switching network a minute after connecting, for instance) never reached the site.
+  Changes now go to every tab showing the site, whatever the worker did meanwhile.
 
 ## [1.4.0] — 2026-10-12
 

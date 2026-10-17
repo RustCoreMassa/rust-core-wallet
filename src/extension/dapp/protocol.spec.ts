@@ -8,6 +8,7 @@ import {
   isPageMessage,
   isPageRequest,
   isPortMessage,
+  isTabEvent,
   needsApproval,
   needsSignature,
   parseRequest,
@@ -50,19 +51,30 @@ describe('isPageRequest', () => {
   });
 });
 
-describe('isPortMessage / isPageMessage', () => {
-  it('accepts replies and known events', () => {
+describe('isPortMessage / isPageMessage / isTabEvent', () => {
+  it('accepts replies, and known events for the page or a tab', () => {
     expect(isPortMessage({ id: 'a1', result: null })).toBe(true);
     expect(isPortMessage({ id: 'a1', error: { code: 4001, message: 'no' } })).toBe(true);
-    expect(isPortMessage({ event: 'accountChanged', data: 'AU1' })).toBe(true);
     expect(isPageMessage({ channel: CHANNEL, to: 'page', id: 'a1', result: 1 })).toBe(true);
+    expect(isPageMessage({ channel: CHANNEL, to: 'page', event: 'disconnect' })).toBe(true);
+    expect(
+      isTabEvent({ channel: CHANNEL, origin: 'https://a.example', event: 'accountChanged' }),
+    ).toBe(true);
   });
 
   it('rejects anything else', () => {
     expect(isPortMessage({ id: 'a1' })).toBe(false);
     expect(isPortMessage({ id: 'a1', error: 'no' })).toBe(false);
     expect(isPortMessage({ id: 'a b', result: 1 })).toBe(false);
-    expect(isPortMessage({ event: 'somethingElse' })).toBe(false);
+    expect(isPortMessage({ event: 'accountChanged', data: 'AU1' })).toBe(false); // tab messages now
+    expect(isPageMessage({ channel: CHANNEL, to: 'page', event: 'somethingElse' })).toBe(false);
+    expect(isTabEvent({ channel: CHANNEL, event: 'disconnect' })).toBe(false); // no origin
+    expect(isTabEvent({ channel: 'x', origin: 'https://a.example', event: 'disconnect' })).toBe(
+      false,
+    );
+    expect(isTabEvent({ channel: CHANNEL, origin: 'https://a.example', event: 'other' })).toBe(
+      false,
+    );
     expect(isPageMessage({ channel: CHANNEL, to: 'wallet', id: 'a1', result: 1 })).toBe(false);
     expect(isPageMessage({ id: 'a1', result: 1 })).toBe(false);
   });
@@ -82,7 +94,42 @@ describe('parseRequest', () => {
 
   it('takes no params for connection methods', () => {
     expect(parseRequest('connect', undefined)).toEqual({ method: 'connect' });
-    expect(parseRequest('account', { anything: true })).toEqual({ method: 'account' });
+    expect(parseRequest('network', null)).toEqual({ method: 'network' });
+    expect(parseRequest('account', {})).toEqual({ method: 'account' });
+    expect(codeOf('account', { anything: true })).toBe(DappErrorCode.InvalidParams);
+    expect(codeOf('connect', 'please')).toBe(DappErrorCode.InvalidParams);
+  });
+
+  it('refuses keys a method does not take, instead of ignoring them', () => {
+    const cases: [string, Record<string, unknown>][] = [
+      ['sign', { data: b64([1]), encoding: 'utf8' }],
+      ['transfer', { to: USER, amount: '1', periodToLive: 10 }],
+      ['buyRolls', { rolls: '1', amount: '1' }],
+      ['sellRolls', { rolls: '1', maxGas: '1' }],
+      ['callSC', { target: CONTRACT, func: 'swap', gasLimit: '1' }],
+    ];
+    for (const [method, params] of cases) {
+      expect(() => parseRequest(method, params)).toThrow(/Unsupported params/);
+      expect(codeOf(method, params)).toBe(DappErrorCode.InvalidParams);
+    }
+  });
+
+  it('takes an optional fee on transfers and rolls, in exact units', () => {
+    expect(parseRequest('transfer', { to: USER, amount: '5', fee: '20000000' })).toEqual({
+      method: 'transfer',
+      to: USER,
+      amount: 5n,
+      fee: 20000000n,
+    });
+    expect(parseRequest('sellRolls', { rolls: '2', fee: '0' })).toEqual({
+      method: 'sellRolls',
+      rolls: 2n,
+      fee: 0n, // raised to the wallet's own fee later
+    });
+    expect(codeOf('buyRolls', { rolls: '1', fee: 0.02 })).toBe(DappErrorCode.InvalidParams);
+    expect(codeOf('transfer', { to: USER, amount: '1', fee: '-1' })).toBe(
+      DappErrorCode.InvalidParams,
+    );
   });
 
   it('parses a transfer with an exact bigint amount', () => {

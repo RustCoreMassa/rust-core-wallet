@@ -5,7 +5,8 @@
 //
 // It never adds the page's origin: the background reads it from the port's sender, which the
 // browser fills in. It opens the port only on the page's first request, so pages that never use
-// the wallet never talk to it.
+// the wallet never talk to it. Events don't come over the port (it closes whenever the browser
+// stops the idle background worker) but as tab messages, relayed only if they're for this site.
 import {
   CHANNEL,
   DappErrorCode,
@@ -17,6 +18,7 @@ import {
   PortRequest,
   isPageRequest,
   isPortMessage,
+  isTabEvent,
 } from './protocol';
 
 /** The parts of `window` the relay uses — a real window in the browser, a fake one in tests. */
@@ -34,7 +36,10 @@ export interface RelayPort {
 /** Opens a port to the background worker; throws if the extension was reloaded or removed. */
 export type ConnectPort = () => RelayPort;
 
-export function startRelay(win: ContentWindow, connect: ConnectPort): void {
+/** Subscribes to messages the extension sends this tab (chrome.runtime.onMessage). */
+export type ListenToTab = (callback: (message: unknown) => void) => void;
+
+export function startRelay(win: ContentWindow, connect: ConnectPort, listen: ListenToTab): void {
   let port: RelayPort | null = null;
   /** Requests sent on the current port and not answered yet. */
   const waiting = new Set<string>();
@@ -68,13 +73,16 @@ export function startRelay(win: ContentWindow, connect: ConnectPort): void {
   };
 
   const relayToPage = (message: PortMessage) => {
-    if ('event' in message) {
-      toPage({ channel: CHANNEL, to: 'page', event: message.event, data: message.data });
-      return;
-    }
     if (!waiting.delete(message.id)) return; // not ours, or already answered
     toPage({ channel: CHANNEL, to: 'page', ...message });
   };
+
+  listen((message) => {
+    // The tab may have moved to another site since the background last heard from it.
+    if (!isTabEvent(message) || message.origin !== win.location.origin) return;
+    const { event, data } = message;
+    toPage({ channel: CHANNEL, to: 'page', event, ...(data !== undefined && { data }) });
+  });
 
   win.addEventListener('message', (event: MessageEvent) => {
     if (event.source !== win || !isPageRequest(event.data)) return;

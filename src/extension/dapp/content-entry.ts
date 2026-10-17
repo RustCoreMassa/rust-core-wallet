@@ -3,4 +3,11 @@
 import { startRelay } from './content';
 import { PORT_NAME } from './protocol';
 
-startRelay(window, () => chrome.runtime.connect({ name: PORT_NAME }));
+startRelay(
+  window,
+  () => chrome.runtime.connect({ name: PORT_NAME }),
+  (callback) =>
+    chrome.runtime.onMessage.addListener((message, sender) => {
+      if (sender.id === chrome.runtime.id) callback(message);
+    }),
+);

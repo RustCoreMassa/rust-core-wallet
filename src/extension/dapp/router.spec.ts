@@ -1,6 +1,14 @@
 import { DappPermissions, PERMISSIONS_ITEM } from './permissions';
-import { NETWORK_ITEM, PortMessage, WalletNetwork, networkInfo, toBase64 } from './protocol';
+import {
+  NETWORK_ITEM,
+  PortMessage,
+  TabEventMessage,
+  WalletNetwork,
+  networkInfo,
+  toBase64,
+} from './protocol';
 import { DappRouter, MAX_PENDING, REQUEST_TTL_MS, RouterPort } from './router';
+import { SITE_TABS_ITEM, SiteTabs } from './site-tabs';
 
 const ALICE = 'AU12dG5xP1RDEB5ocdHkymNVvvSJmUL9BgHwCksDowqmGWxfpm93x';
 const BOB = 'AU1qDAxGJ387ETi9JRQzZWSPKYq4YPXrFvdiE4VoXUaiAt38JFEC';
@@ -12,10 +20,13 @@ const SIGNATURE =
 const DUSA = 'https://app.dusa.io';
 const ITEMS = { permissions: PERMISSIONS_ITEM, network: NETWORK_ITEM };
 
-/** A page's port as the background sees it. */
+let lastTabId = 0;
+
+/** A page's port as the background sees it — each in its own tab unless the sender says. */
 function fakePort(
   sender: RouterPort['sender'] = { origin: DUSA, url: `${DUSA}/trade`, frameId: 0 },
 ) {
+  if (sender) sender = { tab: { id: ++lastTabId }, ...sender };
   const sent: PortMessage[] = [];
   const onMessage: ((m: unknown) => void)[] = [];
   const onDisconnect: (() => void)[] = [];
@@ -41,26 +52,54 @@ function fakePort(
     raw: (message: unknown) => onMessage.forEach((cb) => cb(message)),
     close: () => onDisconnect.forEach((cb) => cb()),
     /** The reply to request `id`, if any. */
-    replyTo: (id: string) => sent.find((m) => 'id' in m && m.id === id),
-    events: () => sent.filter((m) => 'event' in m),
+    replyTo: (id: string) => sent.find((m) => m.id === id),
+    tabId: sender?.tab?.id ?? -1,
   };
 }
 
-function setup(network: WalletNetwork = 'mainnet') {
-  const items: Record<string, unknown> = {};
-  const area = {
+type FakeStorage = ConstructorParameters<typeof DappPermissions>[0];
+
+function fakeArea(items: Record<string, unknown>): FakeStorage {
+  return {
     get: async (key: string) => (key in items ? { [key]: items[key] } : {}),
     set: async (entries: Record<string, unknown>) => void Object.assign(items, entries),
-  } as unknown as ConstructorParameters<typeof DappPermissions>[0];
-  const permissions = new DappPermissions(area, () => 1000);
+  } as unknown as FakeStorage;
+}
+
+/** What the browser keeps while the worker restarts: chrome.storage.local and .session. */
+function fakeBrowser() {
+  return {
+    local: {} as Record<string, unknown>,
+    session: {} as Record<string, unknown>,
+    /** Events delivered per tab (chrome.tabs.sendMessage). */
+    delivered: new Map<number, TabEventMessage[]>(),
+    /** Tabs where nothing listens anymore (closed, or the extension was reloaded). */
+    deaf: new Set<number>(),
+  };
+}
+
+function setup(network: WalletNetwork = 'mainnet', browser = fakeBrowser()) {
+  const items = browser.local;
+  const permissions = new DappPermissions(fakeArea(items), () => 1000);
   const showApproval = vi.fn();
   const state = { network };
+  const sendToTab = vi.fn(async (tabId: number, message: TabEventMessage) => {
+    if (browser.deaf.has(tabId)) throw new Error('Receiving end does not exist');
+    browser.delivered.set(tabId, [...(browser.delivered.get(tabId) ?? []), message]);
+  });
   const router = new DappRouter({
     permissions,
     network: async () => state.network,
     showApproval,
+    tabs: new SiteTabs(fakeArea(browser.session)),
+    sendToTab,
     now: () => 5000,
   });
+  /** The events a page's tab received, as the page will see them. */
+  const events = (page: { tabId: number }) =>
+    (browser.delivered.get(page.tabId) ?? []).map(({ event, data }) =>
+      data === undefined ? { event } : { event, data },
+    );
   /** Simulates chrome.storage.onChanged for a write the test makes through `permissions`. */
   const trackPermissions = async (change: () => Promise<unknown>) => {
     const oldValue = structuredClone(items[PERMISSIONS_ITEM]);
@@ -70,7 +109,7 @@ function setup(network: WalletNetwork = 'mainnet') {
       ITEMS,
     );
   };
-  return { router, permissions, showApproval, state, trackPermissions };
+  return { router, permissions, showApproval, state, trackPermissions, events, sendToTab, browser };
 }
 
 const settle = async () => {
@@ -277,6 +316,63 @@ describe('DappRouter — signatures', () => {
     expect(router.next()!.queued).toBe(MAX_PENDING - 1);
   });
 
+  it('answers a repeated connect together with the waiting one', async () => {
+    const { router, showApproval } = setup();
+    const page = fakePort();
+    const otherTab = fakePort();
+    router.attach(page.port);
+    router.attach(otherTab.port);
+    const first = page.send('connect');
+    const again = page.send('connect');
+    const fromOtherTab = otherTab.send('connect');
+    await settle();
+    expect(router.next()).toMatchObject({ method: 'connect', queued: 0 });
+    expect(showApproval).toHaveBeenCalledTimes(3);
+
+    expect(await router.resolve(router.next()!.approvalId, { address: ALICE })).toBe(true);
+    for (const [p, id] of [
+      [page, first],
+      [page, again],
+      [otherTab, fromOtherTab],
+    ] as const) {
+      expect(p.replyTo(id)).toEqual({ id, result: { address: ALICE } });
+    }
+  });
+
+  it('rejects every page waiting on a connect, and keeps it while one still waits', async () => {
+    const { router } = setup();
+    const page = fakePort();
+    const otherTab = fakePort();
+    router.attach(page.port);
+    router.attach(otherTab.port);
+    page.send('connect');
+    const stays = otherTab.send('connect');
+    await settle();
+    page.close();
+    expect(router.next()).not.toBeNull();
+    router.reject(router.next()!.approvalId);
+    expect(otherTab.replyTo(stays)).toMatchObject({ error: { code: 4001 } });
+
+    const last = fakePort();
+    router.attach(last.port);
+    last.send('connect');
+    await settle();
+    last.close();
+    expect(router.next()).toBeNull();
+  });
+
+  it('stays busy for anything else while a connect waits', async () => {
+    const { router, permissions } = setup();
+    const page = fakePort();
+    router.attach(page.port);
+    page.send('connect');
+    await settle();
+    await permissions.grant(DUSA, ALICE); // e.g. connected from another profile view meanwhile
+    const transfer = page.send('transfer', { to: BOB, amount: '1' });
+    await settle();
+    expect(page.replyTo(transfer)).toMatchObject({ error: { code: 4900 } });
+  });
+
   it('shows requests oldest first', async () => {
     const { router, permissions, page } = await connectedPage();
     await permissions.grant('https://other.example', BOB);
@@ -345,7 +441,7 @@ describe('DappRouter — requests that end without the user', () => {
 
 describe('DappRouter — events', () => {
   it("tells every page of a site when it's disconnected, and drops what it had waiting", async () => {
-    const { router, permissions, trackPermissions } = setup();
+    const { router, permissions, trackPermissions, events } = setup();
     await permissions.grant(DUSA, ALICE);
     const tab1 = fakePort();
     const tab2 = fakePort();
@@ -355,13 +451,13 @@ describe('DappRouter — events', () => {
     await settle();
     await trackPermissions(() => permissions.revoke(DUSA));
     expect(tab1.replyTo(waiting)).toMatchObject({ error: { code: 4100 } });
-    expect(tab1.events()).toEqual([{ event: 'disconnect' }]);
-    expect(tab2.events()).toEqual([{ event: 'disconnect' }]);
+    expect(events(tab1)).toEqual([{ event: 'disconnect' }]);
+    expect(events(tab2)).toEqual([{ event: 'disconnect' }]);
     expect(router.next()).toBeNull();
   });
 
   it('tells a site when its account changes, and nobody else', async () => {
-    const { router, permissions, trackPermissions } = setup();
+    const { router, permissions, trackPermissions, events } = setup();
     await permissions.grant(DUSA, ALICE);
     await permissions.grant('https://other.example', ALICE);
     const dusa = fakePort();
@@ -369,12 +465,12 @@ describe('DappRouter — events', () => {
     router.attach(dusa.port);
     router.attach(other.port);
     await trackPermissions(() => permissions.changeAccount(DUSA, BOB));
-    expect(dusa.events()).toEqual([{ event: 'accountChanged', data: { address: BOB } }]);
-    expect(other.events()).toEqual([]);
+    expect(events(dusa)).toEqual([{ event: 'accountChanged', data: { address: BOB } }]);
+    expect(events(other)).toEqual([]);
   });
 
   it('tells connected sites only when the wallet switches network', async () => {
-    const { router, permissions, state } = setup();
+    const { router, permissions, state, events } = setup();
     await permissions.grant(DUSA, ALICE);
     const dusa = fakePort();
     const stranger = fakePort({ origin: 'https://stranger.example', frameId: 0 });
@@ -385,7 +481,56 @@ describe('DappRouter — events', () => {
       { [NETWORK_ITEM]: { oldValue: undefined, newValue: 'buildnet' } },
       ITEMS,
     );
-    expect(dusa.events()).toEqual([{ event: 'networkChanged', data: networkInfo('buildnet') }]);
-    expect(stranger.events()).toEqual([]);
+    expect(events(dusa)).toEqual([{ event: 'networkChanged', data: networkInfo('buildnet') }]);
+    expect(events(stranger)).toEqual([]);
+  });
+
+  it('still reaches a page after the browser restarted the worker and the port closed', async () => {
+    const browser = fakeBrowser();
+    const before = setup('mainnet', browser);
+    await before.permissions.grant(DUSA, ALICE);
+    const dusa = fakePort();
+    before.router.attach(dusa.port);
+    await settle();
+    dusa.close();
+
+    // A new worker: nothing in memory, no port — only what the browser stored.
+    const after = setup('buildnet', browser);
+    await after.router.onStorageChanged(
+      { [NETWORK_ITEM]: { oldValue: 'mainnet', newValue: 'buildnet' } },
+      ITEMS,
+    );
+    expect(after.events(dusa)).toEqual([
+      { event: 'networkChanged', data: networkInfo('buildnet') },
+    ]);
+    expect(browser.delivered.get(dusa.tabId)?.[0]).toMatchObject({ origin: DUSA });
+  });
+
+  it('forgets a tab where nothing listens anymore', async () => {
+    const { router, permissions, trackPermissions, sendToTab, browser } = setup();
+    await permissions.grant(DUSA, ALICE);
+    const dusa = fakePort();
+    router.attach(dusa.port);
+    await settle();
+    browser.deaf.add(dusa.tabId);
+    await trackPermissions(() => permissions.changeAccount(DUSA, BOB));
+    expect(sendToTab).toHaveBeenCalledTimes(1);
+    expect(browser.session[SITE_TABS_ITEM]).toEqual({});
+    await trackPermissions(() => permissions.changeAccount(DUSA, ALICE));
+    expect(sendToTab).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a tab for the site it shows now, not one it showed before', async () => {
+    const { router, permissions, trackPermissions, events } = setup();
+    await permissions.grant(DUSA, ALICE);
+    const dusa = fakePort();
+    router.attach(dusa.port);
+    // The same tab moves on to another site, whose page opens its own port.
+    router.attach(
+      fakePort({ origin: 'https://other.example', frameId: 0, tab: { id: dusa.tabId } }).port,
+    );
+    await settle();
+    await trackPermissions(() => permissions.revoke(DUSA));
+    expect(events(dusa)).toEqual([]);
   });
 });
