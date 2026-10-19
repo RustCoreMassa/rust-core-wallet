@@ -94,7 +94,7 @@
     [price]="store.prices()[token.id] ?? 0"
   />
   }
-  @if (hasBuiltinTokens()) {
+  @if (hasHideableTokens()) {
   <button class="token-toggle" type="button" (click)="toggleShowAllTokens()">
     @if (showAllTokens()) {
     Hide low balances

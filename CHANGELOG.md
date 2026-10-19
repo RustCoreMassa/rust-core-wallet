@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Empty and low-balance tokens start hidden every time you open the wallet.** "Show all
+  tokens" used to be remembered on the device, so one tap kept the zero balances on the Home
+  list for good; now it lasts until the wallet is closed. Tokens you added yourself are hidden
+  too while their balance is 0.
+
 ## [1.5.0] — 2026-10-17
 
 ### Added

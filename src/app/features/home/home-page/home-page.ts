@@ -1,7 +1,7 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { TokenMeta } from '../../../core/models/token.model';
-import { KeyValueStore, LOCAL_STORE } from '../../../core/platform/app-storage';
+import { LOCAL_STORE } from '../../../core/platform/app-storage';
 import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { AmountPipe } from '../../../shared/pipes/amount-pipe';
@@ -12,17 +12,17 @@ type HomeTab = 'tokens' | 'history';
 
 /** Tokens worth less than this (USD) count as "low balance" and are hidden by default. */
 const LOW_BALANCE_USD = 0.1;
-const SHOW_ALL_KEY = 'massa-wallet:show-all-tokens';
+/** Where versions up to 1.5.0 remembered the toggle — removed on sight. */
+const OLD_SHOW_ALL_KEY = 'massa-wallet:show-all-tokens';
 /** Distance from the bottom of the list (px) at which the next history page loads. */
 const NEAR_BOTTOM_PX = 120;
 
-function loadShowAll(store: KeyValueStore): boolean {
-  try {
-    return store.getItem(SHOW_ALL_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
+/**
+ * "Show all tokens" lives in memory only: it survives moving between tabs,
+ * but every time the wallet is opened (page load, popup) low balances start
+ * hidden again.
+ */
+const showAllTokens = signal(false);
 
 @Component({
   selector: 'app-home-page',
@@ -33,7 +33,6 @@ function loadShowAll(store: KeyValueStore): boolean {
 export class HomePage {
   protected readonly store = inject(WalletStore);
   protected readonly modal = inject(Modal);
-  private readonly localStore = inject(LOCAL_STORE);
 
   protected readonly activeTab = signal<HomeTab>('tokens');
 
@@ -46,11 +45,19 @@ export class HomePage {
     () => (this.wallet().balances.MAS ?? 0) * (this.store.prices().MAS ?? 0),
   );
 
-  protected readonly showAllTokens = signal(loadShowAll(this.localStore));
+  protected readonly showAllTokens = showAllTokens;
+
+  constructor() {
+    try {
+      inject(LOCAL_STORE).removeItem(OLD_SHOW_ALL_KEY);
+    } catch {
+      // Storage unavailable — nothing to clean up.
+    }
+  }
 
   /**
-   * Tokens on this network worth under LOW_BALANCE_USD — MAS and tokens the
-   * user added never are. A held token with no Dusa price can't be valued,
+   * Tokens on this network worth under LOW_BALANCE_USD — MAS never is. A held
+   * token with no Dusa price (custom tokens never have one) can't be valued,
    * so only an empty one counts as low; hiding a real holding just for
    * lacking a price would be wrong.
    */
@@ -61,7 +68,7 @@ export class HomePage {
       this.store
         .availableTokens()
         .filter((t) => {
-          if (t.id === 'MAS' || t.custom) return false;
+          if (t.id === 'MAS') return false;
           const balance = balances[t.id] ?? 0;
           const price = prices[t.id];
           return price === undefined ? balance === 0 : balance * price < LOW_BALANCE_USD;
@@ -97,8 +104,8 @@ export class HomePage {
   });
 
   /** Low-balance toggle: only when there's something besides MAS that could be hidden. */
-  protected readonly hasBuiltinTokens = computed(() =>
-    this.store.availableTokens().some((t) => t.isErc20 && !t.custom),
+  protected readonly hasHideableTokens = computed(() =>
+    this.store.availableTokens().some((t) => t.id !== 'MAS'),
   );
 
   protected setTab(tab: HomeTab): void {
@@ -117,12 +124,6 @@ export class HomePage {
   }
 
   protected toggleShowAllTokens(): void {
-    const next = !this.showAllTokens();
-    this.showAllTokens.set(next);
-    try {
-      this.localStore.setItem(SHOW_ALL_KEY, String(next));
-    } catch {
-      // Storage unavailable — the choice still holds until reload.
-    }
+    this.showAllTokens.update((on) => !on);
   }
 }
