@@ -127,7 +127,26 @@ describe('ApprovePage', () => {
     );
     await page.approve();
     expect(store.dappTransfer).toHaveBeenCalledWith('b', OUTSIDER, 1_234_567_891n, undefined);
-    expect(approvals.resolve).toHaveBeenCalledWith('ap1', { operationId: 'O1sent' });
+    expect(approvals.resolve).toHaveBeenCalledWith('ap1', {
+      operationId: 'O1sent',
+      network: 'mainnet',
+    });
+  });
+
+  it('answers with the network the operation was sent on, even if the user switched since', async () => {
+    const { page, approvals, store } = await setup([
+      view({ method: 'transfer', params: { to: OUTSIDER, amount: '1' }, address: SAVINGS }),
+    ]);
+    store.network.set('buildnet');
+    store.dappTransfer.mockImplementationOnce(async () => {
+      store.network.set('mainnet'); // switched while the operation was being sent
+      return 'O1sent';
+    });
+    await page.approve();
+    expect(approvals.resolve).toHaveBeenCalledWith('ap1', {
+      operationId: 'O1sent',
+      network: 'buildnet',
+    });
   });
 
   it("keeps Approve off when the wallet can't do it, and never sends", async () => {
@@ -212,7 +231,10 @@ describe('ApprovePage', () => {
       expect(fixture.nativeElement.textContent).toContain('Send 12.5 USDC.e');
       await page.approve();
       expect(store.dappCall).toHaveBeenCalledWith('b', simulated);
-      expect(approvals.resolve).toHaveBeenCalledWith('ap1', { operationId: 'O1call' });
+      expect(approvals.resolve).toHaveBeenCalledWith('ap1', {
+        operationId: 'O1call',
+        network: 'mainnet',
+      });
     });
 
     it('keeps Approve off when the test run fails, and explains it plainly', async () => {
@@ -277,7 +299,10 @@ describe('ApprovePage', () => {
     ]);
     store.dappRolls.mockRejectedValueOnce(new OperationFailedError('O1fail', 'reverted'));
     await page.approve();
-    expect(approvals.resolve).toHaveBeenCalledWith('ap1', { operationId: 'O1fail' });
+    expect(approvals.resolve).toHaveBeenCalledWith('ap1', {
+      operationId: 'O1fail',
+      network: 'mainnet',
+    });
     expect(page.phase()).toBe('notice');
     expect(page.notice()).toBeTruthy();
   });

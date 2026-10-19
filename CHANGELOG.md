@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **dApps learn the network of every operation they send.** Transfers, rolls and contract calls
+  now answer `{ operationId, network }`, with the network the wallet sent the operation on, so a
+  site keeps following it on the right node even if you switch network meanwhile.
+
 ### Changed
 
 - **Empty and low-balance tokens start hidden every time you open the wallet.** "Show all

@@ -7,6 +7,7 @@ import {
   networkInfo,
   toBase64,
 } from './protocol';
+import { ApprovalResult } from './approval';
 import { DappRouter, MAX_PENDING, REQUEST_TTL_MS, RouterPort } from './router';
 import { SITE_TABS_ITEM, SiteTabs } from './site-tabs';
 
@@ -272,8 +273,23 @@ describe('DappRouter — signatures', () => {
     await settle();
     const view = router.next()!;
     expect(view).toMatchObject({ method: 'transfer', params, address: ALICE, createdAt: 5000 });
-    expect(await router.resolve(view.approvalId, { operationId: OP_ID })).toBe(true);
-    expect(page.replyTo(id)).toEqual({ id, result: { operationId: OP_ID } });
+    expect(await router.resolve(view.approvalId, { operationId: OP_ID, network: 'buildnet' })).toBe(
+      true,
+    );
+    expect(page.replyTo(id)).toEqual({
+      id,
+      result: { operationId: OP_ID, network: networkInfo('buildnet') },
+    });
+  });
+
+  it('refuses an operation result without the network it was sent on', async () => {
+    const { router, page } = await connectedPage();
+    const id = page.send('transfer', { to: BOB, amount: '1000' });
+    await settle();
+    const view = router.next()!;
+    const result = { operationId: OP_ID } as unknown as ApprovalResult;
+    expect(await router.resolve(view.approvalId, result)).toBe(false);
+    expect(page.replyTo(id)).toMatchObject({ error: { code: -32603 } });
   });
 
   it('returns a signature for sign', async () => {
@@ -405,7 +421,9 @@ describe('DappRouter — requests that end without the user', () => {
       error: { code: 4001, message: 'The request expired' },
     });
     expect(router.next()).toBeNull();
-    expect(await router.resolve(view.approvalId, { operationId: OP_ID })).toBe(false);
+    expect(await router.resolve(view.approvalId, { operationId: OP_ID, network: 'mainnet' })).toBe(
+      false,
+    );
   });
 
   it('forgets the requests of a page that went away', async () => {
@@ -418,7 +436,9 @@ describe('DappRouter — requests that end without the user', () => {
     const view = router.next()!;
     page.close();
     expect(router.next()).toBeNull();
-    expect(await router.resolve(view.approvalId, { operationId: OP_ID })).toBe(false);
+    expect(await router.resolve(view.approvalId, { operationId: OP_ID, network: 'mainnet' })).toBe(
+      false,
+    );
     expect(page.sent).toHaveLength(0);
   });
 

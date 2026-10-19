@@ -142,12 +142,14 @@ async function write(method: string, params: Record<string, unknown>): Promise<v
     return;
   }
   const outcome = await call(method, params);
-  if (outcome.ok) await follow((outcome.value as { operationId: string }).operationId);
+  if (!outcome.ok) return;
+  const sent = outcome.value as { operationId: string; network: NetworkInfo };
+  await follow(sent.operationId, sent.network);
 }
 
-async function follow(operationId: string): Promise<void> {
-  if (!network) return;
-  const provider = JsonRpcPublicProvider.fromRPCUrl(network.url);
+/** Follows the operation on the network it was sent on, as wallet-provider does. */
+async function follow(operationId: string, sentOn: NetworkInfo): Promise<void> {
+  const provider = JsonRpcPublicProvider.fromRPCUrl(sentOn.url);
   let last: OperationStatus | null = null;
   for (let i = 0; i < 90; i++) {
     const status = await provider.getOperationStatus(operationId).catch(() => null);

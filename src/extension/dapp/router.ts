@@ -147,6 +147,12 @@ export class DappRouter {
       this.answer(pending, { result: { address } });
       return true;
     }
+    if ('operationId' in result) {
+      // the site follows the operation on that network's node: give it the network's details
+      const { operationId, network } = result;
+      this.answer(pending, { result: { operationId, network: networkInfo(network) } });
+      return true;
+    }
     this.answer(pending, { result });
     return true;
   }
@@ -345,7 +351,7 @@ export class DappRouter {
 /** Does the approval window's result match what the request asked for? */
 function fitsRequest(request: DappRequest, result: ApprovalResult): boolean {
   const r = result as Partial<
-    Record<'address' | 'publicKey' | 'signature' | 'operationId', unknown>
+    Record<'address' | 'publicKey' | 'signature' | 'operationId' | 'network', unknown>
   >;
   switch (request.method) {
     case 'connect':
@@ -362,7 +368,11 @@ function fitsRequest(request: DappRequest, result: ApprovalResult): boolean {
     case 'buyRolls':
     case 'sellRolls':
     case 'callSC':
-      return typeof r.operationId === 'string' && OPERATION_ID.test(r.operationId);
+      return (
+        typeof r.operationId === 'string' &&
+        OPERATION_ID.test(r.operationId) &&
+        (r.network === 'mainnet' || r.network === 'buildnet')
+      );
     default:
       return false;
   }

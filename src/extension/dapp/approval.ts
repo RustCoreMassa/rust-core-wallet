@@ -1,6 +1,6 @@
 // Messages between the approval window (the wallet app, ?view=approve) and the background
 // worker — see docs/DAPP-CONNECTION.md. No Angular here: the background bundles it too.
-import { DappMethod } from './protocol';
+import { DappMethod, WalletNetwork } from './protocol';
 
 /** Port the approval window keeps open while it's shown; its traffic keeps the worker alive. */
 export const APPROVAL_PORT = 'rustcore:approval';
@@ -29,8 +29,8 @@ export type ApprovalResult =
   | { readonly address: string }
   /** sign: massa-web3's SignedData. */
   | { readonly publicKey: string; readonly signature: string }
-  /** transfer, rolls, callSC: the operation the wallet sent. */
-  | { readonly operationId: string };
+  /** transfer, rolls, callSC: the operation the wallet sent, and the network it was sent on. */
+  | { readonly operationId: string; readonly network: WalletNetwork };
 
 export type ApprovalMessage =
   | { readonly type: 'rustcore:approval:next' }

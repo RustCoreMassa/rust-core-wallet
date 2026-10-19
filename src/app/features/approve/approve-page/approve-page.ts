@@ -1,6 +1,6 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ApprovalResult, ApprovalView } from '../../../../extension/dapp/approval';
-import { DappRequest, parseRequest } from '../../../../extension/dapp/protocol';
+import { DappRequest, WalletNetwork, parseRequest } from '../../../../extension/dapp/protocol';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { DAPP_APPROVALS, DappApprovals } from '../../../core/platform/dapp-approvals';
 import {
@@ -190,10 +190,13 @@ export class ApprovePage {
     this.phase.set('busy');
     this.error.set(null);
 
+    // The network the wallet sends on (it reads it as it starts): the site follows the operation
+    // there, even if the user switches network before the answer reaches it.
+    const network = this.store.network();
     let result: ApprovalResult;
     let notice: string | null = null;
     try {
-      result = await this.carryOut(request, account);
+      result = await this.carryOut(request, account, network);
     } catch (err) {
       // Sent, but it failed on-chain or isn't confirmed yet: the site still gets the operation,
       // to follow its status itself. Anything else (checks, network) sent nothing — retry or reject.
@@ -202,7 +205,7 @@ export class ApprovePage {
         this.phase.set('review');
         return;
       }
-      result = { operationId: err.operationId };
+      result = { operationId: err.operationId, network };
       notice = toUserMessage(err);
     }
 
@@ -304,7 +307,11 @@ export class ApprovePage {
     );
   }
 
-  private async carryOut(request: DappRequest, account: VaultAccount): Promise<ApprovalResult> {
+  private async carryOut(
+    request: DappRequest,
+    account: VaultAccount,
+    network: WalletNetwork,
+  ): Promise<ApprovalResult> {
     switch (request.method) {
       case 'connect':
         return { address: account.address };
@@ -318,6 +325,7 @@ export class ApprovePage {
             request.amount,
             request.fee,
           ),
+          network,
         };
       case 'buyRolls':
       case 'sellRolls': {
@@ -328,10 +336,10 @@ export class ApprovePage {
           request.rolls,
           request.fee,
         );
-        return { operationId };
+        return { operationId, network };
       }
       case 'callSC':
-        return { operationId: await this.store.dappCall(account.id, dappCall(request)) };
+        return { operationId: await this.store.dappCall(account.id, dappCall(request)), network };
       default:
         throw new Error("This request isn't supported yet");
     }

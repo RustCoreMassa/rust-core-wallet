@@ -180,6 +180,13 @@ Params (amounts in smallest units, as decimal strings; `?` = optional):
 | `buyRolls`, `sellRolls` | `rolls`, `fee?` |
 | `callSC` | `target`, `func`, `parameter?` (base64), `coins?`, `fee?`, `maxGas?` |
 
+Answers: `connect` and `account` → `{ address }`; `connected` → boolean; `network` →
+`{ name, chainId, url, minimalFee }`; `sign` → massa-web3's `SignedData`; `transfer`, `buyRolls`,
+`sellRolls`, `callSC` → `{ operationId, network }`, where `network` (same shape as `network`'s
+answer) is the one the operation was sent on — follow its status on that node: the user may
+switch network before the answer arrives, and events travel apart from answers, so a
+`networkChanged` can come after it.
+
 A key the method doesn't take is refused with `-32602` (`Unsupported params: …`) instead of being
 ignored — the site would otherwise believe it was applied (e.g. `periodToLive`, which the wallet
 sets itself).
@@ -315,4 +322,7 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   params refused with `-32602`; a repeated `connect` joins the waiting one; events sent to the
   site's tabs (`dapp/site-tabs.ts`) instead of over ports that close with the idle worker. The
   test page has a fee field for transfer and rolls and 27 protocol checks.
+- [x] Operation answers carry the network they were sent on (`{ operationId, network }`): the
+  approval window reports the network it sent on, the background answers that network's details
+  (#366 review: a network switch during the prompt sent status polling to the wrong node).
 - [ ] wallet-provider PR
