@@ -26,6 +26,8 @@ declare global {
 /** Wrapped MAS on buildnet (massa-web3's WMAS.buildnet). */
 const WMAS_BUILDNET = 'AS12FW5Rs5YN2zdpEnqwj4iHUUPt9R4Eqjq2qtpJFNKW3mn33RuLU';
 const U256_MAX = (1n << 256n) - 1n;
+/** Some user address that isn't one of the wallet's (any valid AU address the site can't use). */
+const STRANGER = 'AU1Aq3tvikkbBW83jKLTB2UmcfknUMvNjXNyTafNPbSmUdAsjWQ4';
 /** How long a check may wait for its error before we assume it opened an approval instead. */
 const CHECK_TIMEOUT_MS = 3000;
 
@@ -33,6 +35,7 @@ type Outcome = { ok: true; value: unknown } | { ok: false; code: number; message
 
 let wallet: RustCoreInjected | null = null;
 let account: string | null = null;
+let accounts: readonly string[] = [];
 let network: NetworkInfo | null = null;
 
 // ------------------------------------------------------------------ page helpers
@@ -95,11 +98,14 @@ async function call(method: string, params?: unknown, quiet = false): Promise<Ou
 async function refresh(): Promise<void> {
   const connected = await call('connected', undefined, true);
   account = null;
+  accounts = [];
   network = null;
   if (connected.ok && connected.value === true) {
     const a = await call('account', undefined, true);
+    const all = await call('accounts', undefined, true);
     const n = await call('network', undefined, true);
     if (a.ok) account = (a.value as { address: string }).address;
+    if (all.ok) accounts = (all.value as { addresses: string[] }).addresses;
     if (n.ok) network = n.value as NetworkInfo;
   }
   $('s-ext').textContent = wallet ? `RustCore, protocol v${wallet.version}` : 'not found';
@@ -107,6 +113,7 @@ async function refresh(): Promise<void> {
     ? String(connected.value)
     : `– (${connected.message})`;
   $('s-account').textContent = account ?? '–';
+  $('s-accounts').textContent = accounts.length > 0 ? accounts.join('\n') : '–';
   $('s-network').textContent = network ? `${network.name} (chain ${network.chainId})` : '–';
   $('s-mas').textContent = '–';
   $('s-wmas').textContent = '–';
@@ -141,7 +148,7 @@ async function write(method: string, params: Record<string, unknown>): Promise<v
     await refresh();
     return;
   }
-  const outcome = await call(method, params);
+  const outcome = await call(method, withFrom(params));
   if (!outcome.ok) return;
   const sent = outcome.value as { operationId: string; network: NetworkInfo };
   await follow(sent.operationId, sent.network);
@@ -171,15 +178,21 @@ async function follow(operationId: string, sentOn: NetworkInfo): Promise<void> {
 
 // ------------------------------------------------------------------ actions
 
+/** The `from` field, when set: the site's account to sign with. */
+function withFrom<T extends Record<string, unknown>>(params: T): T & { from?: string } {
+  return value('from') ? { ...params, from: value('from') } : params;
+}
+
 async function sign(data: Uint8Array): Promise<void> {
-  const outcome = await call('sign', { data: toBase64(data) });
+  const outcome = await call('sign', withFrom({ data: toBase64(data) }));
   if (!outcome.ok) return;
   const { publicKey, signature } = outcome.value as { publicKey: string; signature: string };
   const key = PublicKey.fromString(publicKey);
   const valid = await key.verify(data, Signature.fromString(signature));
   const owner = Address.fromPublicKey(key).toString();
   log(valid ? 'ok' : 'err', `Signature ${valid ? 'is valid' : 'is NOT valid'}`);
-  log(owner === account ? 'ok' : 'err', `Public key belongs to ${owner}`);
+  const signer = value('from') || account;
+  log(owner === signer ? 'ok' : 'err', `Public key belongs to ${owner}`);
 }
 
 function wmasCall(func: string, args: Args, coins = 0n): Promise<void> {
@@ -276,6 +289,18 @@ function checks(connected: boolean, self: string): Check[] {
     },
     { label: 'buyRolls: zero', method: 'buyRolls', params: { rolls: '0' }, expect: InvalidParams },
     {
+      label: 'transfer: a contract as from',
+      method: 'transfer',
+      params: { to: self, amount: '1', from: WMAS_BUILDNET },
+      expect: InvalidParams,
+    },
+    {
+      label: 'accounts: unexpected params',
+      method: 'accounts',
+      params: { all: true },
+      expect: InvalidParams,
+    },
+    {
       label: 'account: unexpected params',
       method: 'account',
       params: { verbose: true },
@@ -313,9 +338,17 @@ function checks(connected: boolean, self: string): Check[] {
       expect: InvalidParams,
     },
   ];
-  if (!connected) {
+  if (connected) {
+    list.push({
+      label: 'sign from an account not connected to the site',
+      method: 'sign',
+      params: { data: 'aGk=', from: STRANGER },
+      expect: Unauthorized,
+    });
+  } else {
     list.push(
       { label: 'account before connect', method: 'account', expect: Unauthorized },
+      { label: 'accounts before connect', method: 'accounts', expect: Unauthorized },
       { label: 'network before connect', method: 'network', expect: Unauthorized },
       {
         label: 'sign before connect',
@@ -383,7 +416,12 @@ async function busyTest(): Promise<void> {
 function attach(api: RustCoreInjected): void {
   wallet = api;
   $('detect').textContent = 'RustCore Wallet found.';
-  for (const event of ['accountChanged', 'networkChanged', 'disconnect'] as const) {
+  for (const event of [
+    'accountChanged',
+    'accountsChanged',
+    'networkChanged',
+    'disconnect',
+  ] as const) {
     api.on(event, (data) => {
       log('info', `event ${event}`, data);
       void refresh();
@@ -399,6 +437,7 @@ on('connect', async () => {
 });
 on('connected', () => call('connected'));
 on('account', () => call('account'));
+on('accounts', () => call('accounts'));
 on('network', () => call('network'));
 on('disconnect', async () => {
   await call('disconnect');

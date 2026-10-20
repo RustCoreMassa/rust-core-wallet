@@ -5,10 +5,14 @@
 /** chrome.storage.local item holding every connected site. */
 export const PERMISSIONS_ITEM = 'rustcore:dapp-permissions';
 
-/** One connected site. The address is public on-chain, so it's stored in clear. */
+/** One connected site. Addresses are public on-chain, so they're stored in clear. */
 export interface SitePermission {
-  /** The one account this site sees and can ask to sign with. */
-  readonly address: string;
+  /**
+   * The accounts this site may see and ask to sign with, never empty. The first is the site's
+   * current account: the one it uses unless it names another (`from`). Like MetaMask, it is
+   * the wallet's most recently active account among them.
+   */
+  readonly addresses: readonly string[];
   /** When the user approved the connection (ms epoch). */
   readonly grantedAt: number;
 }
@@ -52,19 +56,62 @@ export class DappPermissions {
     return (await this.all())[origin] ?? null;
   }
 
-  async grant(origin: string, address: string): Promise<SitePermission> {
-    const permission: SitePermission = { address, grantedAt: this.now() };
+  /** Connects a site to `addresses` (at least one); the first becomes its current account. */
+  async grant(origin: string, addresses: readonly string[]): Promise<SitePermission> {
+    const list = unique(addresses);
+    if (list.length === 0) throw new Error('A site needs at least one account');
+    const permission: SitePermission = { addresses: list, grantedAt: this.now() };
     await this.write({ ...(await this.all()), [origin]: permission });
     return permission;
   }
 
-  /** Points a connected site at another account; false if the site isn't connected. */
-  async changeAccount(origin: string, address: string): Promise<boolean> {
+  /**
+   * Lets a connected site see one more account — as its current account when `current`, else
+   * after the others. False if the site isn't connected.
+   */
+  async addAccount(origin: string, address: string, current: boolean): Promise<boolean> {
     const map = await this.all();
-    const current = map[origin];
-    if (!current) return false;
-    await this.write({ ...map, [origin]: { ...current, address } });
+    const site = map[origin];
+    if (!site) return false;
+    const others = site.addresses.filter((a) => a !== address);
+    const addresses = current ? [address, ...others] : [...others, address];
+    if (sameList(addresses, site.addresses)) return true;
+    await this.write({ ...map, [origin]: { ...site, addresses } });
     return true;
+  }
+
+  /**
+   * Takes one account away from a site; the site is disconnected when it was its last one.
+   * False if the site didn't have it.
+   */
+  async removeAccount(origin: string, address: string): Promise<boolean> {
+    const map = await this.all();
+    const site = map[origin];
+    if (!site?.addresses.includes(address)) return false;
+    await this.write(withoutAddress(map, address, origin));
+    return true;
+  }
+
+  /**
+   * The wallet switched to `address`: it becomes the current account of every site that may
+   * see it. Returns the sites whose current account changed.
+   */
+  async useAccount(address: string): Promise<string[]> {
+    const map = await this.all();
+    const moved = Object.keys(map).filter(
+      (o) => map[o].addresses.includes(address) && map[o].addresses[0] !== address,
+    );
+    if (moved.length === 0) return [];
+    const next = { ...map };
+    for (const origin of moved) {
+      const site = map[origin];
+      next[origin] = {
+        ...site,
+        addresses: [address, ...site.addresses.filter((a) => a !== address)],
+      };
+    }
+    await this.write(next);
+    return moved;
   }
 
   /** Disconnects a site; false if it wasn't connected. */
@@ -75,13 +122,16 @@ export class DappPermissions {
     return true;
   }
 
-  /** Disconnects every site connected to an account (e.g. when the account is removed). */
-  async revokeAddress(address: string): Promise<string[]> {
+  /**
+   * Takes an account away from every site (it was removed from the wallet). Sites left without
+   * an account are disconnected; returns them.
+   */
+  async removeAddress(address: string): Promise<string[]> {
     const map = await this.all();
-    const origins = Object.keys(map).filter((o) => map[o].address === address);
-    if (origins.length === 0) return [];
-    await this.write(Object.fromEntries(Object.entries(map).filter(([o]) => !origins.includes(o))));
-    return origins;
+    if (!Object.values(map).some((site) => site.addresses.includes(address))) return [];
+    const next = withoutAddress(map, address);
+    await this.write(next);
+    return Object.keys(map).filter((origin) => !next[origin]);
   }
 
   /** Disconnects every site (log out: the wallets they were connected to are gone). */
@@ -94,19 +144,51 @@ export class DappPermissions {
   }
 }
 
-/** A stored value as a permission map; anything damaged or tampered with counts as empty. */
-export function toPermissionMap(value: unknown): PermissionMap {
-  return isPermissionMap(value) ? value : {};
+/** `map` without `address` (on one site, or on all); sites left with no account are dropped. */
+function withoutAddress(map: PermissionMap, address: string, onlyOrigin?: string): PermissionMap {
+  const next: Record<string, SitePermission> = {};
+  for (const [origin, site] of Object.entries(map)) {
+    if (onlyOrigin !== undefined && origin !== onlyOrigin) {
+      next[origin] = site;
+      continue;
+    }
+    const addresses = site.addresses.filter((a) => a !== address);
+    if (addresses.length > 0) next[origin] = { ...site, addresses };
+  }
+  return next;
 }
 
-function isPermissionMap(value: unknown): value is PermissionMap {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  return Object.entries(value).every(
-    ([origin, p]) =>
-      dappOrigin(origin) === origin &&
-      typeof p === 'object' &&
-      p !== null &&
-      typeof (p as SitePermission).address === 'string' &&
-      typeof (p as SitePermission).grantedAt === 'number',
-  );
+function unique(addresses: readonly string[]): string[] {
+  return [...new Set(addresses)];
+}
+
+/** Same accounts in the same order? */
+export function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
+
+/**
+ * A stored value as a permission map; anything damaged or tampered with counts as empty. Sites
+ * saved before multiple accounts (`{ address, grantedAt }`) read as connected to that one.
+ */
+export function toPermissionMap(value: unknown): PermissionMap {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const map: Record<string, SitePermission> = {};
+  for (const [origin, stored] of Object.entries(value)) {
+    const site = toSitePermission(stored);
+    if (!site || dappOrigin(origin) !== origin) return {};
+    map[origin] = site;
+  }
+  return map;
+}
+
+function toSitePermission(value: unknown): SitePermission | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { addresses, address, grantedAt } = value as Record<string, unknown>;
+  if (typeof grantedAt !== 'number') return null;
+  if (Array.isArray(addresses)) {
+    if (addresses.length === 0 || !addresses.every((a) => typeof a === 'string')) return null;
+    return { addresses: unique(addresses), grantedAt };
+  }
+  return typeof address === 'string' ? { addresses: [address], grantedAt } : null;
 }

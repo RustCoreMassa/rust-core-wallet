@@ -48,55 +48,98 @@ describe('DappPermissions', () => {
     expect(await permissions.all()).toEqual({});
   });
 
-  it('grants one account per site and stores it', async () => {
+  it('grants a site its accounts, the first in use, and stores them', async () => {
     const { area, items } = fakeLocal();
     const permissions = new DappPermissions(area, () => 1000);
-    await permissions.grant('https://app.dusa.io', A);
-    await permissions.grant('https://other.example', B);
-    expect(await permissions.get('https://app.dusa.io')).toEqual({ address: A, grantedAt: 1000 });
+    await permissions.grant('https://app.dusa.io', [B, A, B]);
+    await permissions.grant('https://other.example', [B]);
+    expect(await permissions.get('https://app.dusa.io')).toEqual({
+      addresses: [B, A],
+      grantedAt: 1000,
+    });
     expect(Object.keys(items[PERMISSIONS_ITEM] as object)).toEqual([
       'https://app.dusa.io',
       'https://other.example',
     ]);
+    await expect(permissions.grant('https://empty.example', [])).rejects.toThrow();
   });
 
-  it('changes the account of a connected site only', async () => {
+  it('adds an account to a connected site only — in use, or after the others', async () => {
     const { area } = fakeLocal();
     const permissions = new DappPermissions(area, () => 1000);
-    await permissions.grant('https://app.dusa.io', A);
-    expect(await permissions.changeAccount('https://app.dusa.io', B)).toBe(true);
-    expect((await permissions.get('https://app.dusa.io'))?.address).toBe(B);
-    expect(await permissions.changeAccount('https://unknown.example', B)).toBe(false);
+    await permissions.grant('https://app.dusa.io', [A]);
+    expect(await permissions.addAccount('https://app.dusa.io', B, false)).toBe(true);
+    expect((await permissions.get('https://app.dusa.io'))?.addresses).toEqual([A, B]);
+    expect(await permissions.addAccount('https://app.dusa.io', B, true)).toBe(true);
+    expect((await permissions.get('https://app.dusa.io'))?.addresses).toEqual([B, A]);
+    expect(await permissions.addAccount('https://unknown.example', B, true)).toBe(false);
     expect(await permissions.get('https://unknown.example')).toBeNull();
+  });
+
+  it('takes an account away from a site, and disconnects it with its last one', async () => {
+    const { area } = fakeLocal();
+    const permissions = new DappPermissions(area);
+    await permissions.grant('https://app.dusa.io', [A, B]);
+    expect(await permissions.removeAccount('https://app.dusa.io', A)).toBe(true);
+    expect((await permissions.get('https://app.dusa.io'))?.addresses).toEqual([B]);
+    expect(await permissions.removeAccount('https://app.dusa.io', A)).toBe(false);
+    expect(await permissions.removeAccount('https://app.dusa.io', B)).toBe(true);
+    expect(await permissions.get('https://app.dusa.io')).toBeNull();
+  });
+
+  it('puts the wallet switched to in use on every site that may see it', async () => {
+    const { area } = fakeLocal();
+    const permissions = new DappPermissions(area);
+    await permissions.grant('https://one.example', [A, B]);
+    await permissions.grant('https://two.example', [A]);
+    await permissions.grant('https://three.example', [B, A]);
+    expect(await permissions.useAccount(B)).toEqual(['https://one.example']);
+    const map = await permissions.all();
+    expect(map['https://one.example'].addresses).toEqual([B, A]);
+    expect(map['https://two.example'].addresses).toEqual([A]);
+    expect(map['https://three.example'].addresses).toEqual([B, A]);
+    expect(await permissions.useAccount(B)).toEqual([]);
   });
 
   it('revokes a site', async () => {
     const { area } = fakeLocal();
     const permissions = new DappPermissions(area);
-    await permissions.grant('https://app.dusa.io', A);
+    await permissions.grant('https://app.dusa.io', [A]);
     expect(await permissions.revoke('https://app.dusa.io')).toBe(true);
     expect(await permissions.revoke('https://app.dusa.io')).toBe(false);
     expect(await permissions.get('https://app.dusa.io')).toBeNull();
   });
 
-  it('revokes every site of a removed account and returns them', async () => {
+  it('takes a removed account away from every site, disconnecting those left with none', async () => {
     const { area } = fakeLocal();
     const permissions = new DappPermissions(area);
-    await permissions.grant('https://one.example', A);
-    await permissions.grant('https://two.example', B);
-    await permissions.grant('https://three.example', A);
-    expect(await permissions.revokeAddress(A)).toEqual([
-      'https://one.example',
-      'https://three.example',
-    ]);
-    expect(Object.keys(await permissions.all())).toEqual(['https://two.example']);
+    await permissions.grant('https://one.example', [A]);
+    await permissions.grant('https://two.example', [B]);
+    await permissions.grant('https://three.example', [A, B]);
+    expect(await permissions.removeAddress(A)).toEqual(['https://one.example']);
+    const map = await permissions.all();
+    expect(Object.keys(map)).toEqual(['https://two.example', 'https://three.example']);
+    expect(map['https://three.example'].addresses).toEqual([B]);
+  });
+
+  it('reads sites saved with one account (before several per site) as that account', async () => {
+    const { area } = fakeLocal({
+      [PERMISSIONS_ITEM]: { 'https://app.dusa.io': { address: A, grantedAt: 7 } },
+    });
+    const permissions = new DappPermissions(area);
+    expect(await permissions.get('https://app.dusa.io')).toEqual({ addresses: [A], grantedAt: 7 });
+    await permissions.addAccount('https://app.dusa.io', B, false);
+    expect(await permissions.get('https://app.dusa.io')).toEqual({
+      addresses: [A, B],
+      grantedAt: 7,
+    });
   });
 
   it('disconnects every site at once', async () => {
     const { area } = fakeLocal();
     const permissions = new DappPermissions(area);
-    await permissions.grant('https://one.example', A);
-    await permissions.grant('https://two.example', B);
+    await permissions.grant('https://one.example', [A]);
+    await permissions.grant('https://two.example', [B]);
     await permissions.clear();
     expect(await permissions.all()).toEqual({});
   });
@@ -106,6 +149,8 @@ describe('DappPermissions', () => {
       'oops',
       [],
       { 'https://ok.example': { address: A } }, // grantedAt missing
+      { 'https://ok.example': { addresses: [], grantedAt: 1 } }, // no account
+      { 'https://ok.example': { addresses: [A, 3], grantedAt: 1 } }, // not an address
       { 'http://evil.example': { address: A, grantedAt: 1 } }, // not an allowed origin
       { 'https://ok.example/path': { address: A, grantedAt: 1 } }, // not an origin
     ]) {

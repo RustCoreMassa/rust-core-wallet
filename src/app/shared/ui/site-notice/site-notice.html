@@ -1,0 +1,28 @@
+@if (connection.notice(); as notice) {
+<aside class="site-notice" role="region" aria-labelledby="site-notice-title">
+  <div class="site-notice-head">
+    <span class="site-notice-dot" aria-hidden="true"></span>
+    <div class="site-notice-text">
+      <div class="site-notice-title" id="site-notice-title">Not connected to {{ notice.host }}</div>
+      <div class="site-notice-sub">
+        <b>{{ notice.name }}</b> isn't connected to this site. It keeps using another of your
+        accounts.
+      </div>
+    </div>
+    <button
+      class="site-notice-close"
+      type="button"
+      aria-label="Hide"
+      (click)="connection.dismiss()"
+    >
+      ✕
+    </button>
+  </div>
+  @if (error()) {
+  <div class="error-text site-notice-error">{{ error() }}</div>
+  }
+  <button class="btn btn-ghost site-notice-action" type="button" [disabled]="busy()" (click)="connect()">
+    Connect {{ notice.name }}
+  </button>
+</aside>
+}

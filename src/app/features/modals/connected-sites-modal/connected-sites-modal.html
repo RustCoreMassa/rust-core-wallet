@@ -24,16 +24,50 @@
     <div class="site-origin">{{ site.origin }}</div>
     <div class="site-since">Connected {{ since(site.grantedAt) }}</div>
 
-    <div class="field-label">Account it sees</div>
-    @if (isKnown(site.address)) {
-    <app-dropdown
-      [inputId]="'site-account-' + $index"
-      [options]="accountOptions()"
-      [value]="site.address"
-      (valueChange)="changeAccount(site.origin, $event)"
-    />
-    } @else {
-    <div class="hint">This account is no longer in RustCore Wallet.</div>
+    <div class="field-label">Accounts it can see</div>
+    <div class="site-accounts">
+      @for (account of accountsOf(site); track account.address) {
+      <div class="site-account">
+        <div class="site-account-names">
+          <span class="site-account-name" [class.gone]="!account.name">
+            {{ account.name ?? 'No longer in RustCore Wallet' }}
+          </span>
+          <span class="site-account-address">{{ account.short }}</span>
+        </div>
+        @if (account.inUse) {
+        <span class="site-account-badge">In use</span>
+        }
+        @if (site.addresses.length > 1) {
+        <button
+          class="site-account-remove"
+          type="button"
+          [attr.aria-label]="'Remove ' + (account.name ?? account.short) + ' from ' + site.origin"
+          [disabled]="busyOrigin() === site.origin"
+          (click)="removeAccount(site.origin, account.address)"
+        >
+          ✕
+        </button>
+        }
+      </div>
+      }
+    </div>
+
+    @if (addable(site); as more) {
+    @if (more.length > 0) {
+    <div class="site-add">
+      <span class="site-add-label">Add</span>
+      @for (account of more; track account.address) {
+      <button
+        class="site-add-chip"
+        type="button"
+        [disabled]="busyOrigin() === site.origin"
+        (click)="addAccount(site.origin, account.address)"
+      >
+        + {{ account.name }}
+      </button>
+      }
+    </div>
+    }
     }
 
     <button
@@ -48,7 +82,7 @@
   } @empty {
   <div class="sites-empty">
     No site is connected. When a site asks to connect, RustCore Wallet opens a window to ask you
-    first — and you can disconnect it here at any time.
+    first — and you can change what it sees, or disconnect it, here at any time.
   </div>
   }
 </div>

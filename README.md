@@ -109,8 +109,9 @@ That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.m
   address) — you confirm before anything is signed.
 - Revealing a private key, removing a wallet or logging out asks for your PIN (or the
   extension's password) again.
-- In the browser extension, a dApp you connect sees only the wallet you chose for it, and each
-  of its requests opens a review window; you can disconnect sites in Settings → Connected sites.
+- In the browser extension, a dApp you connect sees only the wallets you chose for it, and each
+  of its requests opens a review window; you can change which wallets a site sees, or disconnect
+  it, in Settings → Connected sites.
 - Swaps are sent with a minimum you'll accept, so the exchange cancels them instead of filling
   at a bad price.
 

@@ -1,4 +1,4 @@
-import { ContentWindow, RelayPort, startRelay } from './content';
+import { ContentWindow, ORIGIN_QUERY, RelayPort, startRelay } from './content';
 import {
   READY_EVENT,
   RustCoreError,
@@ -55,7 +55,7 @@ function setup() {
   const win = new FakeWindow();
   const ports: ReturnType<typeof fakePort>[] = [];
   let connectError: Error | null = null;
-  const tabListeners: ((m: unknown) => void)[] = [];
+  const tabListeners: ((m: unknown, reply: (answer: unknown) => void) => void)[] = [];
   startRelay(
     win as unknown as ContentWindow,
     () => {
@@ -72,7 +72,13 @@ function setup() {
     rustcore,
     ports,
     /** A message from the background to this tab (chrome.tabs.sendMessage). */
-    toTab: (m: unknown) => tabListeners.forEach((cb) => cb(m)),
+    toTab: (m: unknown) => tabListeners.forEach((cb) => cb(m, () => {})),
+    /** A message from the wallet's own pages, and the answer it got (undefined if none). */
+    askTab: (m: unknown) => {
+      let answer: unknown;
+      tabListeners.forEach((cb) => cb(m, (a) => (answer = a)));
+      return answer;
+    },
     failConnect: (e: Error | null) => (connectError = e),
     lastPort: () => ports[ports.length - 1],
   };
@@ -184,6 +190,17 @@ describe('page ⇄ content script ⇄ background', () => {
     toTab({ channel: CHANNEL, origin: 'https://dapp.example', event: 'disconnect' });
     await flush();
     expect(seen).toEqual(['disconnected']);
+  });
+
+  it('tells the wallet which site the tab shows, and nothing for other messages', async () => {
+    const { askTab, rustcore } = setup();
+    const seen: unknown[] = [];
+    rustcore.on('disconnect', (d) => seen.push(d));
+    expect(askTab(ORIGIN_QUERY)).toBe('https://dapp.example');
+    expect(askTab({ channel: 'other', query: 'origin' })).toBeUndefined();
+    expect(askTab({ channel: CHANNEL, query: 'cookies' })).toBeUndefined();
+    await flush();
+    expect(seen).toEqual([]);
   });
 
   it('ignores messages from other windows and other channels', async () => {

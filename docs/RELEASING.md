@@ -116,7 +116,10 @@ What the stores ask for:
   `alarms` (auto-lock after 15 minutes), `sidePanel` (Chromium only — the side-panel view).
   Site access (content scripts on `https://*/*`, plus `http://localhost` / `127.0.0.1` for dApp
   developers): two small scripts let dApps find the wallet (`window.rustcore`), pass their
-  requests to it and hear when the connected account or the network changes. They read nothing from the page and send nothing anywhere; every request needs
+  requests to it and hear when the connected accounts or the network change. When the wallet's
+  popup or side panel asks, the script in the active tab tells it which site the tab shows (its
+  origin only), so the wallet can say whether that site is connected to the active wallet. They
+  read nothing else from the page and send nothing anywhere; every request needs
   the user's approval in the wallet's own window (docs/DAPP-CONNECTION.md). Browsers show this
   as "read and change your data on all websites", like every injected wallet's.
 - **Data**: none is collected. Firefox's manifest declares it

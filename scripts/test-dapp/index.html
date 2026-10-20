@@ -80,6 +80,7 @@
       }
       dd {
         margin: 0;
+        white-space: pre-line;
         overflow-wrap: anywhere;
         font-family: ui-monospace, monospace;
         font-size: 13px;
@@ -175,6 +176,8 @@
           <dd id="s-connected">–</dd>
           <dt>Account</dt>
           <dd id="s-account">–</dd>
+          <dt>All accounts</dt>
+          <dd id="s-accounts">–</dd>
           <dt>Network</dt>
           <dd id="s-network">–</dd>
           <dt>MAS</dt>
@@ -194,9 +197,14 @@
           <button id="connect">connect</button>
           <button id="connected">connected</button>
           <button id="account">account</button>
+          <button id="accounts">accounts</button>
           <button id="network">network</button>
           <button id="disconnect">disconnect</button>
         </div>
+        <label style="margin-top: 10px">
+          Sign with (from, optional — every signature and operation below)
+          <input id="from" placeholder="the account the site uses now" />
+        </label>
       </section>
 
       <section>

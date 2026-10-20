@@ -39,6 +39,7 @@ type FakeStore = ReturnType<typeof fakeStore>;
 function fakeStore() {
   return {
     network: signal<'mainnet' | 'buildnet'>('mainnet'),
+    activeWalletId: signal('a'),
     ensureWallet: vi.fn(),
     prepareDappWallet: vi.fn(async () => undefined),
     validateDappTransfer: vi.fn(),
@@ -78,7 +79,8 @@ async function setup(queue: ApprovalView[], configure: (store: FakeStore) => voi
   const page = fixture.componentInstance as unknown as {
     approve(): Promise<void>;
     reject(): Promise<void>;
-    chosenId: ReturnType<typeof signal<string>>;
+    toggleAccount(id: string): void;
+    ready(): boolean;
     phase(): string;
     error(): string | null;
     blocker(): string | null;
@@ -102,12 +104,29 @@ describe('ApprovePage', () => {
     expect(approvals.close).toHaveBeenCalled();
   });
 
-  it('shows the requesting site and connects the account the user picks', async () => {
+  it('shows the requesting site and connects the accounts the user ticks', async () => {
     const { fixture, page, approvals } = await setup([view({ method: 'connect' })]);
     expect(fixture.nativeElement.textContent).toContain('https://app.dusa.io');
-    page.chosenId.set('b');
+    page.toggleAccount('b'); // the active wallet (a) comes ticked
     await page.approve();
-    expect(approvals.resolve).toHaveBeenCalledWith('ap1', { address: SAVINGS });
+    expect(approvals.resolve).toHaveBeenCalledWith('ap1', { addresses: [MAIN, SAVINGS] });
+  });
+
+  it('offers the active wallet, puts it first, and needs at least one account', async () => {
+    const { page, approvals, store } = await setup(
+      [view({ method: 'connect' }), view({ approvalId: 'ap2', method: 'connect' })],
+      (s) => s.activeWalletId.set('b'),
+    );
+    page.toggleAccount('a');
+    await page.approve();
+    expect(approvals.resolve).toHaveBeenCalledWith('ap1', { addresses: [SAVINGS, MAIN] });
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.activeWalletId()).toBe('b');
+    page.toggleAccount('b'); // nothing ticked any more
+    expect(page.ready()).toBe(false);
+    await page.approve();
+    expect(approvals.resolve).toHaveBeenCalledTimes(1);
   });
 
   it("sends exactly what was asked, from the site's account, and answers with the operation", async () => {

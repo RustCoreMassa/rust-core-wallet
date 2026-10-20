@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Connect several wallets to a site, as in MetaMask** (browser extension). When a site asks to
+  connect, tick the wallets it may see — the one you're using comes ticked. The site uses the
+  wallet you switch to whenever it may see it, and Home tells you when the site open in your
+  browser is connected, but not to the wallet you're using, with a button to connect it.
+  Settings → Connected sites lists the wallets each site sees, the one in use first, to add or
+  take one away. Sites connected before keep their wallet.
+- **For dApp developers:** the `accounts` request, an optional `from` on signatures and
+  operations to choose which of the site's accounts signs, and the `accountsChanged` event.
+  Everything that worked before works the same.
+
 ## [1.5.2] — 2026-10-20
 
 ### Added

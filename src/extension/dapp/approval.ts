@@ -16,7 +16,7 @@ export interface ApprovalView {
   readonly method: DappMethod;
   /** The page's params, exactly as received — the window re-checks them with parseRequest. */
   readonly params: unknown;
-  /** The site's connected account, which must sign; null for `connect`. */
+  /** The account that must sign (the one the site named, else its current one); null for `connect`. */
   readonly address: string | null;
   readonly createdAt: number;
   /** Requests waiting after this one. */
@@ -25,8 +25,8 @@ export interface ApprovalView {
 
 /** What the approval window sends back once the user approved and the wallet did the work. */
 export type ApprovalResult =
-  /** connect: the account the user chose to share. */
-  | { readonly address: string }
+  /** connect: the accounts the user chose to share, the site's current one first. */
+  | { readonly addresses: readonly string[] }
   /** sign: massa-web3's SignedData. */
   | { readonly publicKey: string; readonly signature: string }
   /** transfer, rolls, callSC: the operation the wallet sent, and the network it was sent on. */

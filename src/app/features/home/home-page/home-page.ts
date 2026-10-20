@@ -7,6 +7,7 @@ import { WalletStore } from '../../../core/state/wallet-store';
 import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 import { HistoryRow } from '../../../shared/ui/history-row/history-row';
 import { TokenRow } from '../../../shared/ui/token-row/token-row';
+import { SiteNoticeCard } from '../../../shared/ui/site-notice/site-notice';
 
 type HomeTab = 'tokens' | 'history';
 
@@ -26,7 +27,7 @@ const showAllTokens = signal(false);
 
 @Component({
   selector: 'app-home-page',
-  imports: [CurrencyPipe, AmountPipe, TokenRow, HistoryRow],
+  imports: [CurrencyPipe, AmountPipe, TokenRow, HistoryRow, SiteNoticeCard],
   templateUrl: './home-page.html',
   styleUrl: './home-page.scss',
 })
