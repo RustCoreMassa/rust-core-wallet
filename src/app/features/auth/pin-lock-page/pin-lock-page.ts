@@ -5,13 +5,21 @@ import { VaultAccount } from '../../../core/models/vault.model';
 import { UNLOCK_SECRET, UnlockSecret, secretNoun } from '../../../core/platform/unlock-secret';
 import { MASSA_PROVIDER } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
+import { WalletDataEraser } from '../../../core/state/wallet-data-eraser';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../../../core/utils/password-rules';
 import { toUserMessage } from '../../../core/utils/user-error';
 
 type Step =
-  'unlock' | 'create' | 'confirm-pin' | 'upgrade' | 'key-choice' | 'import-key' | 'generating';
+  | 'unlock'
+  | 'forgot'
+  | 'create'
+  | 'confirm-pin'
+  | 'upgrade'
+  | 'key-choice'
+  | 'import-key'
+  | 'generating';
 
 /**
  * Single self-contained auth flow: unlock (vault already exists) or
@@ -26,6 +34,10 @@ type Step =
  * Which branch you land on is decided once, from `authStore.hasVault()`
  * — not a manual "log in / sign up" toggle, since that state is a fact
  * about the device, not a choice the user makes each time.
+ *
+ * A forgotten secret can't be recovered (it is the vault's key), so
+ * `forgot` offers the only way out: erase this device's wallets, as log
+ * out does, and start over by importing the private keys.
  */
 @Component({
   selector: 'app-pin-lock-page',
@@ -36,6 +48,7 @@ type Step =
 export class PinLockPage {
   private readonly authStore = inject(AuthStore);
   private readonly walletStore = inject(WalletStore);
+  private readonly eraser = inject(WalletDataEraser);
   private readonly provider = inject(MASSA_PROVIDER);
   private readonly router = inject(Router);
   /** Where to go once unlocked: the extension's approval window returns to its request. */
@@ -43,7 +56,7 @@ export class PinLockPage {
     inject(ActivatedRoute).snapshot.queryParamMap.get('next') === 'approve' ? '/approve' : '/home';
 
   protected readonly kind = inject(UNLOCK_SECRET);
-  private readonly noun = secretNoun(this.kind);
+  protected readonly noun = secretNoun(this.kind);
 
   protected readonly step = signal<Step>(this.authStore.hasVault() ? 'unlock' : 'create');
   protected readonly error = signal<string | null>(null);
@@ -53,6 +66,7 @@ export class PinLockPage {
   protected readonly newPassword = signal('');
   protected readonly confirmPassword = signal('');
   protected readonly showPassword = signal(false);
+  protected readonly eraseAccepted = signal(false);
   protected readonly minPasswordLength = MIN_PASSWORD_LENGTH;
 
   private firstSecret = '';
@@ -74,6 +88,8 @@ export class PinLockPage {
     switch (this.step()) {
       case 'unlock':
         return `Enter your ${this.noun}`;
+      case 'forgot':
+        return `Forgot your ${this.noun}?`;
       case 'create':
         return `Create a ${this.noun}`;
       case 'confirm-pin':
@@ -96,6 +112,8 @@ export class PinLockPage {
         return this.kind === 'pin'
           ? 'Unlock your wallet'
           : 'Unlock your wallet. Made it with a PIN? Type the PIN here.';
+      case 'forgot':
+        return `It can't be recovered: it is what encrypts your wallets on this device. You can erase them and start over, then import your wallets again with their private keys.`;
       case 'create':
         return this.kind === 'pin'
           ? 'Set a 6-digit code to secure your wallet'
@@ -151,6 +169,32 @@ export class PinLockPage {
         this.firstSecret = '';
         this.step.set('create');
       }
+    }
+  }
+
+  protected showForgot(): void {
+    this.error.set(null);
+    this.eraseAccepted.set(false);
+    this.step.set('forgot');
+  }
+
+  protected backToUnlock(): void {
+    this.error.set(null);
+    this.step.set('unlock');
+  }
+
+  /** Deletes the vault and every wallet's data on this device, then starts the create flow. */
+  protected async eraseAndStartOver(): Promise<void> {
+    if (!this.eraseAccepted()) return;
+    this.isBusy.set(true);
+    try {
+      this.authStore.logout();
+      await this.eraser.erase();
+      this.eraseAccepted.set(false);
+      this.error.set(null);
+      this.step.set('create');
+    } finally {
+      this.isBusy.set(false);
     }
   }
 

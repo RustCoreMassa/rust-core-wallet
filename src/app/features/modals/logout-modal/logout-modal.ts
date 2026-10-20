@@ -1,11 +1,9 @@
 import { Component, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { UNLOCK_SECRET, secretNoun } from '../../../core/platform/unlock-secret';
 import { Modal } from '../../../core/services/modal';
 import { AuthStore } from '../../../core/state/auth-store';
-import { NetworkStore } from '../../../core/state/network-store';
-import { WalletStore } from '../../../core/state/wallet-store';
+import { WalletDataEraser } from '../../../core/state/wallet-data-eraser';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
 
 type Step = 'warn' | 'confirm-secret';
@@ -25,11 +23,8 @@ type Step = 'warn' | 'confirm-secret';
 export class LogoutModal {
   protected readonly modal = inject(Modal);
   private readonly authStore = inject(AuthStore);
-  private readonly walletStore = inject(WalletStore);
-  private readonly networkStore = inject(NetworkStore);
+  private readonly eraser = inject(WalletDataEraser);
   private readonly router = inject(Router);
-  /** Extension only: no site stays connected to wallets that left the device. */
-  private readonly connectedSites = inject(CONNECTED_SITES);
 
   protected readonly secretName = secretNoun(inject(UNLOCK_SECRET));
   protected readonly step = signal<Step>('warn');
@@ -66,10 +61,6 @@ export class LogoutModal {
     await this.router.navigateByUrl('/login');
     // Wallet state only after leaving the shell — its pages read
     // `activeWallet()`, which throws once the store is empty.
-    this.walletStore.reset();
-    this.networkStore.reset();
-    await this.connectedSites
-      ?.clear()
-      .catch((err) => console.warn('Disconnecting the sites failed', err));
+    await this.eraser.erase();
   }
 }

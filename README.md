@@ -140,9 +140,9 @@ See [how to verify a build](docs/RELEASING.md#verifying-a-build).
 ## FAQ
 
 **I forgot my PIN (or the extension's password).** There is no recovery — it's what encrypts
-your wallet on the device, and nobody else has it. Clear this site's data in your browser
-settings (on iPhone, remove the installed app from your home screen; for the extension, remove
-and reinstall it), open the wallet again and import your private key from your backup.
+your wallet on the device, and nobody else has it. Tap *Forgot your PIN?* (*Forgot your
+password?* in the extension) on the lock screen: it erases the wallets from this device and lets
+you start over — create a new PIN or password, then import your private key from your backup.
 
 **I lost my private key.** If you can still unlock the wallet, back the key up now under
 *Settings → Backup private key*. Without the key and without access to the app, nobody —

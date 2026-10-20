@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **"Forgot your PIN / password?" on the lock screen.** The PIN or password can't be recovered
+  (it encrypts your wallets), so until now a forgotten one left no way back in. The link erases
+  this device's wallets, after a warning and a confirmation, and starts over: create a new PIN or
+  password, then import your wallets again with their private keys. It clears the same data as
+  Log out.
+
 ## [1.5.1] — 2026-10-19
 
 ### Added

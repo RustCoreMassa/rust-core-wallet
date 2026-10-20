@@ -14,6 +14,36 @@
   <app-secret-entry submitLabel="Unlock" [busy]="isBusy()" (submitted)="onSecret($event)" />
   }
 
+  @if (step() === 'unlock') {
+  <button class="forgot-link" type="button" [disabled]="isBusy()" (click)="showForgot()">
+    Forgot your {{ noun }}?
+  </button>
+  }
+
+  @if (step() === 'forgot') {
+  <div class="erase-box">
+    <div class="error-text" style="display:block;margin-bottom:12px;">
+      Erasing removes every wallet from this device. Any wallet whose private key you haven't
+      saved elsewhere is lost for good, together with its funds.
+    </div>
+    <label class="check-row">
+      <input type="checkbox" [checked]="eraseAccepted()" (change)="eraseAccepted.set(!eraseAccepted())" />
+      I have my private keys saved, or I accept losing these wallets
+    </label>
+    <button
+      class="btn btn-red"
+      type="button"
+      [disabled]="!eraseAccepted() || isBusy()"
+      (click)="eraseAndStartOver()"
+    >
+      Erase and start over
+    </button>
+    <button class="btn btn-ghost" type="button" [disabled]="isBusy()" (click)="backToUnlock()">
+      Back
+    </button>
+  </div>
+  }
+
   @if (choosingPassword()) {
   <form class="password-form" (submit)="submitPassword($event)">
     <label class="field-label" for="new-password-input">Password</label>
@@ -36,7 +66,7 @@
       [ngModel]="confirmPassword()"
       (ngModelChange)="confirmPassword.set($event)"
     />
-    <label class="show-password">
+    <label class="check-row">
       <input type="checkbox" [checked]="showPassword()" (change)="showPassword.set(!showPassword())" />
       Show password
     </label>
