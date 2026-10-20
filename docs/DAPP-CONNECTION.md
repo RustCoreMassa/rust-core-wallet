@@ -1,7 +1,7 @@
 # Connecting dApps — architecture
 
-Status: **implemented on branch `dapp-connect`** (see Progress at the end); the wallet-provider PR
-is next. This document is for developers. It describes how Massa dApps connect to the RustCore
+Status: **implemented** (released in 1.2.0, see Progress at the end); the wallet-provider PR is
+merged ([#366](https://github.com/massalabs/wallet-provider/pull/366)). This document is for developers. It describes how Massa dApps connect to the RustCore
 Wallet browser extension and ask it to sign.
 
 ## Goal
@@ -273,6 +273,13 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   the user switches the active wallet; it changes only from Settings → Connected sites.
   wallet-provider's `accounts()` returns a list, so several accounts can come later without
   breaking dApps.
+- **Several accounts per site: on the roadmap, not now** (2026-10-20). A MetaMask-style version
+  was built (accounts ticked at `connect`, the site following the wallet you switch to, a "Not
+  connected" notice on Home, `accounts`, `from`, `accountsChanged`) and rolled back before
+  release: wallet-provider's `RustCoreWallet` (#366, merged) shares one account and signs
+  without `from`, so a site's account changing at every wallet switch could sign from another
+  account than the dApp shows. It comes back together with a wallet-provider update
+  (`accounts()` listing every account, `from` on each signature, fallback for older extensions).
 - **`sign` is in v1**, shown as text when printable, else hex, with a warning.
 - **Approval window: 380 × 600**, the popup's size.
 
@@ -325,4 +332,6 @@ so future native apps could reuse protocol v1 in their own dApp browser.
 - [x] Operation answers carry the network they were sent on (`{ operationId, network }`): the
   approval window reports the network it sent on, the background answers that network's details
   (#366 review: a network switch during the prompt sent status polling to the wrong node).
-- [ ] wallet-provider PR
+- [x] wallet-provider PR — [massalabs/wallet-provider#366](https://github.com/massalabs/wallet-provider/pull/366),
+  merged 2026-10-19 (first in the `3.3.2-dev` build on npm).
+- [ ] Several accounts per site, with the matching wallet-provider update (see Decisions).
