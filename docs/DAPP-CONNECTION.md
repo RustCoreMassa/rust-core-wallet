@@ -1,7 +1,7 @@
 # Connecting dApps — architecture
 
-Status: **implemented on branch `dapp-connect`** (see Progress at the end); the wallet-provider PR
-is next. This document is for developers. It describes how Massa dApps connect to the RustCore
+Status: **implemented** (released in 1.2.0, see Progress at the end); the wallet-provider PR is
+merged ([#366](https://github.com/massalabs/wallet-provider/pull/366)). This document is for developers. It describes how Massa dApps connect to the RustCore
 Wallet browser extension and ask it to sign.
 
 ## Goal
@@ -288,6 +288,11 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   (the popup asks the tab's content script for its origin — no `tabs` permission). Settings →
   Connected sites lists each site's accounts, the one in use first, to add or take away. A site
   that only knows `account` / `accountChanged` keeps working as before.
+  Rolled back once before release (2026-10-20): wallet-provider's `RustCoreWallet` (#366,
+  merged) shares one account and signs without `from`, so a site's account changing at every
+  wallet switch could sign from another account than the dApp shows. It ships together with a
+  wallet-provider update (`accounts()` listing every account, `from` on each signature,
+  fallback for older extensions).
 - **`sign` is in v1**, shown as text when printable, else hex, with a warning.
 - **Approval window: 380 × 600**, the popup's size.
 
@@ -340,8 +345,10 @@ so future native apps could reuse protocol v1 in their own dApp browser.
 - [x] Operation answers carry the network they were sent on (`{ operationId, network }`): the
   approval window reports the network it sent on, the background answers that network's details
   (#366 review: a network switch during the prompt sent status polling to the wrong node).
+- [x] wallet-provider PR — [massalabs/wallet-provider#366](https://github.com/massalabs/wallet-provider/pull/366),
+  merged 2026-10-19 (first in the `3.3.2-dev` build on npm).
 - [x] Several accounts per site, as MetaMask (see Decisions): permissions hold `addresses`,
   `accounts` method, `from` on everything signed, `accountsChanged` event, ticks at `connect`,
   `SiteConnection` (follows the active wallet, Home notice), Connected sites lists accounts. The
   test page has an `accounts` button, a `from` field and the new protocol checks.
-- [ ] wallet-provider PR
+- [ ] wallet-provider update for several accounts (`accounts()`, `from`, `accountsChanged`).
