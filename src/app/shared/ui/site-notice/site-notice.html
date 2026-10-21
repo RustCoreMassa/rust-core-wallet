@@ -1,0 +1,36 @@
+@if (connection.notice(); as notice) {
+<aside class="site-notice" role="region" aria-labelledby="site-notice-title">
+  <div class="site-notice-head">
+    <span class="site-notice-dot" aria-hidden="true"></span>
+    <div class="site-notice-text">
+      @if (notice.kind === 'not-connected') {
+      <div class="site-notice-title" id="site-notice-title">Not connected to {{ notice.host }}</div>
+      <div class="site-notice-sub">
+        <b>{{ notice.name }}</b> isn't connected to this site. It keeps using another of your
+        accounts.
+      </div>
+      } @else {
+      <div class="site-notice-title" id="site-notice-title">{{ notice.host }} uses another account</div>
+      <div class="site-notice-sub">
+        This site uses one account at a time and doesn't follow your wallet switches: it still uses
+        <b>{{ notice.inUseName ?? 'another of your accounts' }}</b>.
+      </div>
+      }
+    </div>
+    <button
+      class="site-notice-close"
+      type="button"
+      aria-label="Hide"
+      (click)="connection.dismiss()"
+    >
+      ✕
+    </button>
+  </div>
+  @if (error()) {
+  <div class="error-text site-notice-error">{{ error() }}</div>
+  }
+  <button class="btn btn-ghost site-notice-action" type="button" [disabled]="busy()" (click)="connect()">
+    {{ notice.kind === 'not-connected' ? 'Connect' : 'Use' }} {{ notice.name }}
+  </button>
+</aside>
+}

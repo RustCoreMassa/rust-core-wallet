@@ -9,7 +9,7 @@ Wallet browser extension and ask it to sign.
 A Massa dApp should be able to:
 
 1. find RustCore Wallet the same way it finds Bearby, Massa Station or MetaMask;
-2. ask to connect, and get one address once the user approves;
+2. ask to connect, and get the addresses the user chooses to share once they approve;
 3. ask for transfers, smart-contract calls, rolls and message signatures, each shown to the user
    on a review screen before anything is signed.
 
@@ -75,7 +75,7 @@ interface RustCoreInjected {
   readonly isRustCore: true;
   readonly version: string;                  // protocol version, "1"
   request(method: string, params?: unknown): Promise<unknown>;
-  on(event: 'accountChanged' | 'networkChanged' | 'disconnect', cb: (data: unknown) => void): () => void;
+  on(event: 'accountChanged' | 'accountsChanged' | 'networkChanged' | 'disconnect', cb: (data: unknown) => void): () => void;
 }
 ```
 
@@ -108,8 +108,13 @@ Runs only in top frames (`all_frames: false`): a dApp inside someone else's ifra
 The existing `background.ts` grows into the bridge's centre (still no Angular in it):
 
 - **Permissions** in `chrome.storage.local` under `rustcore:dapp-permissions`:
-  `{ [origin]: { address, grantedAt } }` — one connected account per site (the same address on
-  every network; requests are signed on the wallet's current network). Addresses are
+  `{ [origin]: { addresses, followsWallet, grantedAt } }` — the accounts the site may see, never
+  empty, the one it uses now first (the same addresses on every network; requests are signed on
+  the wallet's current network). `followsWallet` turns true the first time the site asks for
+  `accounts` or names a signer with `from` (see Decisions). Sites saved before several accounts
+  per site (`{ address, grantedAt }`) are read as that one account, not following the wallet,
+  and rewritten at the next change. Changes run one at a time, so two sites asking at once
+  can't overwrite each other's. Addresses are
   stored in clear (they're public on-chain) so a connected site can be answered while the wallet
   is locked; the list is shown and revocable in Settings → Connected sites.
 - **Requests needing the user** (`connect`, signatures) go into a queue, at most one pending per
@@ -117,13 +122,15 @@ The existing `background.ts` grows into the bridge's centre (still no Angular in
   `connect` from a site whose `connect` is already waiting (the same page again, or another tab of
   the site): it joins the waiting one and gets the same answer. Each opens (or reuses) the
   approval window; closing it rejects the request (`windows.onRemoved`).
-- **Events:** when a site's connected account or the wallet's network changes
+- **Events:** when a site's accounts or the wallet's network change
   (`chrome.storage.onChanged`, which also wakes a stopped worker), the background sends the event
   to every tab showing that site with `chrome.tabs.sendMessage` (top frame; no extra permission).
   It learns a tab when the tab's page opens a port (`port.sender.tab.id`) and keeps
   `{ [tabId]: origin }` in `chrome.storage.session` under `rustcore:dapp-tabs`, so the list
   outlives the worker; a closed tab (`tabs.onRemoved`) or one where nothing answers is
-  forgotten. Revoking a site sends `disconnect`.
+  forgotten. A new account in use sends `accountChanged`, any change to the list
+  `accountsChanged`; revoking a site sends `disconnect`. A waiting request is dropped (`4100`)
+  only when the account that signs it is taken away from the site.
 - Validates every request's params (types, ranges, string/byte limits) before showing anything.
 
 ### 4. Approval view — the Angular app
@@ -146,7 +153,7 @@ What the review shows per request:
 
 | Request | Shown |
 |---|---|
-| `connect` | origin, which account to share (default: active), network |
+| `connect` | origin, which accounts to share (ticked; the active wallet comes ticked), network |
 | `transfer` | recipient, amount, fee |
 | `buyRolls` / `sellRolls` | roll count, MAS cost/return, fee |
 | `callSC` | contract, function, coins sent, fee, max gas, raw parameter size/hex; a **simulation** (`readSC` with the user as caller, same coins) — if it fails, the error is shown and Approve is disabled. Known calls are decoded: MRC-20 `transfer`, `increaseAllowance` / `approve` of tokens in `TOKEN_REGISTRY` (amount in the token's units, spender; a warning for huge allowances), Dusa router swaps |
@@ -161,7 +168,7 @@ decimal strings, bytes as base64 (as wallet-provider already does for Bearby).
 |---|---|---|---|
 | `connect` | — | yes (once per site) | ✓ |
 | `disconnect` | yes | no | ✓ |
-| `connected`, `account`, `network` | — / yes / yes | no | ✓ |
+| `connected`, `account`, `accounts`, `network` | — / yes / yes / yes | no | ✓ |
 | `sign` | yes | yes | ✓ |
 | `transfer` | yes | yes | ✓ |
 | `buyRolls`, `sellRolls` | yes | yes | ✓ |
@@ -174,13 +181,20 @@ Params (amounts in smallest units, as decimal strings; `?` = optional):
 
 | Method | Params |
 |---|---|
-| `connect`, `disconnect`, `connected`, `account`, `network` | none (`undefined`, `null` or `{}`) |
-| `sign` | `data` (base64, ≤ 16 KB) |
-| `transfer` | `to`, `amount`, `fee?` |
-| `buyRolls`, `sellRolls` | `rolls`, `fee?` |
-| `callSC` | `target`, `func`, `parameter?` (base64), `coins?`, `fee?`, `maxGas?` |
+| `connect`, `disconnect`, `connected`, `account`, `accounts`, `network` | none (`undefined`, `null` or `{}`) |
+| `sign` | `data` (base64, ≤ 16 KB), `from?` |
+| `transfer` | `to`, `amount`, `fee?`, `from?` |
+| `buyRolls`, `sellRolls` | `rolls`, `fee?`, `from?` |
+| `callSC` | `target`, `func`, `parameter?` (base64), `coins?`, `fee?`, `maxGas?`, `from?` |
 
-Answers: `connect` and `account` → `{ address }`; `connected` → boolean; `network` →
+`from` names which of the site's accounts signs (an `AU…` address it was given); without it, the
+account it uses now signs. An account the site may not use is refused with `4100` before anything
+is shown to the user. Asking for `accounts`, or sending `from`, tells the wallet the site handles
+several accounts: from then on it follows the wallet the user switches to.
+
+Answers: `connect` → `{ address, addresses }` (the account in use, and every account the site may
+see, that one first); `account` → `{ address }`; `accounts` → `{ addresses }`; `connected` →
+boolean; `network` →
 `{ name, chainId, url, minimalFee }`; `sign` → massa-web3's `SignedData`; `transfer`, `buyRolls`,
 `sellRolls`, `callSC` → `{ operationId, network }`, where `network` (same shape as `network`'s
 answer) is the one the operation was sent on — follow its status on that node: the user may
@@ -269,17 +283,25 @@ so future native apps could reuse protocol v1 in their own dApp browser.
 
 ## Decisions
 
-- **One connected account per site** (2026-10-02). The site sees only that address, even when
-  the user switches the active wallet; it changes only from Settings → Connected sites.
-  wallet-provider's `accounts()` returns a list, so several accounts can come later without
-  breaking dApps.
-- **Several accounts per site: on the roadmap, not now** (2026-10-20). A MetaMask-style version
-  was built (accounts ticked at `connect`, the site following the wallet you switch to, a "Not
-  connected" notice on Home, `accounts`, `from`, `accountsChanged`) and rolled back before
-  release: wallet-provider's `RustCoreWallet` (#366, merged) shares one account and signs
-  without `from`, so a site's account changing at every wallet switch could sign from another
-  account than the dApp shows. It comes back together with a wallet-provider update
-  (`accounts()` listing every account, `from` on each signature, fallback for older extensions).
+- ~~One connected account per site~~ (2026-10-02) → **several accounts per site, as MetaMask**
+  (2026-10-20). At `connect` the user ticks the accounts to share (the active wallet comes
+  ticked). A site that follows the wallet (below) uses the wallet's most recently active account
+  among them: switching wallets moves every such site that may see the new one
+  (`accountChanged`); the wallet the app opens with moves nothing (after a lock it is just the
+  first wallet). When the site in the active tab is connected, but not to the active wallet,
+  Home says so and offers to connect it (the popup asks the tab's content script for its origin
+  — no `tabs` permission). Settings → Connected sites lists each site's accounts, the one in use
+  first, to add or take away.
+- **Only sites that handle several accounts follow wallet switches** (2026-10-21). Rolled back
+  once before release (2026-10-20) because wallet-provider's first `RustCoreWallet` (#366)
+  shares one account and signs without `from`: if a switch moved its site, a signature could
+  come from another account than the one the dApp shows. Fix: a site follows the wallet only
+  once it asked for `accounts` or named a signer with `from` — which only the updated
+  wallet-provider does (it asks `accounts` right after connecting). Other sites (older
+  wallet-provider, sites connected before 1.6.0) keep the account they use, exactly as in 1.5;
+  it changes only by hand: Home says "<site> uses another account" with a button to use the
+  active wallet there, and Connected sites has a Use button and a note. Their signatures without
+  `from` therefore always come from the account the dApp was given.
 - **`sign` is in v1**, shown as text when printable, else hex, with a warning.
 - **Approval window: 380 × 600**, the popup's size.
 
@@ -334,4 +356,10 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   (#366 review: a network switch during the prompt sent status polling to the wrong node).
 - [x] wallet-provider PR — [massalabs/wallet-provider#366](https://github.com/massalabs/wallet-provider/pull/366),
   merged 2026-10-19 (first in the `3.3.2-dev` build on npm).
-- [ ] Several accounts per site, with the matching wallet-provider update (see Decisions).
+- [x] Several accounts per site, as MetaMask (see Decisions): permissions hold `addresses`,
+  `accounts` method, `from` on everything signed, `accountsChanged` event, ticks at `connect`,
+  `SiteConnection` (follows the active wallet, Home notice), Connected sites lists accounts. The
+  test page has an `accounts` button, a `from` field and the new protocol checks.
+- [x] Older dApps don't follow wallet switches (`followsWallet`, see Decisions): Home notice
+  "uses another account", Use button in Connected sites; permission changes serialized.
+- [ ] wallet-provider update for several accounts (`accounts()`, `from`, `accountsChanged`).

@@ -179,7 +179,7 @@ describe('DappRouter — status requests', () => {
 
   it('answers a connected site with its account and the wallet network', async () => {
     const { router, permissions } = setup('buildnet');
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const page = fakePort();
     router.attach(page.port);
     const account = page.send('account');
@@ -189,9 +189,71 @@ describe('DappRouter — status requests', () => {
     expect(page.replyTo(network)).toEqual({ id: network, result: networkInfo('buildnet') });
   });
 
+  it('lists every account a connected site may see, the one in use first', async () => {
+    const { router, permissions } = setup();
+    const page = fakePort();
+    router.attach(page.port);
+    const before = page.send('accounts');
+    await settle();
+    expect(page.replyTo(before)).toMatchObject({ error: { code: 4100 } });
+    await permissions.grant(DUSA, [BOB, ALICE]);
+    const accounts = page.send('accounts');
+    const account = page.send('account');
+    await settle();
+    expect(page.replyTo(accounts)).toEqual({ id: accounts, result: { addresses: [BOB, ALICE] } });
+    expect(page.replyTo(account)).toEqual({ id: account, result: { address: BOB } });
+  });
+
+  it('lets a site that asks for its accounts, or names its signer, follow the wallet', async () => {
+    const { router, permissions } = setup();
+    await permissions.grant(DUSA, [ALICE, BOB]);
+    await permissions.grant('https://signer.example', [ALICE, BOB]);
+    await permissions.grant('https://older.example', [ALICE, BOB]);
+    const dusa = fakePort();
+    const signer = fakePort({ origin: 'https://signer.example', frameId: 0 });
+    const older = fakePort({ origin: 'https://older.example', frameId: 0 });
+    for (const page of [dusa, signer, older]) router.attach(page.port);
+
+    dusa.send('accounts');
+    signer.send('sign', { data: 'aGk=', from: BOB });
+    // what wallet-provider's first RustCoreWallet asks: one account, no `from`
+    older.send('account');
+    older.send('network');
+    older.send('connect'); // already connected: answered at once
+    older.send('transfer', { to: BOB, amount: '1' });
+    await settle();
+
+    expect((await permissions.get(DUSA))?.followsWallet).toBe(true);
+    expect((await permissions.get('https://signer.example'))?.followsWallet).toBe(true);
+    expect((await permissions.get('https://older.example'))?.followsWallet).toBe(false);
+  });
+
+  it("keeps an older dApp's unnamed signer on the account it shows after a wallet switch", async () => {
+    const { router, permissions, trackPermissions, events } = setup();
+    await permissions.grant(DUSA, [ALICE, BOB]);
+    const page = fakePort();
+    router.attach(page.port);
+    await trackPermissions(() => permissions.useAccount(BOB));
+    page.send('transfer', { to: BOB, amount: '1' });
+    await settle();
+    expect(router.next()).toMatchObject({ method: 'transfer', address: ALICE });
+    expect(events(page)).toEqual([]);
+  });
+
+  it('still knows sites connected before several accounts per site', async () => {
+    const browser = fakeBrowser();
+    browser.local[PERMISSIONS_ITEM] = { [DUSA]: { address: ALICE, grantedAt: 1 } };
+    const { router } = setup('mainnet', browser);
+    const page = fakePort();
+    router.attach(page.port);
+    const accounts = page.send('accounts');
+    await settle();
+    expect(page.replyTo(accounts)).toEqual({ id: accounts, result: { addresses: [ALICE] } });
+  });
+
   it('disconnects a site on its request', async () => {
     const { router, permissions } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const page = fakePort();
     router.attach(page.port);
     const id = page.send('disconnect');
@@ -212,20 +274,44 @@ describe('DappRouter — connect', () => {
     expect(showApproval).toHaveBeenCalledTimes(1);
     const view = router.next()!;
     expect(view).toMatchObject({ origin: DUSA, method: 'connect', address: null, queued: 0 });
-    expect(await router.resolve(view.approvalId, { address: BOB })).toBe(true);
-    expect(page.replyTo(id)).toEqual({ id, result: { address: BOB } });
-    expect((await permissions.get(DUSA))?.address).toBe(BOB);
+    expect(await router.resolve(view.approvalId, { addresses: [BOB] })).toBe(true);
+    expect(page.replyTo(id)).toEqual({ id, result: { address: BOB, addresses: [BOB] } });
+    expect((await permissions.get(DUSA))?.addresses).toEqual([BOB]);
     expect(router.next()).toBeNull();
   });
 
-  it('answers at once when the site is already connected', async () => {
-    const { router, permissions, showApproval } = setup();
-    await permissions.grant(DUSA, ALICE);
+  it('connects several accounts, the first one in use', async () => {
+    const { router, permissions } = setup();
     const page = fakePort();
     router.attach(page.port);
     const id = page.send('connect');
     await settle();
-    expect(page.replyTo(id)).toEqual({ id, result: { address: ALICE } });
+    expect(await router.resolve(router.next()!.approvalId, { addresses: [BOB, ALICE] })).toBe(true);
+    expect(page.replyTo(id)).toEqual({ id, result: { address: BOB, addresses: [BOB, ALICE] } });
+    expect((await permissions.get(DUSA))?.addresses).toEqual([BOB, ALICE]);
+  });
+
+  it('refuses a connect result with no account, the same one twice, or a contract', async () => {
+    const { router, permissions } = setup();
+    for (const addresses of [[], [ALICE, ALICE], [ALICE, CONTRACT]]) {
+      const page = fakePort();
+      router.attach(page.port);
+      const id = page.send('connect');
+      await settle();
+      expect(await router.resolve(router.next()!.approvalId, { addresses })).toBe(false);
+      expect(page.replyTo(id)).toMatchObject({ error: { code: -32603 } });
+    }
+    expect(await permissions.get(DUSA)).toBeNull();
+  });
+
+  it('answers at once when the site is already connected', async () => {
+    const { router, permissions, showApproval } = setup();
+    await permissions.grant(DUSA, [ALICE]);
+    const page = fakePort();
+    router.attach(page.port);
+    const id = page.send('connect');
+    await settle();
+    expect(page.replyTo(id)).toEqual({ id, result: { address: ALICE, addresses: [ALICE] } });
     expect(showApproval).not.toHaveBeenCalled();
   });
 
@@ -240,7 +326,7 @@ describe('DappRouter — connect', () => {
 
     const second = page.send('connect');
     await settle();
-    expect(await router.resolve(router.next()!.approvalId, { address: CONTRACT })).toBe(false);
+    expect(await router.resolve(router.next()!.approvalId, { addresses: [CONTRACT] })).toBe(false);
     expect(page.replyTo(second)).toMatchObject({ error: { code: -32603 } });
     expect(await permissions.get(DUSA)).toBeNull();
   });
@@ -249,7 +335,7 @@ describe('DappRouter — connect', () => {
 describe('DappRouter — signatures', () => {
   async function connectedPage() {
     const ctx = setup();
-    await ctx.permissions.grant(DUSA, ALICE);
+    await ctx.permissions.grant(DUSA, [ALICE]);
     const page = fakePort();
     ctx.router.attach(page.port);
     return { ...ctx, page };
@@ -292,6 +378,23 @@ describe('DappRouter — signatures', () => {
     expect(page.replyTo(id)).toMatchObject({ error: { code: -32603 } });
   });
 
+  it("signs with another of the site's accounts when it names it, and only those", async () => {
+    const { router, permissions, page, showApproval } = await connectedPage();
+    await permissions.addAccount(DUSA, BOB, false);
+    page.send('transfer', { to: ALICE, amount: '1', from: BOB });
+    await settle();
+    expect(router.next()).toMatchObject({ method: 'transfer', address: BOB });
+    router.reject(router.next()!.approvalId);
+
+    const outsider = 'AU1Aq3tvikkbBW83jKLTB2UmcfknUMvNjXNyTafNPbSmUdAsjWQ4';
+    const shown = showApproval.mock.calls.length;
+    const id = page.send('sign', { data: 'aGk=', from: outsider });
+    await settle();
+    expect(page.replyTo(id)).toMatchObject({ error: { code: 4100 } });
+    expect(router.next()).toBeNull();
+    expect(showApproval).toHaveBeenCalledTimes(shown);
+  });
+
   it('returns a signature for sign', async () => {
     const { router, page } = await connectedPage();
     const id = page.send('sign', { data: toBase64(new TextEncoder().encode('hello')) });
@@ -305,7 +408,7 @@ describe('DappRouter — signatures', () => {
     const { router, page } = await connectedPage();
     const id = page.send('callSC', { target: CONTRACT, func: 'swap' });
     await settle();
-    expect(await router.resolve(router.next()!.approvalId, { address: ALICE })).toBe(false);
+    expect(await router.resolve(router.next()!.approvalId, { addresses: [ALICE] })).toBe(false);
     expect(page.replyTo(id)).toMatchObject({ error: { code: -32603 } });
   });
 
@@ -318,12 +421,12 @@ describe('DappRouter — signatures', () => {
 
     for (let i = 1; i < MAX_PENDING; i++) {
       const origin = `https://site${i}.example`;
-      await permissions.grant(origin, ALICE);
+      await permissions.grant(origin, [ALICE]);
       const other = fakePort({ origin, frameId: 0 });
       router.attach(other.port);
       other.send('buyRolls', { rolls: '1' });
     }
-    await permissions.grant('https://late.example', ALICE);
+    await permissions.grant('https://late.example', [ALICE]);
     const late = fakePort({ origin: 'https://late.example', frameId: 0 });
     router.attach(late.port);
     const lateId = late.send('buyRolls', { rolls: '1' });
@@ -345,13 +448,13 @@ describe('DappRouter — signatures', () => {
     expect(router.next()).toMatchObject({ method: 'connect', queued: 0 });
     expect(showApproval).toHaveBeenCalledTimes(3);
 
-    expect(await router.resolve(router.next()!.approvalId, { address: ALICE })).toBe(true);
+    expect(await router.resolve(router.next()!.approvalId, { addresses: [ALICE] })).toBe(true);
     for (const [p, id] of [
       [page, first],
       [page, again],
       [otherTab, fromOtherTab],
     ] as const) {
-      expect(p.replyTo(id)).toEqual({ id, result: { address: ALICE } });
+      expect(p.replyTo(id)).toEqual({ id, result: { address: ALICE, addresses: [ALICE] } });
     }
   });
 
@@ -383,7 +486,7 @@ describe('DappRouter — signatures', () => {
     router.attach(page.port);
     page.send('connect');
     await settle();
-    await permissions.grant(DUSA, ALICE); // e.g. connected from another profile view meanwhile
+    await permissions.grant(DUSA, [ALICE]); // e.g. connected from another profile view meanwhile
     const transfer = page.send('transfer', { to: BOB, amount: '1' });
     await settle();
     expect(page.replyTo(transfer)).toMatchObject({ error: { code: 4900 } });
@@ -391,7 +494,7 @@ describe('DappRouter — signatures', () => {
 
   it('shows requests oldest first', async () => {
     const { router, permissions, page } = await connectedPage();
-    await permissions.grant('https://other.example', BOB);
+    await permissions.grant('https://other.example', [BOB]);
     const other = fakePort({ origin: 'https://other.example', frameId: 0 });
     router.attach(other.port);
     page.send('buyRolls', { rolls: '1' });
@@ -410,7 +513,7 @@ describe('DappRouter — requests that end without the user', () => {
   it('expires a request nobody answers', async () => {
     vi.useFakeTimers();
     const { router, permissions } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const page = fakePort();
     router.attach(page.port);
     const id = page.send('buyRolls', { rolls: '1' });
@@ -428,7 +531,7 @@ describe('DappRouter — requests that end without the user', () => {
 
   it('forgets the requests of a page that went away', async () => {
     const { router, permissions } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const page = fakePort();
     router.attach(page.port);
     page.send('buyRolls', { rolls: '1' });
@@ -444,7 +547,7 @@ describe('DappRouter — requests that end without the user', () => {
 
   it('rejects everything when the approval window is closed', async () => {
     const { router, permissions } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const page = fakePort();
     router.attach(page.port);
     const a = page.send('buyRolls', { rolls: '1' });
@@ -462,7 +565,7 @@ describe('DappRouter — requests that end without the user', () => {
 describe('DappRouter — events', () => {
   it("tells every page of a site when it's disconnected, and drops what it had waiting", async () => {
     const { router, permissions, trackPermissions, events } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const tab1 = fakePort();
     const tab2 = fakePort();
     router.attach(tab1.port);
@@ -478,20 +581,72 @@ describe('DappRouter — events', () => {
 
   it('tells a site when its account changes, and nobody else', async () => {
     const { router, permissions, trackPermissions, events } = setup();
-    await permissions.grant(DUSA, ALICE);
-    await permissions.grant('https://other.example', ALICE);
+    await permissions.grant(DUSA, [ALICE]);
+    await permissions.grant('https://other.example', [ALICE]);
     const dusa = fakePort();
     const other = fakePort({ origin: 'https://other.example', frameId: 0 });
     router.attach(dusa.port);
     router.attach(other.port);
-    await trackPermissions(() => permissions.changeAccount(DUSA, BOB));
-    expect(events(dusa)).toEqual([{ event: 'accountChanged', data: { address: BOB } }]);
+    await trackPermissions(() => permissions.addAccount(DUSA, BOB, true));
+    expect(events(dusa)).toEqual([
+      { event: 'accountChanged', data: { address: BOB } },
+      { event: 'accountsChanged', data: { addresses: [BOB, ALICE] } },
+    ]);
     expect(events(other)).toEqual([]);
+  });
+
+  it('tells only the list when an account is added or taken away behind the one in use', async () => {
+    const { router, permissions, trackPermissions, events } = setup();
+    await permissions.grant(DUSA, [ALICE]);
+    const dusa = fakePort();
+    router.attach(dusa.port);
+    await trackPermissions(() => permissions.addAccount(DUSA, BOB, false));
+    await trackPermissions(() => permissions.removeAccount(DUSA, BOB));
+    expect(events(dusa)).toEqual([
+      { event: 'accountsChanged', data: { addresses: [ALICE, BOB] } },
+      { event: 'accountsChanged', data: { addresses: [ALICE] } },
+    ]);
+  });
+
+  it('moves every site that may see the wallet switched to and follows it, as MetaMask', async () => {
+    const { router, permissions, trackPermissions, events } = setup();
+    await permissions.grant(DUSA, [ALICE, BOB]);
+    await permissions.followWallet(DUSA);
+    await permissions.grant('https://alice-only.example', [ALICE]);
+    await permissions.followWallet('https://alice-only.example');
+    await permissions.grant('https://older.example', [ALICE, BOB]);
+    const dusa = fakePort();
+    const aliceOnly = fakePort({ origin: 'https://alice-only.example', frameId: 0 });
+    const older = fakePort({ origin: 'https://older.example', frameId: 0 });
+    router.attach(dusa.port);
+    router.attach(aliceOnly.port);
+    router.attach(older.port);
+    await trackPermissions(() => permissions.useAccount(BOB));
+    expect(events(dusa)).toEqual([
+      { event: 'accountChanged', data: { address: BOB } },
+      { event: 'accountsChanged', data: { addresses: [BOB, ALICE] } },
+    ]);
+    expect(events(aliceOnly)).toEqual([]);
+    expect(events(older)).toEqual([]);
+  });
+
+  it('drops a waiting request only when its account is taken away from the site', async () => {
+    const { router, permissions, trackPermissions } = setup();
+    await permissions.grant(DUSA, [ALICE, BOB]);
+    const page = fakePort();
+    router.attach(page.port);
+    const fromBob = page.send('buyRolls', { rolls: '1', from: BOB });
+    await settle();
+    await trackPermissions(() => permissions.useAccount(BOB)); // still allowed: stays
+    expect(router.next()).toMatchObject({ address: BOB });
+    await trackPermissions(() => permissions.removeAccount(DUSA, BOB));
+    expect(page.replyTo(fromBob)).toMatchObject({ error: { code: 4100 } });
+    expect(router.next()).toBeNull();
   });
 
   it('tells connected sites only when the wallet switches network', async () => {
     const { router, permissions, state, events } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const dusa = fakePort();
     const stranger = fakePort({ origin: 'https://stranger.example', frameId: 0 });
     router.attach(dusa.port);
@@ -508,7 +663,7 @@ describe('DappRouter — events', () => {
   it('still reaches a page after the browser restarted the worker and the port closed', async () => {
     const browser = fakeBrowser();
     const before = setup('mainnet', browser);
-    await before.permissions.grant(DUSA, ALICE);
+    await before.permissions.grant(DUSA, [ALICE]);
     const dusa = fakePort();
     before.router.attach(dusa.port);
     await settle();
@@ -528,21 +683,22 @@ describe('DappRouter — events', () => {
 
   it('forgets a tab where nothing listens anymore', async () => {
     const { router, permissions, trackPermissions, sendToTab, browser } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const dusa = fakePort();
     router.attach(dusa.port);
     await settle();
     browser.deaf.add(dusa.tabId);
-    await trackPermissions(() => permissions.changeAccount(DUSA, BOB));
-    expect(sendToTab).toHaveBeenCalledTimes(1);
+    await trackPermissions(() => permissions.addAccount(DUSA, BOB, true));
+    const calls = sendToTab.mock.calls.length;
+    expect(calls).toBeGreaterThan(0);
     expect(browser.session[SITE_TABS_ITEM]).toEqual({});
-    await trackPermissions(() => permissions.changeAccount(DUSA, ALICE));
-    expect(sendToTab).toHaveBeenCalledTimes(1);
+    await trackPermissions(() => permissions.useAccount(ALICE));
+    expect(sendToTab).toHaveBeenCalledTimes(calls);
   });
 
   it('counts a tab for the site it shows now, not one it showed before', async () => {
     const { router, permissions, trackPermissions, events } = setup();
-    await permissions.grant(DUSA, ALICE);
+    await permissions.grant(DUSA, [ALICE]);
     const dusa = fakePort();
     router.attach(dusa.port);
     // The same tab moves on to another site, whose page opens its own port.

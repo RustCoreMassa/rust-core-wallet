@@ -36,8 +36,25 @@ export interface RelayPort {
 /** Opens a port to the background worker; throws if the extension was reloaded or removed. */
 export type ConnectPort = () => RelayPort;
 
-/** Subscribes to messages the extension sends this tab (chrome.runtime.onMessage). */
-export type ListenToTab = (callback: (message: unknown) => void) => void;
+/**
+ * Subscribes to messages the extension sends this tab (chrome.runtime.onMessage); `reply`
+ * answers the one message it's called for.
+ */
+export type ListenToTab = (
+  callback: (message: unknown, reply: (answer: unknown) => void) => void,
+) => void;
+
+/**
+ * The wallet (popup, side panel) asking which site this tab shows, to say whether its active
+ * account is connected to it. Only the extension's own pages can send it.
+ */
+export const ORIGIN_QUERY = { channel: CHANNEL, query: 'origin' } as const;
+
+function isOriginQuery(message: unknown): boolean {
+  if (typeof message !== 'object' || message === null) return false;
+  const m = message as Record<string, unknown>;
+  return m['channel'] === CHANNEL && m['query'] === ORIGIN_QUERY.query;
+}
 
 export function startRelay(win: ContentWindow, connect: ConnectPort, listen: ListenToTab): void {
   let port: RelayPort | null = null;
@@ -77,7 +94,11 @@ export function startRelay(win: ContentWindow, connect: ConnectPort, listen: Lis
     toPage({ channel: CHANNEL, to: 'page', ...message });
   };
 
-  listen((message) => {
+  listen((message, reply) => {
+    if (isOriginQuery(message)) {
+      reply(win.location.origin);
+      return;
+    }
     // The tab may have moved to another site since the background last heard from it.
     if (!isTabEvent(message) || message.origin !== win.location.origin) return;
     const { event, data } = message;

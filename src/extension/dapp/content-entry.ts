@@ -7,7 +7,7 @@ startRelay(
   window,
   () => chrome.runtime.connect({ name: PORT_NAME }),
   (callback) =>
-    chrome.runtime.onMessage.addListener((message, sender) => {
-      if (sender.id === chrome.runtime.id) callback(message);
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (sender.id === chrome.runtime.id) callback(message, sendResponse);
     }),
 );

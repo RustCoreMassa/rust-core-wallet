@@ -95,7 +95,8 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   { provide: DAPP_APPROVALS, useValue: new ChromeDappApprovals() },
   {
     provide: CONNECTED_SITES,
-    useFactory: () => new ChromeConnectedSites(chrome.storage.local, chrome.storage.onChanged),
+    useFactory: () =>
+      new ChromeConnectedSites(chrome.storage.local, chrome.storage.onChanged, chrome.tabs),
   },
   { provide: SITE_ACCESS, useFactory: () => new ChromeSiteAccess(chrome.permissions) },
 ];

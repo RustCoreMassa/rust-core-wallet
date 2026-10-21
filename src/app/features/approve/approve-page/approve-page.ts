@@ -14,7 +14,6 @@ import { CallDescription, describeCall } from '../../../core/utils/describe-call
 import { formatUnits, toUnits } from '../../../core/utils/token-amount';
 import { rejectedCallMessage, toUserMessage } from '../../../core/utils/user-error';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
-import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 
 type Phase = 'loading' | 'review' | 'busy' | 'notice';
 
@@ -26,6 +25,7 @@ const TITLES: Record<DappRequest['method'], string> = {
   disconnect: '',
   connected: '',
   account: '',
+  accounts: '',
   network: '',
   sign: 'Sign a message',
   transfer: 'Send MAS',
@@ -38,11 +38,12 @@ const TITLES: Record<DappRequest['method'], string> = {
  * The extension's approval window (?view=approve): shows the dApp requests waiting in the
  * background worker one at a time, and carries out the approved ones with the wallet's own
  * code — the same checks, fees and history as its own screens (docs/DAPP-CONNECTION.md).
- * Requests are for the site's connected account; the active wallet is never switched.
+ * Requests are signed by the account the background named (the site's choice among its
+ * accounts, else its current one); the active wallet is never switched.
  */
 @Component({
   selector: 'app-approve-page',
-  imports: [ConfirmDetails, Dropdown],
+  imports: [ConfirmDetails],
   templateUrl: './approve-page.html',
   styleUrl: './approve-page.scss',
 })
@@ -62,22 +63,41 @@ export class ApprovePage {
   protected readonly checking = signal(false);
   /** Shown after an answer that needs a word (the operation failed, the site went away). */
   protected readonly notice = signal<string | null>(null);
-  /** For `connect`: the account the user chooses to share. */
-  protected readonly chosenId = signal('');
+  /** For `connect`: the accounts the user chooses to share (ids). */
+  protected readonly chosenIds = signal<ReadonlySet<string>>(new Set());
 
-  protected readonly accountOptions = computed<DropdownOption[]>(() =>
-    this.auth.accounts().map((a) => ({ value: a.id, label: a.name, sublabel: short(a.address) })),
+  /** For `connect`: every wallet, to tick the ones the site may see. */
+  protected readonly accountChoices = computed(() =>
+    this.auth.accounts().map((a) => ({
+      id: a.id,
+      name: a.name,
+      address: short(a.address),
+      chosen: this.chosenIds().has(a.id),
+    })),
   );
 
-  /** Who signs: the site's connected account, or the one chosen for `connect`. */
-  protected readonly account = computed<VaultAccount | null>(() => {
-    const view = this.view();
-    if (!view) return null;
-    const accounts = this.auth.accounts();
-    return view.address === null
-      ? (accounts.find((a) => a.id === this.chosenId()) ?? null)
-      : (accounts.find((a) => a.address === view.address) ?? null);
+  /**
+   * For `connect`: the chosen accounts' addresses, the active wallet first when chosen — it
+   * becomes the account the site uses.
+   */
+  protected readonly chosenAddresses = computed(() => {
+    const chosen = this.auth.accounts().filter((a) => this.chosenIds().has(a.id));
+    const active = this.store.activeWalletId();
+    return [...chosen.filter((a) => a.id === active), ...chosen.filter((a) => a.id !== active)].map(
+      (a) => a.address,
+    );
   });
+
+  /** Who signs: the account the background named; null for `connect`. */
+  protected readonly account = computed<VaultAccount | null>(() => {
+    const address = this.view()?.address;
+    return address ? (this.auth.accounts().find((a) => a.address === address) ?? null) : null;
+  });
+
+  /** Approve is possible: an account chosen for `connect`, the signing account found otherwise. */
+  protected readonly ready = computed(() =>
+    this.request()?.method === 'connect' ? this.chosenAddresses().length > 0 : !!this.account(),
+  );
 
   /** For `callSC`: what the call does, as far as the wallet can read it. */
   protected readonly callInfo = computed<CallDescription | null>(() => {
@@ -167,7 +187,7 @@ export class ApprovePage {
   protected readonly note = computed(() => {
     switch (this.request()?.method) {
       case 'connect':
-        return 'The site will see this address and can ask you to approve transactions. It can never move funds without your approval.';
+        return 'The site will see these addresses and can ask you to approve transactions from them. It can never move funds without your approval.';
       case 'sign':
         return 'Only sign messages from sites you trust: a signature can prove you agreed to something.';
       default:
@@ -181,11 +201,18 @@ export class ApprovePage {
     void this.showNext();
   }
 
+  protected toggleAccount(id: string): void {
+    this.chosenIds.update((ids) => {
+      const next = new Set(ids);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
   protected async approve(): Promise<void> {
     const view = this.view();
     const request = this.request();
-    const account = this.account();
-    if (!view || !request || !account || this.blocker() || this.checking()) return;
+    if (!view || !request || !this.ready() || this.blocker() || this.checking()) return;
     if (this.phase() !== 'review') return;
     this.phase.set('busy');
     this.error.set(null);
@@ -196,7 +223,7 @@ export class ApprovePage {
     let result: ApprovalResult;
     let notice: string | null = null;
     try {
-      result = await this.carryOut(request, account, network);
+      result = await this.carryOut(request, network);
     } catch (err) {
       // Sent, but it failed on-chain or isn't confirmed yet: the site still gets the operation,
       // to follow its status itself. Anything else (checks, network) sent nothing — retry or reject.
@@ -259,7 +286,10 @@ export class ApprovePage {
     }
     this.view.set(view);
     this.request.set(request);
-    this.chosenId.set(this.auth.activeAccount()?.id ?? '');
+    // Like MetaMask: the active wallet is offered; the user can tick others.
+    const active = this.store.activeWalletId();
+    const known = this.auth.accounts().some((a) => a.id === active);
+    this.chosenIds.set(new Set([known ? active : (this.auth.accounts()[0]?.id ?? '')]));
     this.phase.set('review');
     await this.check(request);
   }
@@ -307,14 +337,11 @@ export class ApprovePage {
     );
   }
 
-  private async carryOut(
-    request: DappRequest,
-    account: VaultAccount,
-    network: WalletNetwork,
-  ): Promise<ApprovalResult> {
+  private async carryOut(request: DappRequest, network: WalletNetwork): Promise<ApprovalResult> {
+    if (request.method === 'connect') return { addresses: this.chosenAddresses() };
+    const account = this.account();
+    if (!account) throw new Error('The signing account is not in this wallet');
     switch (request.method) {
-      case 'connect':
-        return { address: account.address };
       case 'sign':
         return this.store.dappSign(account.id, request.data);
       case 'transfer':

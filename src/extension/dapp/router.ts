@@ -7,7 +7,14 @@
 // does, and reports back through `resolve`. No Angular and no chrome.* here — background.ts wires
 // it to the browser, the specs to fakes.
 import { ApprovalResult, ApprovalView } from './approval';
-import { DappPermissions, PermissionMap, dappOrigin, toPermissionMap } from './permissions';
+import {
+  DappPermissions,
+  PermissionMap,
+  SitePermission,
+  dappOrigin,
+  sameList,
+  toPermissionMap,
+} from './permissions';
 import {
   CHANNEL,
   DappError,
@@ -28,6 +35,8 @@ import { SiteTabs } from './site-tabs';
 export const REQUEST_TTL_MS = 10 * 60_000;
 /** Requests waiting for the user, across all sites. */
 export const MAX_PENDING = 10;
+/** Most accounts one `connect` can share. */
+export const MAX_SHARED_ACCOUNTS = 100;
 
 /** The runtime port's parts the router uses. */
 export interface RouterPort {
@@ -70,6 +79,7 @@ interface Pending {
   readonly waiters: Waiter[];
   readonly request: DappRequest;
   readonly params: unknown;
+  /** The account that must sign; null for `connect`. */
   readonly address: string | null;
   readonly createdAt: number;
   readonly timer: ReturnType<typeof setTimeout>;
@@ -142,9 +152,9 @@ export class DappRouter {
       return false;
     }
     if (request.method === 'connect') {
-      const { address } = result as { address: string };
-      await this.deps.permissions.grant(origin, address);
-      this.answer(pending, { result: { address } });
+      const { addresses } = result as { addresses: readonly string[] };
+      const granted = await this.deps.permissions.grant(origin, addresses);
+      this.answer(pending, { result: connectAnswer(granted) });
       return true;
     }
     if ('operationId' in result) {
@@ -177,8 +187,9 @@ export class DappRouter {
 
   /**
    * Reacts to chrome.storage.local changes made anywhere (Settings, other views, this router):
-   * a site whose account changed gets `accountChanged`, a disconnected one `disconnect`, and
-   * every connected site `networkChanged` when the wallet switches network.
+   * a site whose current account changed gets `accountChanged`, one whose list of accounts
+   * changed `accountsChanged`, a disconnected one `disconnect`, and every connected site
+   * `networkChanged` when the wallet switches network.
    */
   async onStorageChanged(
     changes: Record<string, { oldValue?: unknown; newValue?: unknown }>,
@@ -203,11 +214,21 @@ export class DappRouter {
     for (const [origin, old] of Object.entries(before)) {
       const now = after[origin];
       if (!now) {
-        this.dropOrigin(origin, unauthorized('The site was disconnected'));
+        this.dropOrigin(origin, unauthorized('The site was disconnected'), () => true);
         events.push(this.emit(origin, 'disconnect'));
-      } else if (now.address !== old.address) {
-        this.dropOrigin(origin, unauthorized("The site's account changed"));
-        events.push(this.emit(origin, 'accountChanged', { address: now.address }));
+        continue;
+      }
+      // Requests stay as long as the account that signs them may still be used by the site.
+      this.dropOrigin(
+        origin,
+        unauthorized('The account was disconnected from the site'),
+        (p) => p.address !== null && !now.addresses.includes(p.address),
+      );
+      if (now.addresses[0] !== old.addresses[0]) {
+        events.push(this.emit(origin, 'accountChanged', { address: now.addresses[0] }));
+      }
+      if (!sameList(now.addresses, old.addresses)) {
+        events.push(this.emit(origin, 'accountsChanged', { addresses: now.addresses }));
       }
     }
     await Promise.all(events);
@@ -241,7 +262,12 @@ export class DappRouter {
         return permission !== null;
       case 'account':
         if (!permission) throw unauthorized('Connect to the wallet first');
-        return { address: permission.address };
+        return { address: permission.addresses[0] };
+      case 'accounts':
+        if (!permission) throw unauthorized('Connect to the wallet first');
+        // Only wallet-provider versions that name the signer (`from`) ask for the list.
+        await this.deps.permissions.followWallet(origin);
+        return { addresses: permission.addresses };
       case 'network':
         if (!permission) throw unauthorized('Connect to the wallet first');
         return networkInfo(await this.deps.network());
@@ -250,11 +276,17 @@ export class DappRouter {
         await this.deps.permissions.revoke(origin);
         return true;
       case 'connect':
-        if (permission) return { address: permission.address };
+        if (permission) return connectAnswer(permission);
         return this.enqueue(origin, port, id, request, params, null);
-      default:
+      default: {
         if (!permission) throw unauthorized('Connect to the wallet first');
-        return this.enqueue(origin, port, id, request, params, permission.address);
+        const signer = request.from ?? permission.addresses[0];
+        if (!permission.addresses.includes(signer)) {
+          throw unauthorized('That account is not connected to this site');
+        }
+        if (request.from !== undefined) await this.deps.permissions.followWallet(origin);
+        return this.enqueue(origin, port, id, request, params, signer);
+      }
     }
   }
 
@@ -313,9 +345,9 @@ export class DappRouter {
     for (const { port, requestId } of pending.waiters) post(port, { id: requestId, ...outcome });
   }
 
-  /** Rejects whatever a site still has waiting (its connection was revoked or changed). */
-  private dropOrigin(origin: string, error: DappError): void {
-    for (const pending of this.queue.filter((p) => p.origin === origin)) {
+  /** Rejects what a site still has waiting and `drop` picks (its connection was revoked or changed). */
+  private dropOrigin(origin: string, error: DappError, drop: (pending: Pending) => boolean): void {
+    for (const pending of this.queue.filter((p) => p.origin === origin && drop(p))) {
       this.take(pending.approvalId);
       this.answer(pending, { error: error.toJSON() });
     }
@@ -351,11 +383,19 @@ export class DappRouter {
 /** Does the approval window's result match what the request asked for? */
 function fitsRequest(request: DappRequest, result: ApprovalResult): boolean {
   const r = result as Partial<
-    Record<'address' | 'publicKey' | 'signature' | 'operationId' | 'network', unknown>
+    Record<'publicKey' | 'signature' | 'operationId' | 'network', unknown>
   >;
   switch (request.method) {
-    case 'connect':
-      return typeof r.address === 'string' && USER_ADDRESS.test(r.address);
+    case 'connect': {
+      const { addresses } = result as { addresses?: unknown };
+      return (
+        Array.isArray(addresses) &&
+        addresses.length > 0 &&
+        addresses.length <= MAX_SHARED_ACCOUNTS &&
+        new Set(addresses).size === addresses.length &&
+        addresses.every((a) => typeof a === 'string' && USER_ADDRESS.test(a))
+      );
+    }
     case 'sign':
       return (
         typeof r.publicKey === 'string' &&
@@ -376,6 +416,14 @@ function fitsRequest(request: DappRequest, result: ApprovalResult): boolean {
     default:
       return false;
   }
+}
+
+/** What `connect` answers: the current account, and every account the site may see. */
+function connectAnswer(permission: SitePermission): {
+  address: string;
+  addresses: readonly string[];
+} {
+  return { address: permission.addresses[0], addresses: permission.addresses };
 }
 
 function post(port: RouterPort, message: PortMessage): void {

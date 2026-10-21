@@ -60,6 +60,7 @@ describe('isPortMessage / isPageMessage / isTabEvent', () => {
     expect(
       isTabEvent({ channel: CHANNEL, origin: 'https://a.example', event: 'accountChanged' }),
     ).toBe(true);
+    expect(isPageMessage({ channel: CHANNEL, to: 'page', event: 'accountsChanged' })).toBe(true);
   });
 
   it('rejects anything else', () => {
@@ -96,6 +97,8 @@ describe('parseRequest', () => {
     expect(parseRequest('connect', undefined)).toEqual({ method: 'connect' });
     expect(parseRequest('network', null)).toEqual({ method: 'network' });
     expect(parseRequest('account', {})).toEqual({ method: 'account' });
+    expect(parseRequest('accounts', undefined)).toEqual({ method: 'accounts' });
+    expect(codeOf('accounts', { from: USER })).toBe(DappErrorCode.InvalidParams);
     expect(codeOf('account', { anything: true })).toBe(DappErrorCode.InvalidParams);
     expect(codeOf('connect', 'please')).toBe(DappErrorCode.InvalidParams);
   });
@@ -130,6 +133,24 @@ describe('parseRequest', () => {
     expect(codeOf('transfer', { to: USER, amount: '1', fee: '-1' })).toBe(
       DappErrorCode.InvalidParams,
     );
+  });
+
+  it('takes an optional signing account on everything signed — a user address only', () => {
+    expect(parseRequest('sign', { data: b64([1]), from: USER })).toMatchObject({ from: USER });
+    expect(parseRequest('transfer', { to: USER, amount: '1', from: USER })).toMatchObject({
+      from: USER,
+    });
+    expect(parseRequest('buyRolls', { rolls: '1', from: USER })).toMatchObject({ from: USER });
+    expect(parseRequest('sellRolls', { rolls: '1', from: USER })).toMatchObject({ from: USER });
+    expect(parseRequest('callSC', { target: CONTRACT, func: 'f', from: USER })).toMatchObject({
+      from: USER,
+    });
+    expect(parseRequest('transfer', { to: USER, amount: '1' })).not.toHaveProperty('from');
+    expect(codeOf('transfer', { to: USER, amount: '1', from: CONTRACT })).toBe(
+      DappErrorCode.InvalidParams,
+    );
+    expect(codeOf('sign', { data: b64([1]), from: 'AU1short' })).toBe(DappErrorCode.InvalidParams);
+    expect(codeOf('sign', { data: b64([1]), from: [USER] })).toBe(DappErrorCode.InvalidParams);
   });
 
   it('parses a transfer with an exact bigint amount', () => {
@@ -224,7 +245,7 @@ describe('approval rules', () => {
       expect(needsApproval(m)).toBe(true);
       expect(needsSignature(m)).toBe(true);
     }
-    for (const m of ['disconnect', 'connected', 'account', 'network'] as const) {
+    for (const m of ['disconnect', 'connected', 'account', 'accounts', 'network'] as const) {
       expect(needsApproval(m)).toBe(false);
     }
     expect(needsSignature('connect')).toBe(false);

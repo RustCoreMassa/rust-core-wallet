@@ -30,8 +30,19 @@
     }
 
     @if (request()?.method === 'connect') {
-    <div class="field-label">Account to share</div>
-    <app-dropdown inputId="approve-account" [options]="accountOptions()" [(value)]="chosenId" />
+    <div class="field-label">Accounts to share</div>
+    <div class="approve-accounts">
+      @for (choice of accountChoices(); track choice.id) {
+      <label class="approve-account">
+        <input type="checkbox" [checked]="choice.chosen" (change)="toggleAccount(choice.id)" />
+        <span class="approve-account-name">{{ choice.name }}</span>
+        <span class="approve-account-address">{{ choice.address }}</span>
+      </label>
+      }
+    </div>
+    @if (chosenAddresses().length === 0) {
+    <div class="hint">Choose at least one account.</div>
+    }
     }
 
     @if (message(); as m) {
@@ -55,7 +66,7 @@
       confirmLabel="Approve"
       [busyLabel]="request()?.method === 'sign' ? 'Signing…' : 'Sending…'"
       [busy]="phase() === 'busy'"
-      [disabled]="!!blocker() || checking() || !account()"
+      [disabled]="!!blocker() || checking() || !ready()"
       (confirmed)="approve()"
       (cancelled)="reject()"
     />

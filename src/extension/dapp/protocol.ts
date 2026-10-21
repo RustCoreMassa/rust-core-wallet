@@ -45,23 +45,32 @@ export interface DappErrorData {
   readonly message: string;
 }
 
+/**
+ * Requests signed with one of the site's accounts: `from` names it; without it, the site's
+ * current account signs.
+ */
+interface SignedBy {
+  readonly from?: string;
+}
+
 /** What a page can ask for. Reads (balances, readSC, events…) never come here. */
 export type DappRequest =
   | { readonly method: 'connect' }
   | { readonly method: 'disconnect' }
   | { readonly method: 'connected' }
   | { readonly method: 'account' }
+  | { readonly method: 'accounts' }
   | { readonly method: 'network' }
-  | { readonly method: 'sign'; readonly data: Uint8Array }
-  | {
+  | ({ readonly method: 'sign'; readonly data: Uint8Array } & SignedBy)
+  | ({
       readonly method: 'transfer';
       readonly to: string;
       readonly amount: bigint;
       readonly fee?: bigint;
-    }
-  | { readonly method: 'buyRolls'; readonly rolls: bigint; readonly fee?: bigint }
-  | { readonly method: 'sellRolls'; readonly rolls: bigint; readonly fee?: bigint }
-  | {
+    } & SignedBy)
+  | ({ readonly method: 'buyRolls'; readonly rolls: bigint; readonly fee?: bigint } & SignedBy)
+  | ({ readonly method: 'sellRolls'; readonly rolls: bigint; readonly fee?: bigint } & SignedBy)
+  | ({
       readonly method: 'callSC';
       readonly target: string;
       readonly func: string;
@@ -69,7 +78,7 @@ export type DappRequest =
       readonly coins: bigint;
       readonly fee?: bigint;
       readonly maxGas?: bigint;
-    };
+    } & SignedBy);
 
 export type DappMethod = DappRequest['method'];
 
@@ -78,6 +87,7 @@ const METHODS: readonly DappMethod[] = [
   'disconnect',
   'connected',
   'account',
+  'accounts',
   'network',
   'sign',
   'transfer',
@@ -104,7 +114,7 @@ export function needsApproval(method: DappMethod): boolean {
   return method === 'connect' || needsSignature(method);
 }
 
-/** Methods that sign something with the connected account's key. */
+/** Methods that sign something with the key of one of the site's accounts. */
 export function needsSignature(method: DappMethod): boolean {
   return (
     method === 'sign' ||
@@ -132,9 +142,18 @@ export interface PageRequestMessage {
 /** Content script → page: the answer to one request. */
 export type PageReplyMessage = { readonly channel: typeof CHANNEL; readonly to: 'page' } & Reply;
 
-export type DappEvent = 'accountChanged' | 'networkChanged' | 'disconnect';
+/**
+ * `accountChanged` ({ address }): the site's current account is another one;
+ * `accountsChanged` ({ addresses }): the accounts the site may see changed (current first).
+ */
+export type DappEvent = 'accountChanged' | 'accountsChanged' | 'networkChanged' | 'disconnect';
 
-const EVENTS: readonly DappEvent[] = ['accountChanged', 'networkChanged', 'disconnect'];
+const EVENTS: readonly DappEvent[] = [
+  'accountChanged',
+  'accountsChanged',
+  'networkChanged',
+  'disconnect',
+];
 
 /** Content script → page: something changed for this site. */
 export interface PageEventMessage {
@@ -241,31 +260,38 @@ export function parseRequest(method: string, params: unknown): DappRequest {
     case 'disconnect':
     case 'connected':
     case 'account':
+    case 'accounts':
     case 'network':
       if (params !== undefined && params !== null) record(params, []);
       return { method: m };
     case 'sign': {
-      const p = record(params, ['data']);
+      const p = record(params, ['data', 'from']);
       const data = bytes(p['data'], 'data', MAX_SIGN_BYTES);
       if (data.length === 0) throw invalid('data must not be empty');
-      return { method: m, data };
+      return { method: m, data, ...optionalFrom(p) };
     }
     case 'transfer': {
-      const p = record(params, ['to', 'amount', 'fee']);
+      const p = record(params, ['to', 'amount', 'fee', 'from']);
       return {
         method: m,
         to: address(p['to'], 'to', 'AU', 'AS'),
         amount: positive(units(p['amount'], 'amount'), 'amount'),
         ...optionalFee(p),
+        ...optionalFrom(p),
       };
     }
     case 'buyRolls':
     case 'sellRolls': {
-      const p = record(params, ['rolls', 'fee']);
-      return { method: m, rolls: positive(units(p['rolls'], 'rolls'), 'rolls'), ...optionalFee(p) };
+      const p = record(params, ['rolls', 'fee', 'from']);
+      return {
+        method: m,
+        rolls: positive(units(p['rolls'], 'rolls'), 'rolls'),
+        ...optionalFee(p),
+        ...optionalFrom(p),
+      };
     }
     case 'callSC': {
-      const p = record(params, ['target', 'func', 'parameter', 'coins', 'fee', 'maxGas']);
+      const p = record(params, ['target', 'func', 'parameter', 'coins', 'fee', 'maxGas', 'from']);
       const func = p['func'];
       if (typeof func !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(func)) {
         throw invalid('func must be a function name');
@@ -284,6 +310,7 @@ export function parseRequest(method: string, params: unknown): DappRequest {
         ...(p['maxGas'] !== undefined && {
           maxGas: positive(units(p['maxGas'], 'maxGas'), 'maxGas'),
         }),
+        ...optionalFrom(p),
       };
     }
   }
@@ -331,6 +358,11 @@ function record(params: unknown, allowed: readonly string[]): Record<string, unk
 /** The fee a site set, in nanoMAS; the wallet raises it to its own minimum later. */
 function optionalFee(p: Record<string, unknown>): { fee?: bigint } {
   return p['fee'] === undefined ? {} : { fee: units(p['fee'], 'fee') };
+}
+
+/** The account a site asks to sign with; the router checks the site may use it. */
+function optionalFrom(p: Record<string, unknown>): { from?: string } {
+  return p['from'] === undefined ? {} : { from: address(p['from'], 'from', 'AU') };
 }
 
 function invalid(message: string): DappError {

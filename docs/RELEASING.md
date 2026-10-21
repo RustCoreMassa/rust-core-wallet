@@ -11,14 +11,14 @@ new features, patch for fixes. Every version has a section in [CHANGELOG.md](../
 
 ## Publishing a release
 
-1. Bump the version: `npm version 1.5.2 --no-git-tag-version`
+1. Bump the version: `npm version 1.6.0 --no-git-tag-version`
 2. In `CHANGELOG.md`, rename the `## [Unreleased]` section (where changes collect between
-   releases) to `## [1.5.2] — <date>` and add its link at the bottom.
+   releases) to `## [1.6.0] — <date>` and add its link at the bottom.
 3. Commit, then push a matching tag:
 
 ```bash
-git tag v1.5.2
-git push origin master v1.5.2
+git tag v1.6.0
+git push origin master v1.6.0
 ```
 
 Pushing the tag starts the [release workflow](../.github/workflows/release.yml) on GitHub
@@ -75,8 +75,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.5.2.zip -d rust-core-wallet-v1.5.2
-cd rust-core-wallet-v1.5.2
+unzip rust-core-wallet-v1.6.0.zip -d rust-core-wallet-v1.6.0
+cd rust-core-wallet-v1.6.0
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 
@@ -116,7 +116,10 @@ What the stores ask for:
   `alarms` (auto-lock after 15 minutes), `sidePanel` (Chromium only — the side-panel view).
   Site access (content scripts on `https://*/*`, plus `http://localhost` / `127.0.0.1` for dApp
   developers): two small scripts let dApps find the wallet (`window.rustcore`), pass their
-  requests to it and hear when the connected account or the network changes. They read nothing from the page and send nothing anywhere; every request needs
+  requests to it and hear when the connected accounts or the network change. When the wallet's
+  popup or side panel asks, the script in the active tab tells it which site the tab shows (its
+  origin only), so the wallet can say whether that site is connected to the active wallet. They
+  read nothing else from the page and send nothing anywhere; every request needs
   the user's approval in the wallet's own window (docs/DAPP-CONNECTION.md). Browsers show this
   as "read and change your data on all websites", like every injected wallet's.
 - **Data**: none is collected. Firefox's manifest declares it

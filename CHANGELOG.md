@@ -7,6 +7,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-10-21
+
+### Added
+
+- **Connect several wallets to a site, as in MetaMask** (browser extension). When a site asks to
+  connect, tick the wallets it may see — the one you're using comes ticked. The site uses the
+  wallet you switch to whenever it may see it, and Home tells you when the site open in your
+  browser is connected, but not to the wallet you're using, with a button to connect it.
+  Settings → Connected sites lists the wallets each site sees, the one in use first, to add or
+  take one away.
+- **Older dApps stay on the wallet they show.** A site that doesn't handle several accounts yet
+  (and every site connected before this version) doesn't follow your wallet switches, so it can
+  never ask you to sign from another wallet than the one it displays. Home tells you when it
+  uses another wallet than yours, and Settings → Connected sites lets you choose which one.
+- **For dApp developers:** the `accounts` request, an optional `from` on signatures and
+  operations to choose which of the site's accounts signs, and the `accountsChanged` event. A
+  site follows wallet switches once it asks for `accounts` or sends `from`. Everything that
+  worked before works the same.
+
 ## [1.5.2] — 2026-10-20
 
 ### Added
@@ -234,6 +253,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.6.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.6.0
 [1.5.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.2
 [1.5.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.1
 [1.5.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.0
