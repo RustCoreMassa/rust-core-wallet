@@ -147,7 +147,9 @@ src/extension/       Browser extension: manifest, background worker, chrome.stor
 `npm test` runs the unit tests (Vitest). They cover the logic where a mistake costs money or
 data: amount conversions, the encrypted vault, validation and fees, "nothing changes on
 failure", history merging, the explorer mapping, error messages, staking rewards, Dusa quote
-encoding and platform detection. The blockchain and explorer are faked, so tests run offline.
+encoding, platform detection, and the extension's dApp bridge (protocol parsing, per-site
+permissions, the request router and its events). The blockchain and explorer are faked, so tests
+run offline.
 
 Unit tests can't see problems that only exist in the bundled output, so after
 `npm run build` run `npm run smoke`: it loads the production build in a simulated phone browser

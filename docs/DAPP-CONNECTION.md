@@ -1,7 +1,9 @@
 # Connecting dApps — architecture
 
-Status: **implemented** (released in 1.2.0, see Progress at the end); the wallet-provider PR is
-merged ([#366](https://github.com/massalabs/wallet-provider/pull/366)). This document is for developers. It describes how Massa dApps connect to the RustCore
+Status: **implemented** (released in 1.2.0; several accounts per site in 1.6.0 — see Progress at
+the end). wallet-provider's `RustCoreWallet` is merged
+([#366](https://github.com/massalabs/wallet-provider/pull/366)); its update for several accounts
+is the next PR. This document is for developers. It describes how Massa dApps connect to the RustCore
 Wallet browser extension and ask it to sign.
 
 ## Goal
@@ -25,8 +27,9 @@ implements the library's `Wallet` interface and returns accounts implementing ma
 `Provider`. So:
 
 - our extension exposes an API to web pages (this document);
-- a `RustCoreWallet` / `RustCoreAccount` pair in wallet-provider talks to that API — a PR to
-  massalabs, opened once our side works (issue drafted first);
+- a `RustCoreWallet` / `RustCoreAccount` pair in wallet-provider talks to that API — merged in
+  [#366](https://github.com/massalabs/wallet-provider/pull/366) (one account per site); a
+  follow-up adds several accounts (`accounts()`, `from` on each signature);
 - dApps see us after they update the library.
 
 Bearby and MetaMask answer `importAccount`, `deleteAccount` and `generateNewAccount` with
