@@ -36,6 +36,16 @@
         </div>
         @if (account.inUse) {
         <span class="site-account-badge">In use</span>
+        } @else if (!site.followsWallet) {
+        <button
+          class="site-account-use"
+          type="button"
+          [attr.aria-label]="'Use ' + (account.name ?? account.short) + ' on ' + site.origin"
+          [disabled]="busyOrigin() === site.origin || !account.name"
+          (click)="useOn(site.origin, account.address)"
+        >
+          Use
+        </button>
         }
         @if (site.addresses.length > 1) {
         <button
@@ -51,6 +61,13 @@
       </div>
       }
     </div>
+
+    @if (!site.followsWallet && site.addresses.length > 1) {
+    <div class="site-hint">
+      This site uses one account at a time and doesn't follow your wallet switches. Choose the
+      one it uses here.
+    </div>
+    }
 
     @if (addable(site); as more) {
     @if (more.length > 0) {

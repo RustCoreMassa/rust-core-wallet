@@ -108,10 +108,13 @@ Runs only in top frames (`all_frames: false`): a dApp inside someone else's ifra
 The existing `background.ts` grows into the bridge's centre (still no Angular in it):
 
 - **Permissions** in `chrome.storage.local` under `rustcore:dapp-permissions`:
-  `{ [origin]: { addresses, grantedAt } }` — the accounts the site may see, never empty, the one
-  it uses now first (the same addresses on every network; requests are signed on the wallet's
-  current network). Sites saved before several accounts per site (`{ address, grantedAt }`) are
-  read as that one account and rewritten at the next change. Addresses are
+  `{ [origin]: { addresses, followsWallet, grantedAt } }` — the accounts the site may see, never
+  empty, the one it uses now first (the same addresses on every network; requests are signed on
+  the wallet's current network). `followsWallet` turns true the first time the site asks for
+  `accounts` or names a signer with `from` (see Decisions). Sites saved before several accounts
+  per site (`{ address, grantedAt }`) are read as that one account, not following the wallet,
+  and rewritten at the next change. Changes run one at a time, so two sites asking at once
+  can't overwrite each other's. Addresses are
   stored in clear (they're public on-chain) so a connected site can be answered while the wallet
   is locked; the list is shown and revocable in Settings → Connected sites.
 - **Requests needing the user** (`connect`, signatures) go into a queue, at most one pending per
@@ -186,7 +189,8 @@ Params (amounts in smallest units, as decimal strings; `?` = optional):
 
 `from` names which of the site's accounts signs (an `AU…` address it was given); without it, the
 account it uses now signs. An account the site may not use is refused with `4100` before anything
-is shown to the user.
+is shown to the user. Asking for `accounts`, or sending `from`, tells the wallet the site handles
+several accounts: from then on it follows the wallet the user switches to.
 
 Answers: `connect` → `{ address, addresses }` (the account in use, and every account the site may
 see, that one first); `account` → `{ address }`; `accounts` → `{ addresses }`; `connected` →
@@ -281,18 +285,23 @@ so future native apps could reuse protocol v1 in their own dApp browser.
 
 - ~~One connected account per site~~ (2026-10-02) → **several accounts per site, as MetaMask**
   (2026-10-20). At `connect` the user ticks the accounts to share (the active wallet comes
-  ticked). The site uses the wallet's most recently active account among them: switching
-  wallets moves every site that may see the new one (`accountChanged`); the wallet the app
-  opens with moves nothing (after a lock it is just the first wallet). When the site in the
-  active tab is connected, but not to the active wallet, Home says so and offers to connect it
-  (the popup asks the tab's content script for its origin — no `tabs` permission). Settings →
-  Connected sites lists each site's accounts, the one in use first, to add or take away. A site
-  that only knows `account` / `accountChanged` keeps working as before.
-  Rolled back once before release (2026-10-20): wallet-provider's `RustCoreWallet` (#366,
-  merged) shares one account and signs without `from`, so a site's account changing at every
-  wallet switch could sign from another account than the dApp shows. It ships together with a
-  wallet-provider update (`accounts()` listing every account, `from` on each signature,
-  fallback for older extensions).
+  ticked). A site that follows the wallet (below) uses the wallet's most recently active account
+  among them: switching wallets moves every such site that may see the new one
+  (`accountChanged`); the wallet the app opens with moves nothing (after a lock it is just the
+  first wallet). When the site in the active tab is connected, but not to the active wallet,
+  Home says so and offers to connect it (the popup asks the tab's content script for its origin
+  — no `tabs` permission). Settings → Connected sites lists each site's accounts, the one in use
+  first, to add or take away.
+- **Only sites that handle several accounts follow wallet switches** (2026-10-21). Rolled back
+  once before release (2026-10-20) because wallet-provider's first `RustCoreWallet` (#366)
+  shares one account and signs without `from`: if a switch moved its site, a signature could
+  come from another account than the one the dApp shows. Fix: a site follows the wallet only
+  once it asked for `accounts` or named a signer with `from` — which only the updated
+  wallet-provider does (it asks `accounts` right after connecting). Other sites (older
+  wallet-provider, sites connected before 1.6.0) keep the account they use, exactly as in 1.5;
+  it changes only by hand: Home says "<site> uses another account" with a button to use the
+  active wallet there, and Connected sites has a Use button and a note. Their signatures without
+  `from` therefore always come from the account the dApp was given.
 - **`sign` is in v1**, shown as text when printable, else hex, with a warning.
 - **Approval window: 380 × 600**, the popup's size.
 
@@ -351,4 +360,6 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   `accounts` method, `from` on everything signed, `accountsChanged` event, ticks at `connect`,
   `SiteConnection` (follows the active wallet, Home notice), Connected sites lists accounts. The
   test page has an `accounts` button, a `from` field and the new protocol checks.
+- [x] Older dApps don't follow wallet switches (`followsWallet`, see Decisions): Home notice
+  "uses another account", Use button in Connected sites; permission changes serialized.
 - [ ] wallet-provider update for several accounts (`accounts()`, `from`, `accountsChanged`).

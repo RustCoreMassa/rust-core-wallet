@@ -55,6 +55,7 @@ describe('DappPermissions', () => {
     await permissions.grant('https://other.example', [B]);
     expect(await permissions.get('https://app.dusa.io')).toEqual({
       addresses: [B, A],
+      followsWallet: false,
       grantedAt: 1000,
     });
     expect(Object.keys(items[PERMISSIONS_ITEM] as object)).toEqual([
@@ -87,18 +88,54 @@ describe('DappPermissions', () => {
     expect(await permissions.get('https://app.dusa.io')).toBeNull();
   });
 
-  it('puts the wallet switched to in use on every site that may see it', async () => {
+  it('puts the wallet switched to in use on every site that may see it and follows it', async () => {
     const { area } = fakeLocal();
     const permissions = new DappPermissions(area);
     await permissions.grant('https://one.example', [A, B]);
     await permissions.grant('https://two.example', [A]);
     await permissions.grant('https://three.example', [B, A]);
+    await permissions.grant('https://older.example', [A, B]); // never asked for `accounts`
+    for (const origin of ['https://one.example', 'https://two.example', 'https://three.example']) {
+      await permissions.followWallet(origin);
+    }
     expect(await permissions.useAccount(B)).toEqual(['https://one.example']);
     const map = await permissions.all();
     expect(map['https://one.example'].addresses).toEqual([B, A]);
     expect(map['https://two.example'].addresses).toEqual([A]);
     expect(map['https://three.example'].addresses).toEqual([B, A]);
+    expect(map['https://older.example'].addresses).toEqual([A, B]);
     expect(await permissions.useAccount(B)).toEqual([]);
+  });
+
+  it('marks a connected site as following the wallet, once and for good', async () => {
+    const { area, items } = fakeLocal();
+    const permissions = new DappPermissions(area);
+    await permissions.grant('https://app.dusa.io', [A]);
+    expect((await permissions.get('https://app.dusa.io'))?.followsWallet).toBe(false);
+    expect(await permissions.followWallet('https://app.dusa.io')).toBe(true);
+    const stored = items[PERMISSIONS_ITEM];
+    expect(await permissions.followWallet('https://app.dusa.io')).toBe(true);
+    expect(items[PERMISSIONS_ITEM]).toBe(stored); // nothing written again
+    expect((await permissions.get('https://app.dusa.io'))?.followsWallet).toBe(true);
+    await permissions.addAccount('https://app.dusa.io', B, false);
+    expect((await permissions.get('https://app.dusa.io'))?.followsWallet).toBe(true);
+    expect(await permissions.followWallet('https://unknown.example')).toBe(false);
+    expect(await permissions.get('https://unknown.example')).toBeNull();
+  });
+
+  it('runs changes made at once one after the other, so none is lost', async () => {
+    const { area } = fakeLocal();
+    const permissions = new DappPermissions(area);
+    await permissions.grant('https://one.example', [A]);
+    await permissions.grant('https://two.example', [A]);
+    await Promise.all([
+      permissions.followWallet('https://one.example'),
+      permissions.followWallet('https://two.example'),
+      permissions.addAccount('https://one.example', B, false),
+    ]);
+    const map = await permissions.all();
+    expect(map['https://one.example']).toMatchObject({ addresses: [A, B], followsWallet: true });
+    expect(map['https://two.example'].followsWallet).toBe(true);
   });
 
   it('revokes a site', async () => {
@@ -127,12 +164,19 @@ describe('DappPermissions', () => {
       [PERMISSIONS_ITEM]: { 'https://app.dusa.io': { address: A, grantedAt: 7 } },
     });
     const permissions = new DappPermissions(area);
-    expect(await permissions.get('https://app.dusa.io')).toEqual({ addresses: [A], grantedAt: 7 });
+    expect(await permissions.get('https://app.dusa.io')).toEqual({
+      addresses: [A],
+      followsWallet: false,
+      grantedAt: 7,
+    });
     await permissions.addAccount('https://app.dusa.io', B, false);
     expect(await permissions.get('https://app.dusa.io')).toEqual({
       addresses: [A, B],
+      followsWallet: false,
       grantedAt: 7,
     });
+    // a switch leaves it on the account its dApp shows
+    expect(await permissions.useAccount(B)).toEqual([]);
   });
 
   it('disconnects every site at once', async () => {

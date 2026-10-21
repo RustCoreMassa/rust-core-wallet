@@ -2,19 +2,28 @@ import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } f
 import { CONNECTED_SITES } from '../platform/connected-sites';
 import { WalletStore } from './wallet-store';
 
-/** The active wallet isn't connected to the site in the active tab, though the site is. */
+/**
+ * The site in the active tab is connected, but doesn't use the active wallet:
+ * - `not-connected`: the wallet isn't one of the accounts it may see;
+ * - `not-in-use`: it may see it, but doesn't follow wallet switches (an older dApp) and still
+ *   uses another account, `inUseName`.
+ */
 export interface SiteNotice {
+  readonly kind: 'not-connected' | 'not-in-use';
   readonly origin: string;
   readonly host: string;
   readonly address: string;
   readonly name: string;
+  /** For `not-in-use`: the wallet's name for the account the site uses; null if unknown. */
+  readonly inUseName: string | null;
 }
 
 /**
  * The extension's link between the active wallet and connected sites, as in MetaMask:
- * - switching wallets makes it the account in use on every site that may see it;
- * - when the site in the browser's active tab is connected, but not to the active wallet, the
- *   Home screen says so and offers to connect it (`notice`, `connectActive`).
+ * - switching wallets makes it the account in use on every site that may see it and follows
+ *   the wallet (older dApps don't: they'd sign from another account than the one they show);
+ * - when the site in the browser's active tab is connected, but doesn't use the active wallet,
+ *   the Home screen says so and offers to connect it / use it there (`notice`, `connectActive`).
  * Does nothing in the web app (no CONNECTED_SITES).
  */
 @Injectable({ providedIn: 'root' })
@@ -36,9 +45,20 @@ export class SiteConnection {
     const wallet = this.store.wallets()[this.store.activeWalletId()];
     if (!this.sites || !origin || !wallet) return null;
     const site = this.sites.sites().find((s) => s.origin === origin);
-    if (!site || site.addresses.includes(wallet.address)) return null;
+    if (!site || site.addresses[0] === wallet.address) return null;
+    const kind = site.addresses.includes(wallet.address) ? 'not-in-use' : 'not-connected';
+    // A site that follows the wallet moves to it at the switch; the list may lag a moment.
+    if (kind === 'not-in-use' && site.followsWallet) return null;
     if (this.dismissed().has(`${origin} ${wallet.address}`)) return null;
-    return { origin, host: new URL(origin).host, address: wallet.address, name: wallet.name };
+    const inUse = site.addresses[0];
+    return {
+      kind,
+      origin,
+      host: new URL(origin).host,
+      address: wallet.address,
+      name: wallet.name,
+      inUseName: Object.values(this.store.wallets()).find((w) => w.address === inUse)?.name ?? null,
+    };
   });
 
   /**
@@ -71,7 +91,7 @@ export class SiteConnection {
     inject(DestroyRef).onDestroy(sites.watchActiveTab(() => void readTab()));
   }
 
-  /** Lets the site see the active wallet, and use it. */
+  /** Lets the site see the active wallet (if it didn't), and use it. */
   async connectActive(): Promise<void> {
     const notice = this.notice();
     if (!notice || !this.sites) return;

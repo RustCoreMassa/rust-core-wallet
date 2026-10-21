@@ -63,7 +63,7 @@ function fakeTabs(answer: (tabId: number) => unknown, activeId: number | null = 
 describe('ChromeConnectedSites', () => {
   const stored = {
     [PERMISSIONS_ITEM]: {
-      'https://two.example': { addresses: [B], grantedAt: 2000 },
+      'https://two.example': { addresses: [B], followsWallet: true, grantedAt: 2000 },
       'https://one.example': { address: A, grantedAt: 1000 }, // saved before several accounts
     },
   };
@@ -73,8 +73,8 @@ describe('ChromeConnectedSites', () => {
     const sites = new ChromeConnectedSites(area, onChanged);
     await settle();
     expect(sites.sites()).toEqual([
-      { origin: 'https://one.example', addresses: [A], grantedAt: 1000 },
-      { origin: 'https://two.example', addresses: [B], grantedAt: 2000 },
+      { origin: 'https://one.example', addresses: [A], followsWallet: false, grantedAt: 1000 },
+      { origin: 'https://two.example', addresses: [B], followsWallet: true, grantedAt: 2000 },
     ]);
   });
 
@@ -84,7 +84,10 @@ describe('ChromeConnectedSites', () => {
     await settle();
     await sites.addAccount('https://one.example', B, false);
     expect(sites.sites()[0].addresses).toEqual([A, B]);
+    // one.example doesn't follow the wallet: a switch leaves it alone, a choice by hand doesn't
     await sites.useAccount(B);
+    expect(sites.sites()[0].addresses).toEqual([A, B]);
+    await sites.addAccount('https://one.example', B, true);
     expect(sites.sites()[0].addresses).toEqual([B, A]);
     await sites.removeAccount('https://one.example', B);
     expect(sites.sites()[0].addresses).toEqual([A]);
@@ -109,10 +112,12 @@ describe('ChromeConnectedSites', () => {
     await settle();
     expect(sites.sites()).toEqual([]);
     await external({
-      [PERMISSIONS_ITEM]: { 'https://new.example': { addresses: [A, B], grantedAt: 5 } },
+      [PERMISSIONS_ITEM]: {
+        'https://new.example': { addresses: [A, B], followsWallet: true, grantedAt: 5 },
+      },
     });
     expect(sites.sites()).toEqual([
-      { origin: 'https://new.example', addresses: [A, B], grantedAt: 5 },
+      { origin: 'https://new.example', addresses: [A, B], followsWallet: true, grantedAt: 5 },
     ]);
   });
 

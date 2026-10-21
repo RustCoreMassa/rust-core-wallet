@@ -5,9 +5,14 @@ export interface ConnectedSite {
   readonly origin: string;
   /**
    * The accounts the site may see and ask to sign with, never empty. The first is the one it
-   * uses now: the wallet's most recently active account among them.
+   * uses now: the wallet's most recently active account among them when it `followsWallet`.
    */
   readonly addresses: readonly string[];
+  /**
+   * The site handles several accounts and follows the wallet you switch to. Other sites (older
+   * dApps) keep the account they use until you change it by hand.
+   */
+  readonly followsWallet: boolean;
   readonly grantedAt: number;
 }
 
@@ -22,7 +27,10 @@ export interface ConnectedSites {
   addAccount(origin: string, address: string, current: boolean): Promise<void>;
   /** Takes an account away from a site; the site is disconnected when it was its last one. */
   removeAccount(origin: string, address: string): Promise<void>;
-  /** The wallet switched to this account: every site that may see it now uses it. */
+  /**
+   * The wallet switched to this account: every site that may see it and follows the wallet now
+   * uses it.
+   */
   useAccount(address: string): Promise<void>;
   disconnect(origin: string): Promise<void>;
   /** Takes a wallet removed from RustCore away from every site. */

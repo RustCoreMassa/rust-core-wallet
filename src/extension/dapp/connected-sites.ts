@@ -111,6 +111,11 @@ export class ChromeConnectedSites implements ConnectedSites {
 
 function toSites(map: PermissionMap): ConnectedSite[] {
   return Object.entries(map)
-    .map(([origin, p]) => ({ origin, addresses: p.addresses, grantedAt: p.grantedAt }))
+    .map(([origin, p]) => ({
+      origin,
+      addresses: p.addresses,
+      followsWallet: p.followsWallet,
+      grantedAt: p.grantedAt,
+    }))
     .sort((a, b) => a.grantedAt - b.grantedAt);
 }

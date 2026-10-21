@@ -25,7 +25,8 @@ interface SiteAccount {
  * Settings → Connected sites (browser extension): every site connected to the wallet, the
  * accounts each can see and ask to sign with — the one in use first — and ways to add or take
  * away an account, or disconnect the site. Like MetaMask, the site uses the most recently active
- * wallet among them. The sites hear about it at once (docs/DAPP-CONNECTION.md → events).
+ * wallet among them — or, for an older dApp that doesn't follow wallet switches, the one chosen
+ * here. The sites hear about it at once (docs/DAPP-CONNECTION.md → events).
  */
 @Component({
   selector: 'app-connected-sites-modal',
@@ -88,6 +89,11 @@ export class ConnectedSitesModal {
   protected async addAccount(origin: string, address: string): Promise<void> {
     const active = this.store.wallets()[this.store.activeWalletId()]?.address;
     await this.run(origin, () => this.connected.addAccount(origin, address, address === active));
+  }
+
+  /** For a site that doesn't follow the wallet: the account it uses from now on. */
+  protected async useOn(origin: string, address: string): Promise<void> {
+    await this.run(origin, () => this.connected.addAccount(origin, address, true));
   }
 
   protected async removeAccount(origin: string, address: string): Promise<void> {

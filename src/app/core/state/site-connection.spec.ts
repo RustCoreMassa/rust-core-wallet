@@ -66,13 +66,17 @@ describe('SiteConnection', () => {
   });
 
   it("says when the active tab's site is connected, but not to the active wallet", async () => {
-    const { connection, activeWalletId } = setup([{ origin: DUSA, addresses: [B], grantedAt: 0 }]);
+    const { connection, activeWalletId } = setup([
+      { origin: DUSA, addresses: [B], followsWallet: true, grantedAt: 0 },
+    ]);
     await settle();
     expect(connection.notice()).toEqual({
+      kind: 'not-connected',
       origin: DUSA,
       host: 'app.dusa.io',
       address: A,
       name: 'main',
+      inUseName: 'savings',
     });
     activeWalletId.set('b');
     await settle();
@@ -82,33 +86,74 @@ describe('SiteConnection', () => {
   it('says nothing for a site that is not connected, or no site', async () => {
     expect(setup([]).connection.notice()).toBeNull();
     TestBed.resetTestingModule();
-    const { connection } = setup([{ origin: DUSA, addresses: [B], grantedAt: 0 }], null);
+    const { connection } = setup(
+      [{ origin: DUSA, addresses: [B], followsWallet: true, grantedAt: 0 }],
+      null,
+    );
     await settle();
     expect(connection.notice()).toBeNull();
   });
 
   it('connects the active wallet to the site and makes it the one in use', async () => {
-    const { connection, service } = setup([{ origin: DUSA, addresses: [B], grantedAt: 0 }]);
+    const { connection, service } = setup([
+      { origin: DUSA, addresses: [B], followsWallet: true, grantedAt: 0 },
+    ]);
     await settle();
     await connection.connectActive();
     expect(service.addAccount).toHaveBeenCalledWith(DUSA, A, true);
   });
 
   it('stays hidden once closed, for that site and wallet', async () => {
-    const { connection } = setup([{ origin: DUSA, addresses: [B], grantedAt: 0 }]);
+    const { connection } = setup([
+      { origin: DUSA, addresses: [B], followsWallet: true, grantedAt: 0 },
+    ]);
     await settle();
     connection.dismiss();
     expect(connection.notice()).toBeNull();
   });
 
   it('reads the site again when the active tab changes', async () => {
-    const { connection, tab, changeTab } = setup([{ origin: DUSA, addresses: [B], grantedAt: 0 }]);
+    const { connection, tab, changeTab } = setup([
+      { origin: DUSA, addresses: [B], followsWallet: true, grantedAt: 0 },
+    ]);
     await settle();
     expect(connection.notice()).not.toBeNull();
     tab.origin = 'https://elsewhere.example';
     changeTab();
     await settle();
     expect(connection.notice()).toBeNull();
+  });
+
+  it('says when an older dApp, which keeps its account, uses another one than the active wallet', async () => {
+    const { connection, activeWalletId } = setup([
+      { origin: DUSA, addresses: [B, A], followsWallet: false, grantedAt: 0 },
+    ]);
+    await settle();
+    expect(connection.notice()).toMatchObject({
+      kind: 'not-in-use',
+      address: A,
+      inUseName: 'savings',
+    });
+    activeWalletId.set('b');
+    await settle();
+    expect(connection.notice()).toBeNull();
+  });
+
+  it('says nothing when a site that follows the wallet may see the active one', async () => {
+    const { connection } = setup([
+      { origin: DUSA, addresses: [B, A], followsWallet: true, grantedAt: 0 },
+    ]);
+    await settle();
+    expect(connection.notice()).toBeNull();
+  });
+
+  it('makes the active wallet the one an older dApp uses', async () => {
+    const { connection, service } = setup([
+      { origin: DUSA, addresses: [B, A], followsWallet: false, grantedAt: 0 },
+    ]);
+    await settle();
+    await connection.connectActive();
+    expect(service.addAccount).toHaveBeenCalledWith(DUSA, A, true);
   });
 
   it('does nothing in the web app', async () => {

@@ -265,6 +265,8 @@ export class DappRouter {
         return { address: permission.addresses[0] };
       case 'accounts':
         if (!permission) throw unauthorized('Connect to the wallet first');
+        // Only wallet-provider versions that name the signer (`from`) ask for the list.
+        await this.deps.permissions.followWallet(origin);
         return { addresses: permission.addresses };
       case 'network':
         if (!permission) throw unauthorized('Connect to the wallet first');
@@ -282,6 +284,7 @@ export class DappRouter {
         if (!permission.addresses.includes(signer)) {
           throw unauthorized('That account is not connected to this site');
         }
+        if (request.from !== undefined) await this.deps.permissions.followWallet(origin);
         return this.enqueue(origin, port, id, request, params, signer);
       }
     }

@@ -9,10 +9,18 @@ export const PERMISSIONS_ITEM = 'rustcore:dapp-permissions';
 export interface SitePermission {
   /**
    * The accounts this site may see and ask to sign with, never empty. The first is the site's
-   * current account: the one it uses unless it names another (`from`). Like MetaMask, it is
-   * the wallet's most recently active account among them.
+   * current account: the one it uses unless it names another (`from`). For a site that
+   * `followsWallet`, like MetaMask, it is the wallet's most recently active account among them.
    */
   readonly addresses: readonly string[];
+  /**
+   * The site showed it handles several accounts (it asked for `accounts`, or named its signer
+   * with `from`), so it follows the wallet the user switches to. Sites that never did — dApps
+   * on an older wallet-provider, sites connected before 1.6.0 — sign without `from` and show
+   * the account they were given: their current account changes only by hand, or a signature
+   * could come from another account than the one the dApp shows (docs/DAPP-CONNECTION.md).
+   */
+  readonly followsWallet: boolean;
   /** When the user approved the connection (ms epoch). */
   readonly grantedAt: number;
 }
@@ -41,8 +49,15 @@ export function dappOrigin(url: string | undefined): string | null {
   return null;
 }
 
-/** Connected sites, kept in chrome.storage.local. Every call reads the stored map afresh. */
+/**
+ * Connected sites, kept in chrome.storage.local. Every call reads the stored map afresh; changes
+ * run one at a time, so two at once (two sites asking for their accounts together) can't
+ * overwrite each other.
+ */
 export class DappPermissions {
+  /** The last change started; the next one waits for it. */
+  private queue: Promise<unknown> = Promise.resolve();
+
   constructor(
     private readonly area: LocalArea,
     private readonly now: () => number = Date.now,
@@ -60,9 +75,12 @@ export class DappPermissions {
   async grant(origin: string, addresses: readonly string[]): Promise<SitePermission> {
     const list = unique(addresses);
     if (list.length === 0) throw new Error('A site needs at least one account');
-    const permission: SitePermission = { addresses: list, grantedAt: this.now() };
-    await this.write({ ...(await this.all()), [origin]: permission });
-    return permission;
+    const permission: SitePermission = {
+      addresses: list,
+      followsWallet: false,
+      grantedAt: this.now(),
+    };
+    return this.change((map) => [{ ...map, [origin]: permission }, permission]);
   }
 
   /**
@@ -70,14 +88,14 @@ export class DappPermissions {
    * after the others. False if the site isn't connected.
    */
   async addAccount(origin: string, address: string, current: boolean): Promise<boolean> {
-    const map = await this.all();
-    const site = map[origin];
-    if (!site) return false;
-    const others = site.addresses.filter((a) => a !== address);
-    const addresses = current ? [address, ...others] : [...others, address];
-    if (sameList(addresses, site.addresses)) return true;
-    await this.write({ ...map, [origin]: { ...site, addresses } });
-    return true;
+    return this.change((map) => {
+      const site = map[origin];
+      if (!site) return [null, false];
+      const others = site.addresses.filter((a) => a !== address);
+      const addresses = current ? [address, ...others] : [...others, address];
+      if (sameList(addresses, site.addresses)) return [null, true];
+      return [{ ...map, [origin]: { ...site, addresses } }, true];
+    });
   }
 
   /**
@@ -85,41 +103,57 @@ export class DappPermissions {
    * False if the site didn't have it.
    */
   async removeAccount(origin: string, address: string): Promise<boolean> {
-    const map = await this.all();
-    const site = map[origin];
-    if (!site?.addresses.includes(address)) return false;
-    await this.write(withoutAddress(map, address, origin));
-    return true;
+    return this.change((map) =>
+      map[origin]?.addresses.includes(address)
+        ? [withoutAddress(map, address, origin), true]
+        : [null, false],
+    );
+  }
+
+  /**
+   * The site showed it handles several accounts: from now on it follows the wallet the user
+   * switches to. False if the site isn't connected.
+   */
+  async followWallet(origin: string): Promise<boolean> {
+    return this.change((map) => {
+      const site = map[origin];
+      if (!site) return [null, false];
+      if (site.followsWallet) return [null, true];
+      return [{ ...map, [origin]: { ...site, followsWallet: true } }, true];
+    });
   }
 
   /**
    * The wallet switched to `address`: it becomes the current account of every site that may
-   * see it. Returns the sites whose current account changed.
+   * see it and follows the wallet. Returns the sites whose current account changed.
    */
   async useAccount(address: string): Promise<string[]> {
-    const map = await this.all();
-    const moved = Object.keys(map).filter(
-      (o) => map[o].addresses.includes(address) && map[o].addresses[0] !== address,
-    );
-    if (moved.length === 0) return [];
-    const next = { ...map };
-    for (const origin of moved) {
-      const site = map[origin];
-      next[origin] = {
-        ...site,
-        addresses: [address, ...site.addresses.filter((a) => a !== address)],
-      };
-    }
-    await this.write(next);
-    return moved;
+    return this.change((map) => {
+      const moved = Object.keys(map).filter(
+        (o) =>
+          map[o].followsWallet &&
+          map[o].addresses.includes(address) &&
+          map[o].addresses[0] !== address,
+      );
+      if (moved.length === 0) return [null, []];
+      const next = { ...map };
+      for (const origin of moved) {
+        const site = map[origin];
+        next[origin] = {
+          ...site,
+          addresses: [address, ...site.addresses.filter((a) => a !== address)],
+        };
+      }
+      return [next, moved];
+    });
   }
 
   /** Disconnects a site; false if it wasn't connected. */
   async revoke(origin: string): Promise<boolean> {
-    const { [origin]: removed, ...rest } = await this.all();
-    if (!removed) return false;
-    await this.write(rest);
-    return true;
+    return this.change((map) => {
+      const { [origin]: removed, ...rest } = map;
+      return removed ? [rest, true] : [null, false];
+    });
   }
 
   /**
@@ -127,20 +161,30 @@ export class DappPermissions {
    * an account are disconnected; returns them.
    */
   async removeAddress(address: string): Promise<string[]> {
-    const map = await this.all();
-    if (!Object.values(map).some((site) => site.addresses.includes(address))) return [];
-    const next = withoutAddress(map, address);
-    await this.write(next);
-    return Object.keys(map).filter((origin) => !next[origin]);
+    return this.change((map) => {
+      if (!Object.values(map).some((site) => site.addresses.includes(address))) return [null, []];
+      const next = withoutAddress(map, address);
+      return [next, Object.keys(map).filter((origin) => !next[origin])];
+    });
   }
 
   /** Disconnects every site (log out: the wallets they were connected to are gone). */
   async clear(): Promise<void> {
-    await this.write({});
+    return this.change(() => [{}, undefined]);
   }
 
-  private async write(map: PermissionMap): Promise<void> {
-    await this.area.set({ [PERMISSIONS_ITEM]: map });
+  /**
+   * Reads the map, lets `edit` say what it becomes (null: unchanged) and what to return, and
+   * writes it — after every change started before this one.
+   */
+  private change<T>(edit: (map: PermissionMap) => [PermissionMap | null, T]): Promise<T> {
+    const run = this.queue.then(async () => {
+      const [next, result] = edit(await this.all());
+      if (next) await this.area.set({ [PERMISSIONS_ITEM]: next });
+      return result;
+    });
+    this.queue = run.catch(() => undefined);
+    return run;
   }
 }
 
@@ -169,7 +213,8 @@ export function sameList(a: readonly string[], b: readonly string[]): boolean {
 
 /**
  * A stored value as a permission map; anything damaged or tampered with counts as empty. Sites
- * saved before multiple accounts (`{ address, grantedAt }`) read as connected to that one.
+ * saved before multiple accounts (`{ address, grantedAt }`) read as connected to that one, and
+ * not following the wallet.
  */
 export function toPermissionMap(value: unknown): PermissionMap {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
@@ -184,11 +229,13 @@ export function toPermissionMap(value: unknown): PermissionMap {
 
 function toSitePermission(value: unknown): SitePermission | null {
   if (typeof value !== 'object' || value === null) return null;
-  const { addresses, address, grantedAt } = value as Record<string, unknown>;
+  const { addresses, address, followsWallet, grantedAt } = value as Record<string, unknown>;
   if (typeof grantedAt !== 'number') return null;
   if (Array.isArray(addresses)) {
     if (addresses.length === 0 || !addresses.every((a) => typeof a === 'string')) return null;
-    return { addresses: unique(addresses), grantedAt };
+    return { addresses: unique(addresses), followsWallet: followsWallet === true, grantedAt };
   }
-  return typeof address === 'string' ? { addresses: [address], grantedAt } : null;
+  return typeof address === 'string'
+    ? { addresses: [address], followsWallet: false, grantedAt }
+    : null;
 }

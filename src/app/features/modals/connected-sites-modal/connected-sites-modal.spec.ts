@@ -60,8 +60,8 @@ describe('ConnectedSitesModal', () => {
 
   it('lists each site and disconnects the one asked', async () => {
     const { fixture, service, text } = setup([
-      { origin: 'https://app.dusa.io', addresses: [MAIN], grantedAt: 0 },
-      { origin: 'https://other.example', addresses: [MAIN], grantedAt: 1 },
+      { origin: 'https://app.dusa.io', addresses: [MAIN], followsWallet: true, grantedAt: 0 },
+      { origin: 'https://other.example', addresses: [MAIN], followsWallet: true, grantedAt: 1 },
     ]);
     expect(text()).toContain('https://app.dusa.io');
     expect(text()).toContain('https://other.example');
@@ -75,8 +75,13 @@ describe('ConnectedSitesModal', () => {
 
   it('lists the accounts each site sees, the one in use first, and adds or takes one away', async () => {
     const { fixture, service, text } = setup([
-      { origin: 'https://app.dusa.io', addresses: [MAIN, SAVINGS], grantedAt: 0 },
-      { origin: 'https://other.example', addresses: [MAIN], grantedAt: 1 },
+      {
+        origin: 'https://app.dusa.io',
+        addresses: [MAIN, SAVINGS],
+        followsWallet: true,
+        grantedAt: 0,
+      },
+      { origin: 'https://other.example', addresses: [MAIN], followsWallet: true, grantedAt: 1 },
     ]);
     expect(text()).toContain('In use');
     const buttons = () =>
@@ -98,8 +103,45 @@ describe('ConnectedSitesModal', () => {
     expect(service.addAccount).toHaveBeenCalledWith('https://other.example', SAVINGS, true);
   });
 
+  it('lets you choose the account an older dApp uses, as it does not follow wallet switches', async () => {
+    const { fixture, service, text } = setup([
+      {
+        origin: 'https://old.example',
+        addresses: [MAIN, SAVINGS],
+        followsWallet: false,
+        grantedAt: 0,
+      },
+    ]);
+    expect(text()).toContain("doesn't follow your wallet switches");
+    const uses = [...fixture.nativeElement.querySelectorAll('button')].filter(
+      (b: HTMLButtonElement) => b.textContent?.trim() === 'Use',
+    ) as HTMLButtonElement[];
+    expect(uses).toHaveLength(1); // not on the account already in use
+    uses[0].click();
+    await fixture.whenStable();
+    expect(service.addAccount).toHaveBeenCalledWith('https://old.example', SAVINGS, true);
+  });
+
+  it('offers no Use button on sites that follow the wallet', () => {
+    const { fixture, text } = setup([
+      {
+        origin: 'https://app.dusa.io',
+        addresses: [MAIN, SAVINGS],
+        followsWallet: true,
+        grantedAt: 0,
+      },
+    ]);
+    expect(text()).not.toContain("doesn't follow your wallet switches");
+    const uses = [...fixture.nativeElement.querySelectorAll('button')].filter(
+      (b: HTMLButtonElement) => b.textContent?.trim() === 'Use',
+    );
+    expect(uses).toHaveLength(0);
+  });
+
   it('flags a site still pointing at an account no longer in the wallet', () => {
-    const { text } = setup([{ origin: 'https://app.dusa.io', addresses: [GONE], grantedAt: 0 }]);
+    const { text } = setup([
+      { origin: 'https://app.dusa.io', addresses: [GONE], followsWallet: true, grantedAt: 0 },
+    ]);
     expect(text()).toContain('No longer in RustCore Wallet');
   });
 

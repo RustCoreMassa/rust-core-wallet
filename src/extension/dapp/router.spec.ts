@@ -204,6 +204,42 @@ describe('DappRouter — status requests', () => {
     expect(page.replyTo(account)).toEqual({ id: account, result: { address: BOB } });
   });
 
+  it('lets a site that asks for its accounts, or names its signer, follow the wallet', async () => {
+    const { router, permissions } = setup();
+    await permissions.grant(DUSA, [ALICE, BOB]);
+    await permissions.grant('https://signer.example', [ALICE, BOB]);
+    await permissions.grant('https://older.example', [ALICE, BOB]);
+    const dusa = fakePort();
+    const signer = fakePort({ origin: 'https://signer.example', frameId: 0 });
+    const older = fakePort({ origin: 'https://older.example', frameId: 0 });
+    for (const page of [dusa, signer, older]) router.attach(page.port);
+
+    dusa.send('accounts');
+    signer.send('sign', { data: 'aGk=', from: BOB });
+    // what wallet-provider's first RustCoreWallet asks: one account, no `from`
+    older.send('account');
+    older.send('network');
+    older.send('connect'); // already connected: answered at once
+    older.send('transfer', { to: BOB, amount: '1' });
+    await settle();
+
+    expect((await permissions.get(DUSA))?.followsWallet).toBe(true);
+    expect((await permissions.get('https://signer.example'))?.followsWallet).toBe(true);
+    expect((await permissions.get('https://older.example'))?.followsWallet).toBe(false);
+  });
+
+  it("keeps an older dApp's unnamed signer on the account it shows after a wallet switch", async () => {
+    const { router, permissions, trackPermissions, events } = setup();
+    await permissions.grant(DUSA, [ALICE, BOB]);
+    const page = fakePort();
+    router.attach(page.port);
+    await trackPermissions(() => permissions.useAccount(BOB));
+    page.send('transfer', { to: BOB, amount: '1' });
+    await settle();
+    expect(router.next()).toMatchObject({ method: 'transfer', address: ALICE });
+    expect(events(page)).toEqual([]);
+  });
+
   it('still knows sites connected before several accounts per site', async () => {
     const browser = fakeBrowser();
     browser.local[PERMISSIONS_ITEM] = { [DUSA]: { address: ALICE, grantedAt: 1 } };
@@ -572,20 +608,26 @@ describe('DappRouter — events', () => {
     ]);
   });
 
-  it('moves every site that may see the wallet switched to, as MetaMask', async () => {
+  it('moves every site that may see the wallet switched to and follows it, as MetaMask', async () => {
     const { router, permissions, trackPermissions, events } = setup();
     await permissions.grant(DUSA, [ALICE, BOB]);
+    await permissions.followWallet(DUSA);
     await permissions.grant('https://alice-only.example', [ALICE]);
+    await permissions.followWallet('https://alice-only.example');
+    await permissions.grant('https://older.example', [ALICE, BOB]);
     const dusa = fakePort();
     const aliceOnly = fakePort({ origin: 'https://alice-only.example', frameId: 0 });
+    const older = fakePort({ origin: 'https://older.example', frameId: 0 });
     router.attach(dusa.port);
     router.attach(aliceOnly.port);
+    router.attach(older.port);
     await trackPermissions(() => permissions.useAccount(BOB));
     expect(events(dusa)).toEqual([
       { event: 'accountChanged', data: { address: BOB } },
       { event: 'accountsChanged', data: { addresses: [BOB, ALICE] } },
     ]);
     expect(events(aliceOnly)).toEqual([]);
+    expect(events(older)).toEqual([]);
   });
 
   it('drops a waiting request only when its account is taken away from the site', async () => {

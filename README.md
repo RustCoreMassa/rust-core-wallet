@@ -189,12 +189,12 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Popup, side panel and full screen
 - [x] Connect to Massa dApps and sign their transactions, with a review screen
 - [x] Per-site permissions
+- [x] Several wallets connected to one site, as in MetaMask: the site follows the wallet you
+  switch to *(dApps using Massa's wallet library get it with the library's next update)*
 - [x] Added to Massa's wallet library (`@massalabs/wallet-provider`), so dApps find RustCore
   *([merged](https://github.com/massalabs/wallet-provider/pull/366); dApps get it as they move
   to the library's next release)*
 - [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
-- [ ] Several wallets connected to one site, as in MetaMask: the site follows the wallet you
-  switch to
 
 **Phase 3 — Mobile apps** *(planned)*
 - [ ] iOS and Android apps

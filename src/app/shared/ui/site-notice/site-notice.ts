@@ -4,8 +4,8 @@ import { toUserMessage } from '../../../core/utils/user-error';
 
 /**
  * Extension, Home: the site in the active tab is connected, but not to the active wallet (as
- * MetaMask's "Not connected"). The site keeps using one of the accounts it may see; one tap
- * lets it see this one too, and use it.
+ * MetaMask's "Not connected"), or — an older dApp that doesn't follow wallet switches — still
+ * uses another of its accounts. One tap lets it see this one too, and use it.
  */
 @Component({
   selector: 'app-site-notice',

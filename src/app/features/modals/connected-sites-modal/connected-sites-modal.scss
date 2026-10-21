@@ -146,3 +146,32 @@
     border-color: var(--gray-500);
   }
 }
+
+.site-account-use {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: none;
+  color: var(--gray-300);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--white);
+    border-color: var(--gray-500);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.site-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gray-500);
+}
