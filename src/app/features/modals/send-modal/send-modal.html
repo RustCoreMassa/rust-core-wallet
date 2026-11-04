@@ -82,7 +82,14 @@
 <div class="error-text">{{ error() }}</div>
 }
 
-<button class="btn btn-red" type="button" (click)="review()">Review</button>
+<button class="btn btn-red" type="button" [disabled]="isReviewing()" (click)="review()">
+  @if (isReviewing()) {
+  <div class="spinner"></div>
+  <span>Checking…</span>
+  } @else {
+  <span>Review</span>
+  }
+</button>
 } @else {
 <app-confirm-details
   [rows]="confirmRows()"
@@ -90,7 +97,7 @@
   confirmLabel="Confirm & send"
   busyLabel="Confirming on-chain…"
   (confirmed)="confirm()"
-  (cancelled)="step.set('form')"
+  (cancelled)="backToForm()"
 />
 
 @if (error()) {

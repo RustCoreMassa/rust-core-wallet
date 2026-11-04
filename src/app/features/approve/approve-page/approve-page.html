@@ -82,7 +82,7 @@
       confirmLabel="Approve"
       [busyLabel]="request()?.method === 'sign' ? 'Signing…' : 'Sending…'"
       [busy]="phase() === 'busy'"
-      [disabled]="!!blocker() || checking() || !ready()"
+      [disabled]="!!blocker() || checking() || !ready() || !armed()"
       (confirmed)="approve()"
       (cancelled)="reject()"
     />

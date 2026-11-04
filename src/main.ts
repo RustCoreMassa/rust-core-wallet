@@ -10,4 +10,10 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
 
-bootstrapApplication(App, appConfig).catch((err) => console.error(err));
+// Never inside another page's frame: that page could lay its own content over the wallet's
+// buttons (clickjacking). A <meta> CSP can't say frame-ancestors; the extension's manifest does.
+if (window.top !== window.self) {
+  document.body.textContent = "RustCore Wallet can't run inside another page — open it directly.";
+} else {
+  bootstrapApplication(App, appConfig).catch((err) => console.error(err));
+}

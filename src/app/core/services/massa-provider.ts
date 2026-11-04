@@ -10,6 +10,8 @@ export const ROLL_PRICE_MAS = 100;
  * MRC-20 transfers (smart contract calls) and roll buys/sells alike.
  */
 export const NETWORK_FEE_MAS = 0.01;
+/** NETWORK_FEE_MAS in nanoMAS. Every write passes its fee explicitly: never the node's own default. */
+export const NETWORK_FEE_UNITS = 10_000_000n;
 
 export interface StakingInfo {
   readonly rolls: RollsState;
@@ -85,12 +87,15 @@ export interface MassaProvider {
 
   // ---- native MAS -------------------------------------------------------
   getBalance(privateKey: string, isFinal?: boolean): Promise<bigint>;
-  /** `fee` in nanoMAS; massa-web3's default (the network's minimal fee) when left out. */
+  /**
+   * `fee` in nanoMAS — always given: left to massa-web3, the fee would be whatever the node
+   * reports as its minimum, not the one the Review step showed.
+   */
   transferMas(
     privateKey: string,
     toAddress: string,
     amount: bigint,
-    fee?: bigint,
+    fee: bigint,
   ): Promise<OperationResult>;
 
   // ---- MRC-20 tokens ------------------------------------------------------
@@ -101,11 +106,19 @@ export interface MassaProvider {
    * contract, a user address). Rejects only when the network can't be read.
    */
   getTokenInfo(contractAddress: string): Promise<TokenInfo | null>;
+  /**
+   * nanoMAS a transfer of the token to `toAddress` must send for the storage of the recipient's
+   * balance entry: 0 when the recipient already has one (massa-web3's MRC20BalanceCreationCost).
+   */
+  getTokenStorageCost(contractAddress: string, toAddress: string): Promise<bigint>;
+  /** Sends exactly `fee` and `coins` (the storage cost, from getTokenStorageCost) with the call. */
   transferToken(
     privateKey: string,
     contractAddress: string,
     toAddress: string,
     amount: bigint,
+    fee: bigint,
+    coins: bigint,
   ): Promise<OperationResult>;
 
   // ---- rolls (staking) ----------------------------------------------------
@@ -113,8 +126,8 @@ export interface MassaProvider {
   getStaking(address: string): Promise<StakingInfo>;
   /** Rolls staked across the whole network (sum over all stakers). */
   getTotalRolls(): Promise<number>;
-  buyRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult>;
-  sellRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult>;
+  buyRolls(privateKey: string, rollCount: bigint, fee: bigint): Promise<OperationResult>;
+  sellRolls(privateKey: string, rollCount: bigint, fee: bigint): Promise<OperationResult>;
 
   // ---- Massa Name System ----------------------------------------------------
   /** Domains owned by `address`, each with the address it resolves to. */
@@ -152,11 +165,16 @@ export interface MassaProvider {
 
 /** The chain executed the operation and it failed — nothing changed except the fee. */
 export class OperationFailedError extends Error {
+  /**
+   * `reason`: the node's execution error — text a contract can choose (an abort message), so it
+   * is for the console and for matching known causes (toUserMessage), never shown as is.
+   */
   constructor(
     readonly operationId: string,
-    reason: string,
+    readonly reason: string,
   ) {
     super(`Transaction failed: ${reason}`);
+    this.name = 'OperationFailedError';
   }
 }
 

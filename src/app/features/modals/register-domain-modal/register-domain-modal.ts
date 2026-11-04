@@ -98,7 +98,8 @@ export class RegisterDomainModal {
 
   protected async confirm(): Promise<void> {
     const registration = this.registration();
-    if (!registration) return;
+    // One operation per Review: a second tap before the button turns off sends nothing.
+    if (!registration || this.isRegistering()) return;
     this.error.set(null);
     this.isRegistering.set(true);
     try {

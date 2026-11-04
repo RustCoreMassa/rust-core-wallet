@@ -37,8 +37,9 @@ export function parseIconLink(input: string): string | null {
   if (url.protocol !== 'https:' || !url.hostname) throw new Error(INVALID_LINK);
   // user:password@host links are a phishing classic and never needed for an image.
   if (url.username || url.password) throw new Error("An icon link can't contain a login");
-  // The CSPs let images load from these servers only (media-hosts.ts).
-  if (!MEDIA_HOSTS.includes(url.hostname)) throw new Error(OTHER_SERVER);
+  // The CSPs let images load from these servers only (media-hosts.ts) — and from the IPFS
+  // gateway, only content addressed by its hash.
+  if (!MEDIA_HOSTS.includes(url.hostname) || !mediaUrl(url.href)) throw new Error(OTHER_SERVER);
   return url.href;
 }
 

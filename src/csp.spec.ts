@@ -15,6 +15,16 @@ const csp = new Map(
 const media = MEDIA_HOSTS.map((host) => `https://${host}`);
 
 describe('Content Security Policy', () => {
+  it('refuses anything it does not list', () => {
+    expect(csp.get('default-src')).toEqual(["'none'"]);
+    expect(csp.get('font-src')).toEqual(["'self'"]); // fonts are bundled, never a CDN
+    // Angular adds component styles as <style> elements.
+    expect(csp.get('style-src')).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(csp.get('manifest-src')).toEqual(["'self'"]);
+    expect(csp.get('worker-src')).toEqual(["'self'"]);
+    expect(csp.has('frame-src')).toBe(false); // → default-src: no frames at all
+  });
+
   it('runs only scripts the app itself serves, no plugins, no forms, no framing', () => {
     expect(csp.get('script-src')).toEqual(["'self'"]);
     expect(csp.get('object-src')).toEqual(["'none'"]);

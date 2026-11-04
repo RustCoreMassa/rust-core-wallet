@@ -8,9 +8,15 @@
 # public CI, from exactly the tagged commit, so anyone can check that what they
 # run matches the source (see docs/RELEASING.md).
 #
-# Only first-party actions are used (actions/checkout, actions/setup-node) plus
-# the GitHub CLI preinstalled on the runner — nothing third-party touches the
-# build of a wallet.
+# Only first-party actions are used (actions/checkout, actions/setup-node,
+# actions/upload-artifact, actions/download-artifact), pinned to commits, plus the
+# GitHub CLI preinstalled on the runner — nothing third-party touches the build of
+# a wallet.
+#
+# Two jobs, so that no code from the dependencies ever runs next to a token that
+# can write to the repository: `build` installs, tests and builds with a read-only
+# token and no credentials left in the checkout; `publish` only uploads the files
+# `build` produced — it checks nothing out and runs no npm.
 
 name: Release
 
@@ -19,17 +25,19 @@ on:
     tags:
       - 'v*.*.*'
 
-permissions:
-  contents: write # create the release and upload its files
+# Nothing by default: each job asks for what it needs.
+permissions: {}
 
 concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     env:
       TAG: ${{ github.ref_name }}
 
@@ -38,6 +46,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0 (pinned: a moved tag cannot change the release build)
         with:
           fetch-depth: 0 # all tags, to compare with earlier releases
+          persist-credentials: false # no token left in .git/config for later steps to read
 
       - name: Set up Node.js (version pinned in .nvmrc)
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -97,7 +106,11 @@ jobs:
           cat release-notes.md
 
       - name: Install exact dependencies
-        run: npm ci
+        # Without the packages' own install scripts (none is needed for the build, which comes out
+        # byte-identical); then the project's own postinstall, which trims massa-web3.
+        run: |
+          npm ci --ignore-scripts
+          node scripts/trim-massa-web3.mjs
 
       - name: Run the tests
         run: npx ng test --watch=false
@@ -118,22 +131,24 @@ jobs:
 
       - name: Package the build and checksums
         run: |
+          mkdir release
+          OUT="$PWD/release"
           BUILD=dist/rust-core-wallet/browser
           WEB_ZIP="rust-core-wallet-$TAG.zip"
           # ngsw.json records the build time, so it's the one file left out of the
           # reproducible checksums (see docs/RELEASING.md).
-          (cd "$BUILD" && find . -type f ! -name ngsw.json | sort | xargs sha256sum) > SHA256SUMS
-          (cd "$BUILD" && zip -qr "$GITHUB_WORKSPACE/$WEB_ZIP" .)
-          sha256sum "$WEB_ZIP" >> SHA256SUMS
-          # Not "ZIP": zip reads $ZIP as default options, so exporting it made every later
-          # `zip` call add to this archive instead of writing its own (v1.1.0's first run).
-          echo "WEB_ZIP=$WEB_ZIP" >> "$GITHUB_ENV"
-          cat SHA256SUMS
+          (cd "$BUILD" && find . -type f ! -name ngsw.json | sort | xargs sha256sum) > "$OUT/SHA256SUMS"
+          # Never name a variable ZIP: zip reads $ZIP as default options, so exporting it made
+          # every later `zip` call add to that archive instead of writing its own (v1.1.0).
+          (cd "$BUILD" && zip -qr "$OUT/$WEB_ZIP" .)
+          (cd "$OUT" && sha256sum "$WEB_ZIP") >> "$OUT/SHA256SUMS"
+          mv release-notes.md "$OUT/"
+          cat "$OUT/SHA256SUMS"
 
       - name: Package the extension and checksums
         run: |
           # The two folders differ only in manifest.json, so each gets its own SHA256SUMS.
-          OUT="$PWD"
+          OUT="$PWD/release"
           for TARGET in chromium firefox; do
             DIR="dist/extension/$TARGET"
             EXT_ZIP="rustcore-wallet-extension-$TARGET-$TAG.zip"
@@ -148,13 +163,40 @@ jobs:
             cat "$OUT/SHA256SUMS-$TARGET"
           done
 
+      - name: Hand the release files to the publish job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-files
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the release and upload its files
+    env:
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Take the files the build job produced
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-files
+          path: release
+
       - name: Publish the GitHub Release
+        working-directory: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" "$WEB_ZIP" SHA256SUMS \
+          gh release create "$TAG" \
+            "rust-core-wallet-$TAG.zip" SHA256SUMS \
             "rustcore-wallet-extension-chromium-$TAG.zip" SHA256SUMS-chromium \
             "rustcore-wallet-extension-firefox-$TAG.zip" SHA256SUMS-firefox \
+            --repo "$GITHUB_REPOSITORY" \
             --title "RustCore Wallet $TAG" \
             --notes-file release-notes.md \
             --verify-tag

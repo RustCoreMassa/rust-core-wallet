@@ -7,9 +7,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Self-custodial wallet for the Massa blockchain.">
   <meta name="theme-color" content="#07070a">
+  <!-- The Massa nodes, the explorer and the media servers never learn which page asked. -->
+  <meta name="referrer" content="no-referrer">
   <!-- Same policy as the browser extension (src/extension/manifest.json, minus frame-ancestors,
-       which a <meta> can't set); csp.spec.ts keeps them equal. Remote media: media-hosts.ts. -->
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net https://ipfs.io https://nft.rustcoremassa.com; img-src 'self' data: https://ipfs.io https://nft.rustcoremassa.com">
+       which a <meta> can't set — main.ts refuses to run inside a frame instead); csp.spec.ts
+       and scripts/build-extension.mjs keep them equal. Everything not listed is refused
+       (default-src 'none'). Remote media: media-hosts.ts. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://ipfs.io https://nft.rustcoremassa.com; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net https://ipfs.io https://nft.rustcoremassa.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 
   <!-- Installable app (PWA) -->
   <link rel="manifest" href="manifest.webmanifest">

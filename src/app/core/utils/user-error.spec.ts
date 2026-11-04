@@ -1,3 +1,4 @@
+import { OperationFailedError } from '../services/massa-provider';
 import { rejectedCallMessage, toUserMessage } from './user-error';
 
 describe('toUserMessage', () => {
@@ -46,6 +47,18 @@ describe('toUserMessage', () => {
     const message = toUserMessage(new Error('VM Error: something odd at ~lib/x.ts:9'));
     expect(message).toMatch(/Something went wrong/);
     expect(message).not.toMatch(/VM Error|~lib/);
+  });
+
+  it("never shows an on-chain failure's own text — a contract writes it", () => {
+    const phishing = new OperationFailedError('O1x', 'Wallet flagged: visit massa-help.example');
+    expect(toUserMessage(phishing)).toBe(
+      'The network executed this transaction and it failed — only the network fee was paid.',
+    );
+    expect(toUserMessage(phishing)).not.toMatch(/massa-help/);
+    // Known causes still read as such.
+    expect(toUserMessage(new OperationFailedError('O1y', 'insufficient balance'))).toMatch(
+      /enough funds/,
+    );
   });
 
   it('treats overly long messages as technical', () => {

@@ -35,6 +35,13 @@ import { SiteTabs } from './site-tabs';
 export const REQUEST_TTL_MS = 10 * 60_000;
 /** Requests waiting for the user, across all sites. */
 export const MAX_PENDING = 10;
+/**
+ * Requests waiting for the user from one site — its subdomains together (siteOf), so a site
+ * can't fill the queue, nor keep popping the approval window, from many subdomains at once.
+ */
+export const MAX_PENDING_PER_SITE = 2;
+/** Requests one page may have in flight at once, status reads included. */
+export const MAX_IN_FLIGHT_PER_PAGE = 16;
 /** Most accounts one `connect` can share. */
 export const MAX_SHARED_ACCOUNTS = 100;
 
@@ -96,6 +103,8 @@ const OPERATION_ID = /^O[1-9A-HJ-NP-Za-km-z]{20,100}$/;
 export class DappRouter {
   /** Requests waiting for the user, oldest first; the approval window shows the first. */
   private readonly queue: Pending[] = [];
+  /** Requests each page sent that aren't answered (or queued) yet. */
+  private readonly inFlight = new Map<RouterPort, number>();
   private readonly now: () => number;
 
   constructor(private readonly deps: RouterDeps) {
@@ -240,12 +249,22 @@ export class DappRouter {
     if (typeof message !== 'object' || message === null) return;
     const { id, method, params } = message as { id?: unknown; method?: unknown; params?: unknown };
     if (typeof id !== 'string' || !REQUEST_ID.test(id) || typeof method !== 'string') return;
+    const busy = this.inFlight.get(port) ?? 0;
+    if (busy >= MAX_IN_FLIGHT_PER_PAGE) {
+      post(port, { id, error: { code: DappErrorCode.Busy, message: 'Too many requests at once' } });
+      return;
+    }
+    this.inFlight.set(port, busy + 1);
     try {
       const request = parseRequest(method, params);
       const result = await this.dispatch(origin, port, id, request, params);
       if (result !== QUEUED) post(port, { id, result });
     } catch (err) {
       post(port, { id, error: toErrorData(err) });
+    } finally {
+      const left = (this.inFlight.get(port) ?? 1) - 1;
+      if (left > 0) this.inFlight.set(port, left);
+      else this.inFlight.delete(port);
     }
   }
 
@@ -308,6 +327,10 @@ export class DappRouter {
     if (waiting) {
       throw new DappError(DappErrorCode.Busy, 'Another request from this site is waiting');
     }
+    const site = siteOf(origin);
+    if (this.queue.filter((p) => siteOf(p.origin) === site).length >= MAX_PENDING_PER_SITE) {
+      throw new DappError(DappErrorCode.Busy, 'Too many requests from this site are waiting');
+    }
     if (this.queue.length >= MAX_PENDING) {
       throw new DappError(DappErrorCode.Busy, 'The wallet is busy. Try again in a moment.');
     }
@@ -355,6 +378,7 @@ export class DappRouter {
 
   /** A page went away: it can't get answers anymore; a request nobody waits for is dropped. */
   private detach(port: RouterPort): void {
+    this.inFlight.delete(port);
     for (const pending of [...this.queue]) {
       const left = pending.waiters.filter((w) => w.port !== port);
       if (left.length === pending.waiters.length) continue;
@@ -378,6 +402,19 @@ export class DappRouter {
       ),
     );
   }
+}
+
+/**
+ * The site an origin belongs to, roughly: its host's last two labels (app.dusa.io → dusa.io).
+ * Without the public-suffix list, sites under a two-label suffix (x.co.uk, y.co.uk) count as one
+ * — they then share MAX_PENDING_PER_SITE, never anything else. IPs and localhost stand alone.
+ */
+export function siteOf(origin: string): string {
+  const { hostname } = new URL(origin);
+  if (!hostname.includes('.') || /^[\d.]+$/.test(hostname) || hostname.startsWith('[')) {
+    return hostname;
+  }
+  return hostname.split('.').slice(-2).join('.');
 }
 
 /** Does the approval window's result match what the request asked for? */

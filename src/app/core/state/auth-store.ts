@@ -1,7 +1,13 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { SavedAddress } from '../models/saved-address.model';
 import { VaultAccount, VaultEnvelope, VaultPayload } from '../models/vault.model';
 import { LOCAL_STORE } from '../platform/app-storage';
-import { Ciphertext, CryptoVault, PBKDF2_ITERATIONS } from '../services/crypto-vault';
+import {
+  Ciphertext,
+  CryptoVault,
+  LEGACY_PBKDF2_ITERATIONS,
+  PBKDF2_ITERATIONS,
+} from '../services/crypto-vault';
 import { SESSION_KEY_STORE } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
 
@@ -20,6 +26,39 @@ const MAX_WAIT_MS = 60 * 60_000;
 export function unlockWaitMs(failures: number): number {
   if (failures < FREE_ATTEMPTS) return 0;
   return Math.min(FIRST_WAIT_MS * 2 ** (failures - FREE_ATTEMPTS), MAX_WAIT_MS);
+}
+
+/**
+ * Thrown by `register` when this device already has a vault — e.g. made meanwhile in another
+ * tab or extension view: creating one more would overwrite it, and the keys it holds.
+ */
+export class VaultExistsError extends Error {
+  constructor() {
+    super('A wallet was already set up on this device, in another window. Unlock it instead.');
+    this.name = 'VaultExistsError';
+  }
+}
+
+/** Longest saved-address label kept. */
+const MAX_ADDRESS_NAME = 60;
+/** Most saved addresses. */
+const MAX_SAVED_ADDRESSES = 200;
+const MASSA_ADDRESS = /^A[US][1-9A-HJ-NP-Za-km-z]{40,60}$/;
+
+/** The saved addresses of a decrypted payload; anything malformed is left out. */
+function toAddressBook(value: unknown): SavedAddress[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (e): e is SavedAddress =>
+        !!e &&
+        typeof e === 'object' &&
+        typeof e.name === 'string' &&
+        typeof e.address === 'string' &&
+        MASSA_ADDRESS.test(e.address),
+    )
+    .slice(0, MAX_SAVED_ADDRESSES)
+    .map(({ name, address }) => ({ name: name.slice(0, MAX_ADDRESS_NAME), address }));
 }
 
 /** Thrown instead of checking a secret while the wallet makes the user wait. */
@@ -74,39 +113,66 @@ export class AuthStore {
 
   private readonly _isUnlocked = signal(false);
   private readonly _accounts = signal<VaultAccount[]>([]);
+  private readonly _addressBook = signal<SavedAddress[]>([]);
   private readonly _hasVault = signal(this.vaultStorage.exists());
 
   private sessionKey: CryptoKey | null = null;
 
   readonly isUnlocked = this._isUnlocked.asReadonly();
   readonly accounts = this._accounts.asReadonly();
+  /**
+   * The addresses the user saved for sending (Send → "Save this address"), with their labels.
+   * Kept inside the encrypted vault: they reveal who the user pays, and must outlive the session.
+   */
+  readonly addressBook = this._addressBook.asReadonly();
   readonly hasVault = this._hasVault.asReadonly();
 
   readonly activeAccount = computed(() => this._accounts()[0] ?? null);
 
-  /** First-time setup: encrypts `accounts` under a fresh secret and unlocks. */
+  /**
+   * First-time setup: encrypts `accounts` under a fresh secret and unlocks. Throws
+   * VaultExistsError when a vault exists already (another tab or view made one meanwhile):
+   * never overwrites one.
+   */
   async register(secret: string, accounts: VaultAccount[]): Promise<void> {
+    this.assertNoVault();
     const { key, salt, iterations } = await this.cryptoVault.deriveNewKey(
       secret,
       this.sessionKeys.keepsKey,
     );
-    const payload: VaultPayload = { accounts };
+    const payload: VaultPayload = { accounts, addressBook: [] };
     const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
 
+    // Checked again: deriving the key took a while, another window may have saved one since.
+    this.assertNoVault();
     this.vaultStorage.save({ salt, iterations, iv, ciphertext });
     this.clearFailures();
     this.sessionKey = key;
     this._accounts.set(accounts);
+    this._addressBook.set([]);
     this._isUnlocked.set(true);
     this._hasVault.set(true);
     await this.keepSession(key);
   }
 
+  private assertNoVault(): void {
+    if (this.vaultStorage.exists()) {
+      this._hasVault.set(true);
+      throw new VaultExistsError();
+    }
+  }
+
   /**
    * Returns false on a wrong secret instead of throwing — callers just check the result. Throws
    * TooManyAttemptsError, without checking the secret, while the user must wait.
+   *
+   * `keepSession: false` opens the vault for this page only: nothing a reopened popup could
+   * resume — for a vault that must move to a password first (the session is kept once it has).
    */
-  async unlock(secret: string): Promise<boolean> {
+  async unlock(
+    secret: string,
+    { keepSession = true }: { keepSession?: boolean } = {},
+  ): Promise<boolean> {
     const envelope = this.vaultStorage.load();
     if (!envelope) return false;
     this.assertMayTry();
@@ -126,17 +192,18 @@ export class AuthStore {
       return false;
     }
     this.clearFailures();
-    if (envelope.iterations !== PBKDF2_ITERATIONS) {
+    if ((envelope.iterations ?? LEGACY_PBKDF2_ITERATIONS) < PBKDF2_ITERATIONS) {
       // A vault from before 1.7.0: re-encrypt it with today's stronger key while we have the
-      // secret. Best effort — the session goes on under the old key if it fails.
+      // secret. Best effort — the session goes on under the old key if it fails. (A vault with
+      // more iterations, from a newer version, is left as it is.)
       try {
-        await this.strengthen(secret, envelope.salt);
+        await this.strengthen(secret, envelope.salt, keepSession);
         return true;
       } catch (err) {
         console.warn('Strengthening the vault failed', err);
       }
     }
-    await this.keepSession(key);
+    if (keepSession) await this.keepSession(key);
     return true;
   }
 
@@ -146,7 +213,7 @@ export class AuthStore {
    * key, that salt, no iteration count), which the next unlock strengthens again — never one that
    * no secret opens.
    */
-  private async strengthen(secret: string, salt: string): Promise<void> {
+  private async strengthen(secret: string, salt: string, keepSession: boolean): Promise<void> {
     await this.currentVault();
     const key = await this.cryptoVault.deriveExistingKey(
       secret,
@@ -154,11 +221,18 @@ export class AuthStore {
       PBKDF2_ITERATIONS,
       this.sessionKeys.keepsKey,
     );
-    const payload: VaultPayload = { accounts: this._accounts() };
-    const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
+    const { iv, ciphertext } = await this.cryptoVault.encrypt(this.currentPayload(), key);
     this.vaultStorage.save({ salt, iterations: PBKDF2_ITERATIONS, iv, ciphertext });
     this.sessionKey = key;
-    await this.keepSession(key);
+    if (keepSession) await this.keepSession(key);
+  }
+
+  /** What the vault holds now, as encrypted: the accounts and the saved addresses. */
+  private currentPayload(
+    accounts: VaultAccount[] = this._accounts(),
+    addressBook: SavedAddress[] = this._addressBook(),
+  ): string {
+    return JSON.stringify({ accounts, addressBook } satisfies VaultPayload);
   }
 
   /**
@@ -167,18 +241,19 @@ export class AuthStore {
    * meanwhile — a new secret, a stronger key: writing over it with this older key would leave a
    * vault no secret opens. Then nothing is written and the user unlocks again.
    */
-  private async currentVault(): Promise<VaultEnvelope> {
+  private async currentVault(): Promise<{ envelope: VaultEnvelope; stored: VaultPayload }> {
     if (!this.sessionKey) throw new Error('Vault is locked');
     const envelope = this.vaultStorage.load();
     if (!envelope) throw new Error('No vault to update');
+    let plaintext: string;
     try {
-      await this.cryptoVault.decrypt(envelope, this.sessionKey);
+      plaintext = await this.cryptoVault.decrypt(envelope, this.sessionKey);
     } catch {
       throw new Error(
         'The wallet was changed in another window. Lock it and unlock it again, then retry.',
       );
     }
-    return envelope;
+    return { envelope, stored: JSON.parse(plaintext) as VaultPayload };
   }
 
   /** How long the user must still wait before the next try; 0 when they may try now. */
@@ -210,6 +285,7 @@ export class AuthStore {
   lock(): void {
     this._isUnlocked.set(false);
     this._accounts.set([]);
+    this._addressBook.set([]);
     this.sessionKey = null;
     this.sessionKeys.clear().catch((err) => console.warn('Clearing the session key failed', err));
   }
@@ -284,6 +360,8 @@ export class AuthStore {
     const payload = JSON.parse(await this.cryptoVault.decrypt(envelope, key)) as VaultPayload;
     this.sessionKey = key;
     this._accounts.set(payload.accounts);
+    // Vaults saved before the address book moved in (or by an older version) have none.
+    this._addressBook.set(toAddressBook(payload.addressBook));
     this._isUnlocked.set(true);
   }
 
@@ -301,25 +379,66 @@ export class AuthStore {
    * key (the wallet cache) just stops decrypting and is rebuilt.
    */
   async changeSecret(secret: string): Promise<void> {
-    await this.currentVault();
+    const { stored } = await this.currentVault();
     const { key, salt, iterations } = await this.cryptoVault.deriveNewKey(
       secret,
       this.sessionKeys.keepsKey,
     );
-    const payload: VaultPayload = { accounts: this._accounts() };
-    const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
+    const addressBook = toAddressBook(stored.addressBook);
+    const { iv, ciphertext } = await this.cryptoVault.encrypt(
+      this.currentPayload(this._accounts(), addressBook),
+      key,
+    );
 
     this.vaultStorage.save({ salt, iterations, iv, ciphertext });
     this.sessionKey = key;
+    this._addressBook.set(addressBook);
     await this.keepSession(key);
   }
 
   /** Persists an updated account list under the already-derived session key. */
   async saveAccounts(accounts: VaultAccount[]): Promise<void> {
-    const envelope = await this.currentVault();
-    const payload: VaultPayload = { accounts };
+    // The address book as stored: another window may have saved an address since this one read it.
+    await this.persist(accounts, (stored) => toAddressBook(stored.addressBook));
+  }
+
+  /**
+   * Adds a generated or imported wallet. Refuses one whose address is already in the vault:
+   * two entries for one key would split its connected sites and history.
+   */
+  async addAccount(account: VaultAccount): Promise<void> {
+    const accounts = this._accounts();
+    if (accounts.some((a) => a.address === account.address)) {
+      throw new Error('This wallet is already in RustCore Wallet');
+    }
+    if (accounts.some((a) => a.id === account.id)) throw new Error('Duplicate wallet id');
+    await this.saveAccounts([...accounts, account]);
+  }
+
+  /** Saves an address for sending, under a label; an address saved before gets the new label. */
+  async saveAddress(name: string, address: string): Promise<void> {
+    if (!MASSA_ADDRESS.test(address)) throw new Error('Enter a valid Massa address');
+    const label = name.trim().slice(0, MAX_ADDRESS_NAME) || address;
+    await this.persist(this._accounts(), (stored) => {
+      // Added to the book as stored, so an address another window saved meanwhile stays.
+      const others = toAddressBook(stored.addressBook).filter((e) => e.address !== address);
+      if (others.length >= MAX_SAVED_ADDRESSES) throw new Error('Your address book is full');
+      return [...others, { name: label, address }];
+    });
+  }
+
+  /**
+   * Re-encrypts the vault with `accounts` and the address book `book` makes from the stored one,
+   * under the session key.
+   */
+  private async persist(
+    accounts: VaultAccount[],
+    book: (stored: VaultPayload) => SavedAddress[],
+  ): Promise<void> {
+    const { envelope, stored } = await this.currentVault();
+    const addressBook = book(stored);
     const { iv, ciphertext } = await this.cryptoVault.encrypt(
-      JSON.stringify(payload),
+      this.currentPayload(accounts, addressBook),
       this.sessionKey!,
     );
 
@@ -331,6 +450,7 @@ export class AuthStore {
       ciphertext,
     });
     this._accounts.set(accounts);
+    this._addressBook.set(addressBook);
   }
 
   /**

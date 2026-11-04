@@ -9,7 +9,13 @@ import {
 } from '../services/crypto-vault';
 import { SESSION_KEY_STORE, SessionKeyStore } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
-import { AuthStore, FREE_ATTEMPTS, TooManyAttemptsError, unlockWaitMs } from './auth-store';
+import {
+  AuthStore,
+  FREE_ATTEMPTS,
+  TooManyAttemptsError,
+  VaultExistsError,
+  unlockWaitMs,
+} from './auth-store';
 
 const main: VaultAccount = {
   id: 'main',
@@ -133,6 +139,93 @@ describe('AuthStore', () => {
     expect(auth.suggestWalletName()).toBe('wallet_3');
   });
 
+  it('never overwrites a vault another tab or view created meanwhile', async () => {
+    // Both windows opened before any vault existed, both went through "create".
+    const other = TestBed.runInInjectionContext(() => new AuthStore());
+    await auth.register('123456', [main]);
+    const stored = TestBed.inject(VaultStorage).load();
+
+    await expect(other.register('654321', [second])).rejects.toBeInstanceOf(VaultExistsError);
+    expect(other.hasVault()).toBe(true); // that window now offers to unlock instead
+    expect(other.isUnlocked()).toBe(false);
+    expect(TestBed.inject(VaultStorage).load()).toEqual(stored);
+    auth.lock();
+    expect(await auth.unlock('123456')).toBe(true);
+    expect(auth.accounts()).toEqual([main]);
+  });
+
+  it('refuses to add a wallet whose key is already in the vault', async () => {
+    await auth.register('123456', [main]);
+    await expect(auth.addAccount({ ...main, id: 'copy', name: 'again' })).rejects.toThrow(
+      /already in RustCore Wallet/,
+    );
+    await auth.addAccount(second);
+    expect(auth.accounts()).toEqual([main, second]);
+  });
+
+  describe('saved addresses', () => {
+    const FRIEND = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
+    const SHOP = 'AU126s93ZxbT4QUJcZYqsAxyMc3wv8nkHJYKYCtgQyEnZ8VGRM99P';
+
+    it('keeps them in the encrypted vault, past the session', async () => {
+      await auth.register('123456', [main]);
+      await auth.saveAddress('Friend', FRIEND);
+      expect(JSON.stringify(localStorage)).not.toContain(FRIEND);
+
+      auth.lock();
+      expect(auth.addressBook()).toEqual([]);
+      const reloaded = TestBed.runInInjectionContext(() => new AuthStore());
+      expect(await reloaded.unlock('123456')).toBe(true);
+      expect(reloaded.addressBook()).toEqual([{ name: 'Friend', address: FRIEND }]);
+    });
+
+    it('keeps them through account changes, a new secret and a stronger key', async () => {
+      await auth.register('123456', [main]);
+      await auth.saveAddress('Friend', FRIEND);
+      await auth.saveAccounts([main, second]);
+      await auth.changeSecret('correct horse battery');
+      auth.lock();
+      expect(await auth.unlock('correct horse battery')).toBe(true);
+      expect(auth.addressBook()).toEqual([{ name: 'Friend', address: FRIEND }]);
+    });
+
+    it('keeps an address another window saved meanwhile', async () => {
+      await auth.register('123456', [main]);
+      const otherWindow = TestBed.runInInjectionContext(() => new AuthStore());
+      expect(await otherWindow.unlock('123456')).toBe(true);
+      await otherWindow.saveAddress('Shop', SHOP);
+
+      await auth.saveAddress('Friend', FRIEND); // this window never saw Shop…
+      await auth.saveAccounts([main, second]); // …nor does it here
+      auth.lock();
+      expect(await auth.unlock('123456')).toBe(true);
+      expect(auth.addressBook().map((e) => e.name)).toEqual(['Shop', 'Friend']);
+    });
+
+    it('relabels an address saved twice, and refuses what is not an address', async () => {
+      await auth.register('123456', [main]);
+      await auth.saveAddress('Shop', SHOP);
+      await auth.saveAddress('  Coffee shop ', SHOP);
+      expect(auth.addressBook()).toEqual([{ name: 'Coffee shop', address: SHOP }]);
+      await expect(auth.saveAddress('x', 'not-an-address')).rejects.toThrow(/valid Massa/);
+    });
+
+    it('opens vaults from before the address book, with an empty one', async () => {
+      await auth.register('123456', [main]);
+      const storage = TestBed.inject(VaultStorage);
+      const crypto = TestBed.inject(CryptoVault);
+      const envelope = storage.load()!;
+      const key = await crypto.deriveExistingKey('123456', envelope.salt, envelope.iterations);
+      storage.save({
+        ...envelope,
+        ...(await crypto.encrypt(JSON.stringify({ accounts: [main] }), key)),
+      });
+      auth.lock();
+      expect(await auth.unlock('123456')).toBe(true);
+      expect(auth.addressBook()).toEqual([]);
+    });
+  });
+
   it('keeps no session on the web: a reloaded page needs the PIN', async () => {
     await auth.register('123456', [main]);
     const reloaded = TestBed.runInInjectionContext(() => new AuthStore());
@@ -145,6 +238,10 @@ describe('AuthStore', () => {
 class KeepingSessionKeyStore implements SessionKeyStore {
   readonly keepsKey = true;
   raw: string | null = null;
+  touch(): void {}
+  watch(): () => void {
+    return () => {};
+  }
   async save(key: CryptoKey): Promise<void> {
     this.raw = await exportVaultKey(key); // throws unless the key was derived extractable
   }
@@ -191,6 +288,19 @@ describe('AuthStore with a session kept outside the page', () => {
     await auth.register('123456', [main]);
     auth.lock();
     await auth.unlock('123456');
+    expect(await reopen().resume()).toBe(true);
+  });
+
+  it('keeps no session for a vault that must move to a password first', async () => {
+    const auth = TestBed.inject(AuthStore);
+    await auth.register('123456', [main]);
+    auth.lock();
+    await Promise.resolve();
+    expect(await auth.unlock('123456', { keepSession: false })).toBe(true);
+    expect(auth.isUnlocked()).toBe(true); // this page goes on, to the password step
+    expect(await reopen().resume()).toBe(false); // a reopened popup can't skip that step
+
+    await auth.changeSecret('correct horse battery');
     expect(await reopen().resume()).toBe(true);
   });
 
@@ -370,6 +480,23 @@ describe('AuthStore — vault key strength', () => {
     first.lock();
     expect(await first.unlock('correct horse battery')).toBe(true);
     expect(first.accounts()).toEqual([main]);
+  });
+
+  it('never weakens a vault made with more iterations (a newer version)', async () => {
+    const auth = TestBed.inject(AuthStore);
+    const storage = TestBed.inject(VaultStorage);
+    const crypto = TestBed.inject(CryptoVault);
+    await auth.register('123456', [main]);
+    const salt = storage.load()!.salt;
+    const key = await crypto.deriveExistingKey('123456', salt, 700_000);
+    storage.save({
+      salt,
+      iterations: 700_000,
+      ...(await crypto.encrypt(JSON.stringify({ accounts: [main] }), key)),
+    });
+    auth.lock();
+    expect(await auth.unlock('123456')).toBe(true);
+    expect(storage.load()?.iterations).toBe(700_000);
   });
 
   it('refuses a vault whose iteration count was tampered with', async () => {

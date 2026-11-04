@@ -3,6 +3,7 @@
     <div class="modal-title">
       @switch (step()) {
       @case ('edit') { Wallet }
+      @case ('key-confirm') { Private key }
       @default { Remove wallet }
       }
     </div>
@@ -59,6 +60,18 @@
   <button class="btn btn-ghost" type="button" (click)="copyPrivateKey()">Copy private key</button>
   <button class="btn btn-red" type="button" (click)="step.set('remove-confirm')">Continue</button>
   <button class="btn btn-ghost" type="button" (click)="cancelRemove()">Cancel</button>
+  }
+
+  @if (step() === 'key-confirm') {
+  <div class="hint" style="margin-bottom:16px;">Enter your {{ secretName }} to copy the private key of {{ account.name }}. Never share it: anyone who has it can take this wallet's funds.</div>
+
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
+  }
+
+  <app-secret-entry compact submitLabel="Copy private key" [busy]="isCheckingKey()" (submitted)="confirmKeySecret($event)" />
+
+  <button class="btn btn-ghost" type="button" [disabled]="isCheckingKey()" (click)="cancelKey()">Cancel</button>
   }
 
   @if (step() === 'remove-confirm') {

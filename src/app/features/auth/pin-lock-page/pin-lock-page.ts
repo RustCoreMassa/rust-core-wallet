@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { UNLOCK_SECRET, UnlockSecret, secretNoun } from '../../../core/platform/unlock-secret';
 import { MASSA_PROVIDER } from '../../../core/services/massa-provider';
-import { AuthStore } from '../../../core/state/auth-store';
+import { AuthStore, VaultExistsError } from '../../../core/state/auth-store';
 import { WalletDataEraser } from '../../../core/state/wallet-data-eraser';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
@@ -136,9 +136,12 @@ export class PinLockPage {
 
     if (this.step() === 'unlock') {
       this.isBusy.set(true);
+      // A vault that must move to a password first opens for this page only: closing the popup
+      // before choosing the password must not leave a session that skips the step.
+      const upgrade = needsPasswordUpgrade(this.kind, secret);
       let ok: boolean;
       try {
-        ok = await this.authStore.unlock(secret);
+        ok = await this.authStore.unlock(secret, { keepSession: !upgrade });
       } catch (err) {
         // TooManyAttemptsError: its message says how long to wait.
         this.isBusy.set(false);
@@ -154,7 +157,7 @@ export class PinLockPage {
       }
       // Paint last-known balances/history instantly; the shell refreshes them.
       await this.walletStore.restoreCache();
-      if (needsPasswordUpgrade(this.kind, secret)) {
+      if (upgrade) {
         this.step.set('upgrade');
         return;
       }
@@ -306,7 +309,17 @@ export class PinLockPage {
   }
 
   private async completeRegistration(account: VaultAccount): Promise<void> {
-    await this.authStore.register(this.firstSecret, [account]);
+    try {
+      await this.authStore.register(this.firstSecret, [account]);
+    } catch (err) {
+      if (!(err instanceof VaultExistsError)) throw err;
+      // Another tab or view set up a wallet meanwhile: never overwrite it — unlock that one.
+      this.firstSecret = '';
+      this.importKeyValue.set('');
+      this.step.set('unlock');
+      this.error.set(err.message);
+      return;
+    }
     this.firstSecret = '';
     this.router.navigateByUrl(this.destination);
   }

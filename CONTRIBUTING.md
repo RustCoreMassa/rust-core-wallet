@@ -73,7 +73,9 @@ is replaced by `src/extension/platform-providers.ts` — `chrome.storage` instea
 storage, a password instead of the 6-digit PIN (`UNLOCK_SECRET`; a vault made with a PIN moves
 to a password at the next unlock), hash routing, no mobile gate, service worker or install
 banner, and an unlocked session that survives closing the popup (the vault key is kept in
-memory-only `chrome.storage.session` and wiped 15 minutes after the popup was last open). The same page runs in three views
+memory-only `chrome.storage.session` and wiped 15 minutes after the user last did something in
+any view, or when the computer locks — every open view then locks: `ChromeSessionKeyStore`,
+`core/state/auto-lock.ts`). The same page runs in three views
 (Settings → *Open in full screen* / *Open in side panel*; `html[data-view]`, styled in
 `src/extension/views.scss`): the toolbar popup, fixed at 380×600 (the browsers' height limit);
 the side panel (`?view=side-panel` — Chrome's side panel or Firefox's sidebar), full window

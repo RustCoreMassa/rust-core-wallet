@@ -26,6 +26,23 @@ describe('toCustomToken', () => {
     }
   });
 
+  it('refuses a built-in symbol without its bridge suffix, or with another one', () => {
+    for (const symbol of ['USDC', 'USDC.b', 'usdt', 'WETH-e', 'DAI.b', 'U.S.D.C']) {
+      expect(() => toCustomToken(TOKEN, { ...WMAS, symbol })).toThrow(/already lists/);
+    }
+    // Only a separated suffix is one: PURE is not PUR.
+    expect(toCustomToken(TOKEN, { ...WMAS, symbol: 'PURE' }).symbol).toBe('PURE');
+  });
+
+  it('refuses symbols with letters that imitate Latin ones', () => {
+    for (const symbol of ['USDС', 'МAS2', 'WΜAS', 'ＷＭＡＳ2', 'W M A S']) {
+      expect(() => toCustomToken(TOKEN, { ...WMAS, symbol })).toThrow(/imitate|already lists/);
+    }
+    for (const symbol of ['WMAS', 'wETH2', 'xUSD+', '$PEPE', 'LP-MAS_USDC']) {
+      expect(toCustomToken(TOKEN, { ...WMAS, symbol }).symbol).toBe(symbol);
+    }
+  });
+
   it('strips invisible and control characters from what it shows', () => {
     expect(cleanContractText('W​M‮A\u0000S', 16)).toBe('WMAS');
     expect(cleanContractText('  Wrapped \n  Massa ', 40)).toBe('Wrapped Massa');
@@ -127,6 +144,16 @@ describe('TokenCatalog', () => {
       JSON.stringify({ mainnet: [{ contract: 'AU1nope', symbol: 'X', name: 'X', decimals: 2 }] }),
     );
     expect(create().custom()).toEqual([]);
+  });
+
+  it('drops a saved token whose symbol the stricter rules refuse', () => {
+    const saved = (symbol: string) => ({ contract: TOKEN, symbol, name: 'X', decimals: 9 });
+    localStorage.setItem(
+      'massa-wallet:custom-tokens',
+      JSON.stringify({ mainnet: [saved('USDС'), saved('WMAS')], buildnet: [saved('USDC')] }),
+    );
+    const catalog = create();
+    expect(catalog.custom().map((t) => t.symbol)).toEqual(['WMAS']);
   });
 
   it('sets, saves and clears a custom token’s icon', async () => {

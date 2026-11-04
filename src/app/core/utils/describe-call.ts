@@ -68,6 +68,11 @@ export function describeCall(
     const decoded = describeOperatorApproval(call, network);
     if (decoded) return decoded;
   }
+  if (call.func === 'increaseAllowance') {
+    // Any other token (a custom one, any token on buildnet): the classic way to drain one.
+    const decoded = describeUnknownTokenAllowance(call);
+    if (decoded) return decoded;
+  }
   return {
     contract: known ? contractName(call.target) : null,
     summary: null,
@@ -150,6 +155,37 @@ function describeTokenCall(
     default:
       return null;
   }
+}
+
+/**
+ * `increaseAllowance(spender, amount)` on a token the wallet doesn't list: its decimals are
+ * unknown, so the amount shows in the token's smallest units — but an unlimited one, and an
+ * unknown spender, are said out loud as for the listed tokens.
+ */
+function describeUnknownTokenAllowance(call: ContractCall): CallDescription | null {
+  const args = read(call.parameter, (a) => ({ spender: address(a), amount: a.nextU256() }));
+  if (!args) return null;
+  const spender = contractName(args.spender) ?? args.spender;
+  const unlimited = args.amount >= UNLIMITED_ALLOWANCE;
+  const warnings = [
+    unlimited
+      ? `${spender} will be able to spend all your tokens of this contract, now and later, until you lower the allowance.`
+      : `${spender} will be able to spend this amount of your tokens of this contract.`,
+  ];
+  if (!contractName(args.spender)) {
+    warnings.push('RustCore Wallet doesn’t know this spender. Check it before approving.');
+  }
+  return {
+    contract: 'Token (not listed by RustCore)',
+    summary: unlimited
+      ? `Allow ${spender} to spend an unlimited amount of this token`
+      : `Allow ${spender} to spend ${args.amount} units of this token`,
+    rows: [
+      { label: 'Spender', value: args.spender, mono: true },
+      { label: 'Amount', value: unlimited ? 'Unlimited' : `${args.amount} (smallest units)` },
+    ],
+    warnings,
+  };
 }
 
 // ------------------------------------------------------------------ NFT collections

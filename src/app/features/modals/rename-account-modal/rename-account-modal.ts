@@ -14,9 +14,10 @@ import { copySecret } from '../../../core/utils/secret-clipboard';
 
 /**
  * `edit` → rename; `remove-warn` → explain what removal means; `remove-confirm` → confirm with
- * the PIN/password.
+ * the PIN/password; `key-confirm` → the PIN/password before the private key can be copied (from
+ * `edit` or `remove-warn`, where it goes back to).
  */
-type Step = 'edit' | 'remove-warn' | 'remove-confirm';
+type Step = 'edit' | 'remove-warn' | 'remove-confirm' | 'key-confirm';
 
 @Component({
   selector: 'app-rename-account-modal',
@@ -40,6 +41,14 @@ export class RenameAccountModal {
   protected readonly secretName = secretNoun(inject(UNLOCK_SECRET));
   protected readonly step = signal<Step>('edit');
   protected readonly isRemoving = signal(false);
+  protected readonly isCheckingKey = signal(false);
+  /**
+   * The secret was confirmed in this modal: the key may be copied. Like the Backup screen, the
+   * private key never leaves the wallet without the PIN/password — whoever holds an unlocked
+   * phone must not get it in two taps.
+   */
+  private readonly keyUnlocked = signal(false);
+  private keyReturnStep: Step = 'edit';
 
   /** The vault must keep at least one wallet — the last one goes via Log out. */
   protected readonly canRemove = computed(() => this.authStore.accounts().length > 1);
@@ -83,12 +92,52 @@ export class RenameAccountModal {
     }
   }
 
+  /** Copies the key once the PIN/password was confirmed here; asks for it first otherwise. */
   protected copyPrivateKey(): void {
+    if (!this.account()) return;
+    if (!this.keyUnlocked()) {
+      this.error.set(null);
+      this.keyReturnStep = this.step();
+      this.step.set('key-confirm');
+      return;
+    }
+    this.copyKeyNow();
+  }
+
+  protected async confirmKeySecret(secret: string): Promise<void> {
+    this.error.set(null);
+    this.isCheckingKey.set(true);
+    try {
+      if (!(await this.authStore.verifySecret(secret))) {
+        this.error.set(`Incorrect ${this.secretName}`);
+        this.entry()?.clear();
+        return;
+      }
+      this.keyUnlocked.set(true);
+      this.step.set(this.keyReturnStep);
+      // Still within the tap on most browsers; where the clipboard needs a fresh one, the
+      // toast asks for it — the next tap copies without the secret.
+      this.copyKeyNow('Confirmed — tap Copy private key again');
+    } catch (err) {
+      // TooManyAttemptsError: its message says how long to wait.
+      this.error.set(toUserMessage(err));
+      this.entry()?.clear();
+    } finally {
+      this.isCheckingKey.set(false);
+    }
+  }
+
+  protected cancelKey(): void {
+    this.error.set(null);
+    this.step.set(this.keyReturnStep);
+  }
+
+  private copyKeyNow(onFailure = 'Could not copy — copy manually'): void {
     const account = this.account();
-    if (!account) return;
+    if (!account || !this.keyUnlocked()) return;
     copySecret(account.privateKey)
       .then(() => this.toast.show('Private key copied — the clipboard is emptied in 60 s'))
-      .catch(() => this.toast.show('Could not copy — copy manually'));
+      .catch(() => this.toast.show(onFailure));
   }
 
   protected async save(): Promise<void> {

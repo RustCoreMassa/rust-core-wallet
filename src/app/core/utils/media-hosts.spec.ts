@@ -34,6 +34,20 @@ describe('mediaUrl', () => {
     }
   });
 
+  it('loads only content addressed by its hash from the IPFS gateway, never a name', () => {
+    for (const link of [
+      'https://ipfs.io/ipns/tracker.example/1.png',
+      'https://ipfs.io/ipns/k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8',
+      'ipfs://ipns/tracker.example',
+      'https://ipfs.io/',
+      'https://ipfs.io/ipfs/short',
+      'https://ipfs.io/api/v0/cat?arg=' + CID,
+    ]) {
+      expect(mediaUrl(link), link).toBe('');
+    }
+    expect(mediaUrl(`https://ipfs.io/ipfs/${CID}`)).toBe(`https://ipfs.io/ipfs/${CID}`);
+  });
+
   it('refuses anything that is not https', () => {
     for (const link of [
       '',

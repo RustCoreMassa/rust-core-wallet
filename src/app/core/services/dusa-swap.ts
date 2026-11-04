@@ -9,7 +9,7 @@ import {
 } from '@massalabs/massa-web3';
 import { TOKEN_REGISTRY, TokenSymbol } from '../models/token.model';
 import { DUSA, DusaQuote, decodeQuote, quoteArgs } from './dusa-contracts';
-import { OperationResult } from './massa-provider';
+import { NETWORK_FEE_UNITS, OperationResult } from './massa-provider';
 import { waitExecuted } from './operation-execution';
 
 /** MAS the router requires with every swap for storage (`SWAP_STORAGE_COST` in the SDK). */
@@ -108,7 +108,8 @@ export class DusaSwap {
   /**
    * Executes `q` for the key's account: approves the router for the input
    * token when needed (not for MAS), then swaps. Resolves only once the
-   * chain has executed the swap (see waitExecuted).
+   * chain has executed the swap (see waitExecuted). Both operations pay the
+   * wallet's own fee, never the node's default.
    */
   async execute(privateKey: string, q: SwapQuote): Promise<OperationResult> {
     const account = await Account.fromPrivateKey(privateKey);
@@ -119,7 +120,13 @@ export class DusaSwap {
 
     const { func, args, coins } = this.swapCall(q, owner);
     return waitExecuted(
-      await provider.callSC({ target: DUSA.v2Router, func, parameter: args, coins }),
+      await provider.callSC({
+        target: DUSA.v2Router,
+        func,
+        parameter: args,
+        coins,
+        fee: NETWORK_FEE_UNITS,
+      }),
     );
   }
 
@@ -148,7 +155,11 @@ export class DusaSwap {
     const token = new MRC20(provider, TOKEN_REGISTRY[q.from].contract);
     const current = await token.allowance(owner, DUSA.v2Router);
     if (current >= q.amountIn) return;
-    await waitExecuted(await token.increaseAllowance(DUSA.v2Router, q.amountIn - current));
+    await waitExecuted(
+      await token.increaseAllowance(DUSA.v2Router, q.amountIn - current, {
+        fee: NETWORK_FEE_UNITS,
+      }),
+    );
   }
 
   /** SDK `TradeV2.swapCallParameters` for EXACT_INPUT. */

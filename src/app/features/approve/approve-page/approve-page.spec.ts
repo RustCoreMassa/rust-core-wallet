@@ -9,7 +9,7 @@ import { DAPP_APPROVALS, DappApprovals } from '../../../core/platform/dapp-appro
 import { OperationFailedError } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
-import { ApprovePage, describeBytes } from './approve-page';
+import { APPROVE_ARMING, ApproveArming, ApprovePage, describeBytes } from './approve-page';
 import { REFUSED_SIGN_MESSAGE, RefusedSignError } from '../../../core/utils/sign-guard';
 
 const MAIN = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
@@ -54,7 +54,14 @@ function fakeStore() {
   };
 }
 
-async function setup(queue: ApprovalView[], configure: (store: FakeStore) => void = () => {}) {
+/** No wait by default: the arming itself has its own tests below. */
+const noWait: ApproveArming = { delayMs: 0, inFront: () => true };
+
+async function setup(
+  queue: ApprovalView[],
+  configure: (store: FakeStore) => void = () => {},
+  arming: ApproveArming = noWait,
+) {
   const approvals = {
     next: vi.fn(async () => queue.shift() ?? null),
     resolve: vi.fn(async () => true),
@@ -69,6 +76,7 @@ async function setup(queue: ApprovalView[], configure: (store: FakeStore) => voi
     imports: [ApprovePage],
     providers: [
       { provide: DAPP_APPROVALS, useValue: approvals },
+      { provide: APPROVE_ARMING, useValue: arming },
       { provide: WalletStore, useValue: store },
       {
         provide: AuthStore,
@@ -401,6 +409,86 @@ describe('ApprovePage', () => {
     expect(approvals.reject).toHaveBeenCalledWith('ap1');
     expect(approvals.next).toHaveBeenCalledTimes(2);
     expect(approvals.close).not.toHaveBeenCalled();
+  });
+});
+
+describe('ApprovePage — against click-jacking', () => {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const transfer = () =>
+    view({ method: 'transfer', params: { to: OUTSIDER, amount: '1' }, address: SAVINGS });
+
+  function approveButton(fixture: { nativeElement: HTMLElement; detectChanges(): void }) {
+    fixture.detectChanges();
+    return [...fixture.nativeElement.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === 'Approve',
+    ) as HTMLButtonElement;
+  }
+
+  it('keeps Approve off until the window has been in front for the delay', async () => {
+    const { fixture, page, store } = await setup([transfer()], undefined, {
+      delayMs: 80,
+      inFront: () => true,
+    });
+    expect(approveButton(fixture).disabled).toBe(true);
+    await page.approve();
+    expect(store.dappTransfer).not.toHaveBeenCalled();
+
+    await wait(100);
+    expect(approveButton(fixture).disabled).toBe(false);
+    await page.approve();
+    expect(store.dappTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the wait again on every press before it ends — a burst of clicks never approves', async () => {
+    const { page, store } = await setup([transfer()], undefined, {
+      delayMs: 80,
+      inFront: () => true,
+    });
+    for (let i = 0; i < 4; i++) {
+      await wait(40);
+      document.dispatchEvent(new Event('pointerdown'));
+      await page.approve();
+    }
+    expect(store.dappTransfer).not.toHaveBeenCalled();
+  });
+
+  it('ignores a press that began before Approve turned on', async () => {
+    const { page, store } = await setup([transfer()], undefined, {
+      delayMs: 30,
+      inFront: () => true,
+    });
+    document.dispatchEvent(new Event('pointerdown')); // pressed while off…
+    await wait(60);
+    await page.approve(); // …and released after it turned on
+    expect(store.dappTransfer).not.toHaveBeenCalled();
+
+    document.dispatchEvent(new Event('pointerdown')); // a new, deliberate press
+    await page.approve();
+    expect(store.dappTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it('never turns on while the window is behind another one, nor after it lost the focus', async () => {
+    let front = false;
+    const { page, store } = await setup([transfer()], undefined, {
+      delayMs: 20,
+      inFront: () => front,
+    });
+    await wait(50);
+    await page.approve();
+    expect(store.dappTransfer).not.toHaveBeenCalled();
+
+    front = true;
+    window.dispatchEvent(new Event('focus'));
+    await wait(10);
+    window.dispatchEvent(new Event('blur'));
+    await wait(50);
+    await page.approve();
+    expect(store.dappTransfer).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new Event('focus'));
+    await wait(50);
+    await page.approve();
+    expect(store.dappTransfer).toHaveBeenCalledTimes(1);
   });
 });
 

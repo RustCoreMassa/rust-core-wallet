@@ -22,7 +22,10 @@ git push origin master v1.7.0
 ```
 
 Pushing the tag starts the [release workflow](../.github/workflows/release.yml) on GitHub
-Actions. It builds from exactly the tagged commit, in public, and:
+Actions. It builds from exactly the tagged commit, in public, in two jobs: `build` installs the
+dependencies (without their install scripts), tests and builds with a read-only token and no
+credentials in the checkout; `publish`, the only one allowed to write, just uploads what `build`
+produced — no dependency code ever runs next to a token that could push or publish. It:
 
 - refuses a tag that doesn't match `package.json`, has no changelog section, was already
   released, or isn't higher than the latest release — a version can only move forward;
@@ -98,6 +101,36 @@ Nothing in the app needs changing for DeWeb:
 - The app talks to the Massa RPC and explorer directly, so it doesn't depend on which gateway it
   was loaded from.
 
+## Watching the deployed site
+
+Every web user's wallet runs the code the site serves, and installed copies update to it by
+themselves. So after every upload — and from time to time — check that the site still serves
+exactly a release:
+
+```bash
+node scripts/verify-deployment.mjs SHA256SUMS                     # https://wrustcore.massa.network
+node scripts/verify-deployment.mjs SHA256SUMS https://<other gateway>
+```
+
+It downloads every file the release's `SHA256SUMS` lists and compares checksums; any `DIFFERS`
+or `FAILED` line (a missing file comes back as `index.html`, so it differs too) means the site
+isn't that release — find out why before anything else.
+
+## Keys and accounts
+
+Whoever controls these controls what every user runs:
+
+- **The key that owns the DeWeb site and the `wrustcore` name.** Keep it for that only, offline
+  when not deploying, never in a browser wallet you use for anything else. With it, someone could
+  upload a wallet that captures PINs.
+- **The GitHub account** (it can push tags, which publish releases), **the Chrome Web Store,
+  Edge and AMO accounts** (extensions update by themselves): two-factor authentication on all of
+  them, with a hardware key or an app — not SMS.
+- **The repository settings:** protect the `v*` tags (Settings → Rules → Rulesets → Tag rules:
+  only maintainers may create them, nobody may move or delete them) and the `master` branch. For
+  a second pair of eyes, add an environment with required reviewers to the workflow's `publish`
+  job.
+
 ## Publishing the browser extension
 
 Upload the zips from the GitHub Release, never a local build, so what's in each store is exactly
@@ -113,7 +146,9 @@ expect. Check it against its `SHA256SUMS-*` first.
 What the stores ask for:
 
 - **Permissions**, to justify in the listing: `storage` (the encrypted vault and preferences),
-  `alarms` (auto-lock after 15 minutes), `sidePanel` (Chromium only — the side-panel view).
+  `alarms` (auto-lock after 15 minutes without use), `idle` (only to lock the wallet when the
+  computer locks — no other idle data is read), `sidePanel` (Chromium only — the side-panel
+  view).
   Site access (content scripts on `https://*/*`, plus `http://localhost` / `127.0.0.1` for dApp
   developers): two small scripts let dApps find the wallet (`window.rustcore`), pass their
   requests to it and hear when the connected accounts or the network change. When the wallet's

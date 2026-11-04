@@ -129,7 +129,8 @@ export class WalletsModal {
   }
 
   private async addAccount(account: VaultAccount): Promise<void> {
-    await this.authStore.saveAccounts([...this.authStore.accounts(), account]);
+    // Refuses a key already in the vault.
+    await this.authStore.addAccount(account);
     this.store.ensureWallet(account.id, account.name, account.address);
     this.store.switchWallet(account.id);
     this.toast.show(`${account.name} added`);

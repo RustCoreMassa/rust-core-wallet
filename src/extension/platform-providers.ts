@@ -84,7 +84,12 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   { provide: SESSION_STORE, useValue: sessionArea },
   {
     provide: SESSION_KEY_STORE,
-    useValue: new ChromeSessionKeyStore(chrome.storage.session, chrome.alarms),
+    useValue: new ChromeSessionKeyStore(
+      chrome.storage.session,
+      chrome.alarms,
+      Date.now,
+      chrome.storage.onChanged,
+    ),
   },
   // Desktop browsers too: no mobile-only gate, no service worker, no install banner.
   { provide: MOBILE_ONLY, useValue: false },

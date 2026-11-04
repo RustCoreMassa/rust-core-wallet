@@ -16,6 +16,13 @@ export const MEDIA_HOSTS: readonly string[] = ['ipfs.io', 'nft.rustcoremassa.com
 /** Where `ipfs://<cid>/<path>` is loaded from — browsers can't open ipfs:// themselves. */
 export const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 
+/**
+ * Content addressed by its hash only: `/ipfs/<CID>/…`. The gateway's other paths (`/ipns/<name>`)
+ * follow a name to whatever its owner points it to — even through their own DNS server, which then
+ * learns when the user looked.
+ */
+const IPFS_PATH = /^\/ipfs\/[A-Za-z0-9]{46,100}(\/|$)/;
+
 const MAX_LINK_LENGTH = 2048;
 
 /**
@@ -38,5 +45,6 @@ export function mediaUrl(link: string): string {
   }
   if (url.protocol !== 'https:' || url.username || url.password) return '';
   if (!MEDIA_HOSTS.includes(url.hostname)) return '';
+  if (url.hostname === new URL(IPFS_GATEWAY).hostname && !IPFS_PATH.test(url.pathname)) return '';
   return url.href;
 }

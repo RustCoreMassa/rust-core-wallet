@@ -38,6 +38,7 @@ function fakeProvider() {
     })),
     transferMas: vi.fn(async () => ({ operationId: 'Osent' })),
     transferToken: vi.fn(async () => ({ operationId: 'Otoken' })),
+    getTokenStorageCost: vi.fn(async (): Promise<bigint> => 0n),
     buyRolls: vi.fn(async () => ({ operationId: 'Oroll' })),
     sellRolls: vi.fn(async () => ({ operationId: 'Osell' })),
     getTotalRolls: vi.fn(async () => 1000),
@@ -69,7 +70,15 @@ describe('WalletStore', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: MASSA_PROVIDER, useValue: provider },
-        { provide: AuthStore, useValue: { accounts: signal(accounts), isUnlocked: signal(true) } },
+        {
+          provide: AuthStore,
+          useValue: {
+            accounts: signal(accounts),
+            isUnlocked: signal(true),
+            addressBook: signal([]),
+            saveAddress: vi.fn(async () => undefined),
+          },
+        },
         {
           provide: ExplorerApi,
           useValue: { getHistory: vi.fn().mockRejectedValue(new Error('offline')) },
@@ -163,14 +172,62 @@ describe('WalletStore', () => {
   });
 
   describe('send', () => {
+    /** The Send flow: checked (and priced) for the Review step, then sent as reviewed. */
+    const send = async (token: string, to: string, amount: number) =>
+      store.send(await store.prepareSend(token, to, amount));
+
     it('never sends more than held: Max of an 18-decimal token is clamped to the exact balance', async () => {
-      await store.send('DAI.e', OUTSIDER, store.maxSendable('DAI.e'));
+      await send('DAI.e', OUTSIDER, store.maxSendable('DAI.e'));
       expect(provider.transferToken).toHaveBeenCalledWith(
         'S1a',
         DAI,
         OUTSIDER,
         999_797_356_704_803_912n,
+        FEE,
+        0n,
       );
+    });
+
+    it('pays exactly the fee the Review step shows, never the node default', async () => {
+      await send('MAS', OUTSIDER, 10);
+      expect(provider.transferMas).toHaveBeenCalledWith('S1a', OUTSIDER, 10_000_000_000n, FEE);
+    });
+
+    it("prices a token's storage for a new recipient, and sends exactly that", async () => {
+      provider.getTokenStorageCost.mockResolvedValueOnce(9_600_000n);
+      const plan = await store.prepareSend('DAI.e', OUTSIDER, 0.5);
+      expect(provider.getTokenStorageCost).toHaveBeenCalledWith(DAI, OUTSIDER);
+      expect(plan.storageUnits).toBe(9_600_000n);
+      await store.send(plan);
+      expect(provider.transferToken).toHaveBeenCalledWith(
+        'S1a',
+        DAI,
+        OUTSIDER,
+        500_000_000_000_000_000n,
+        FEE,
+        9_600_000n,
+      );
+    });
+
+    it('needs MAS for the storage too, and reads none for MAS transfers', async () => {
+      chain.mas['S1a'] = 15_000_000n; // 0.015 MAS: the fee, not the fee + 0.0096 storage
+      await store.refresh('a');
+      provider.getTokenStorageCost.mockResolvedValueOnce(9_600_000n);
+      await expect(store.prepareSend('DAI.e', OUTSIDER, 0.5)).rejects.toThrow(/token storage/);
+      expect(provider.transferToken).not.toHaveBeenCalled();
+
+      chain.mas['S1a'] = 100_000_000_000n;
+      await store.refresh('a');
+      provider.getTokenStorageCost.mockClear();
+      expect((await store.prepareSend('MAS', OUTSIDER, 1)).storageUnits).toBe(0n);
+      expect(provider.getTokenStorageCost).not.toHaveBeenCalled();
+    });
+
+    it('refuses a reviewed transfer after a network switch', async () => {
+      const plan = await store.prepareSend('MAS', OUTSIDER, 1);
+      store.setNetwork('buildnet');
+      await expect(store.send(plan)).rejects.toThrow(/network changed/);
+      expect(provider.transferMas).not.toHaveBeenCalled();
     });
 
     it('changes nothing locally when the transaction fails', async () => {
@@ -179,7 +236,7 @@ describe('WalletStore', () => {
       );
       const before = store.wallets()['a'];
 
-      await expect(store.send('MAS', OUTSIDER, 10)).rejects.toThrow(/Transaction failed/);
+      await expect(send('MAS', OUTSIDER, 10)).rejects.toThrow(/Transaction failed/);
       expect(store.wallets()['a'].balances).toEqual(before.balances);
       expect(store.wallets()['a'].history).toEqual(before.history);
     });
@@ -189,7 +246,7 @@ describe('WalletStore', () => {
         chain.mas['S1a'] = 89_990_000_000n; // what the chain reports after the send + fee
         return { operationId: 'Osent' };
       });
-      await store.send('MAS', OUTSIDER, 10);
+      await send('MAS', OUTSIDER, 10);
 
       const wallet = store.wallets()['a'];
       expect(wallet.balances.MAS).toBe(89.99);
@@ -204,7 +261,7 @@ describe('WalletStore', () => {
     });
 
     it('records the receive on an own wallet too, with that wallet re-read from chain', async () => {
-      const result = await store.send('MAS', B, 1);
+      const result = await send('MAS', B, 1);
       expect(result.internal).toBe(true);
       expect(store.wallets()['b'].history[0]).toMatchObject({ type: 'receive', amount: 1 });
       expect(provider.getBalance).toHaveBeenCalledWith('S1b', false);
@@ -225,6 +282,13 @@ describe('WalletStore', () => {
 
     it('cannot sell more rolls than are active', () => {
       expect(() => store.validateSellRolls(1)).toThrow(/Not enough active rolls/);
+    });
+
+    it("pays the wallet's own fee, never the node default", async () => {
+      chain.mas['S1a'] = 200_000_000_000n;
+      await store.refresh('a');
+      await store.buyRolls(1);
+      expect(provider.buyRolls).toHaveBeenCalledWith('S1a', 1n, FEE);
     });
   });
 
@@ -371,8 +435,15 @@ describe('WalletStore', () => {
 
     it('sends it with its own decimals and records it under its contract', async () => {
       await addWmas();
-      await store.send(WMAS, OUTSIDER, 1.25);
-      expect(provider.transferToken).toHaveBeenCalledWith('S1a', WMAS, OUTSIDER, 1_250_000_000n);
+      await store.send(await store.prepareSend(WMAS, OUTSIDER, 1.25));
+      expect(provider.transferToken).toHaveBeenCalledWith(
+        'S1a',
+        WMAS,
+        OUTSIDER,
+        1_250_000_000n,
+        FEE,
+        0n,
+      );
       expect(store.wallets()['a'].history[0]).toMatchObject({ type: 'send', token: WMAS });
     });
 

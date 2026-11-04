@@ -83,10 +83,10 @@ it shows a QR code to open it on your phone instead.
 **What stays on your phone**
 
 - Your wallet, encrypted with your PIN (PBKDF2 with 600 000 iterations, then AES-GCM, using the
-  browser's built-in Web Crypto). Without your PIN it can't be read. The PIN itself is never
-  stored.
-- While the wallet is unlocked, your keys live in memory only; locking it or closing the tab
-  drops them.
+  browser's built-in Web Crypto) — your keys and the addresses you saved for sending. Without
+  your PIN it can't be read. The PIN itself is never stored.
+- While the wallet is unlocked, your keys live in memory only; locking it, closing the tab or
+  leaving it untouched for 15 minutes drops them.
 - A short-lived cache of balances and history, encrypted the same way and deleted when the tab
   closes.
 - The tokens you added by contract address, and the icon links you set for them — kept
@@ -105,15 +105,20 @@ That's all: no analytics, no tracking, and no RustCore server behind the wallet 
 it may reach is `nft.rustcoremassa.com`, for Core Keepers NFTs you hold or an icon you set
 there). Links to `explorer.massa.net` and `docs.massa.net` open only when you tap them. The
 wallet enforces this list itself: its Content Security Policy — the same on the web and in the
-browser extension — lets the browser connect and load images only there, so the wallet can't
-reach any other server, even by mistake.
+browser extension — lets the browser connect and load images only there, and load nothing else
+from anywhere (no frames, no scripts, styles or fonts from other servers), so the wallet can't
+reach any other server, even by mistake. It also refuses to run inside another site's page.
 
 **Built-in safeguards**
 
 - Every transaction that spends funds shows a review screen and is checked first (balance, fee,
-  address) — you confirm before anything is signed.
-- Revealing a private key, removing a wallet or logging out asks for your PIN (or the
+  address) — you confirm before anything is signed. The fee it shows is the fee the transaction
+  pays, and so is the small storage deposit a token transfer to a new recipient costs.
+- Revealing or copying a private key, removing a wallet or logging out asks for your PIN (or the
   extension's password) again.
+- The wallet locks itself after 15 minutes without use — in the browser extension also when your
+  computer locks. Locking it in one tab (or, in the extension, in the popup, side panel or full
+  screen) locks it everywhere.
 - After 5 wrong PINs (or passwords) in a row, the wallet makes you wait — 30 seconds, then twice
   as long after each new mistake, up to an hour — so nobody holding your phone can try every PIN.
 - A private key you copy is wiped from the clipboard after 60 seconds (while the wallet is open),
@@ -125,7 +130,9 @@ reach any other server, even by mistake.
   with a warning.
 - In the browser extension, a dApp you connect sees only the wallets you chose for it, and each
   of its requests opens a review window; you can change which wallets a site sees, or disconnect
-  it, in Settings → Connected sites.
+  it, in Settings → Connected sites. That window's Approve button works only once the window has
+  been in front for a second without being clicked, so a site can't make one of your clicks land
+  on it.
 - Swaps are sent with a minimum you'll accept, so the exchange cancels them instead of filling
   at a bad price.
 
@@ -138,7 +145,11 @@ reach any other server, even by mistake.
 - **Tokens you add yourself aren't checked by RustCore.** Anyone can create a token with any name
   and symbol, so they're marked *Added by you* and their contract is shown before every send. Add
   one only from a contract address you got from a source you trust. They have no USD price and
-  can't be swapped in the wallet.
+  can't be swapped in the wallet. Their symbol must be written in Latin letters and digits, and
+  can't be (or look like) one of the tokens RustCore lists.
+- The Massa nodes and the explorer answer the wallet for every wallet you hold, from your
+  connection: whoever runs them could tell those addresses belong together. Everything they see
+  is public on the blockchain anyway — but not who it belongs to.
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
 - The browser extension (in progress) locks the wallet with a **password** instead: at least 8

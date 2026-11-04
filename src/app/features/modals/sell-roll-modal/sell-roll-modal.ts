@@ -59,6 +59,8 @@ export class SellRollModal {
   }
 
   protected async confirm(): Promise<void> {
+    // One operation per Review: a second tap before the button turns off sends nothing.
+    if (this.isSelling()) return;
     const count = this.count();
     this.error.set(null);
     this.isSelling.set(true);

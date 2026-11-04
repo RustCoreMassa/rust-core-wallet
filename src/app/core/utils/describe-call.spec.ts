@@ -142,6 +142,35 @@ describe('describeCall — Dusa swaps', () => {
   });
 });
 
+describe('describeCall — allowances on tokens the wallet does not list', () => {
+  const allowance = (amount: bigint, spender = OTHER) =>
+    call(UNKNOWN_CONTRACT, 'increaseAllowance', new Args().addString(spender).addU256(amount));
+
+  it('says an unlimited allowance out loud, on any token and any network', () => {
+    for (const network of ['mainnet', 'buildnet'] as const) {
+      const d = describeCall(allowance(2n ** 256n - 1n), OWNER, network);
+      expect(d.summary).toMatch(/unlimited amount/);
+      expect(d.warnings.join(' ')).toMatch(/spend all your tokens/);
+      expect(d.warnings.join(' ')).toMatch(/doesn’t know this spender/);
+    }
+  });
+
+  it('shows a limited one in smallest units, and names a known spender', () => {
+    const d = describeCall(allowance(5_000n, DUSA.v2Router), OWNER, 'mainnet');
+    expect(d.summary).toBe('Allow Dusa router to spend 5000 units of this token');
+    expect(d.warnings.join(' ')).not.toMatch(/doesn’t know/);
+  });
+
+  it('stays an unknown call when the parameters are not an allowance', () => {
+    const d = describeCall(
+      call(UNKNOWN_CONTRACT, 'increaseAllowance', new Args().addU64(1n)),
+      OWNER,
+      'mainnet',
+    );
+    expect(d.summary).toBeNull();
+  });
+});
+
 describe('describeCall — unknown calls', () => {
   it('names nothing it doesn’t know and warns', () => {
     const d = describeCall(call(UNKNOWN_CONTRACT, 'mint', new Args().addU64(1n)), OWNER, 'mainnet');

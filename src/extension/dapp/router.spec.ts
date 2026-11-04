@@ -8,7 +8,15 @@ import {
   toBase64,
 } from './protocol';
 import { ApprovalResult } from './approval';
-import { DappRouter, MAX_PENDING, REQUEST_TTL_MS, RouterPort } from './router';
+import {
+  DappRouter,
+  MAX_IN_FLIGHT_PER_PAGE,
+  MAX_PENDING,
+  MAX_PENDING_PER_SITE,
+  REQUEST_TTL_MS,
+  RouterPort,
+  siteOf,
+} from './router';
 import { SITE_TABS_ITEM, SiteTabs } from './site-tabs';
 
 const ALICE = 'AU12dG5xP1RDEB5ocdHkymNVvvSJmUL9BgHwCksDowqmGWxfpm93x';
@@ -116,6 +124,15 @@ function setup(network: WalletNetwork = 'mainnet', browser = fakeBrowser()) {
 const settle = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
+
+describe('siteOf', () => {
+  it('groups subdomains under their site; IPs and localhost stand alone', () => {
+    expect(siteOf('https://app.dusa.io')).toBe('dusa.io');
+    expect(siteOf('https://a.b.evil.example:8443')).toBe('evil.example');
+    expect(siteOf('http://localhost:3000')).toBe('localhost');
+    expect(siteOf('http://127.0.0.1:4300')).toBe('127.0.0.1');
+  });
+});
 
 describe('DappRouter — ports', () => {
   it('accepts https pages and, for developers, localhost', async () => {
@@ -433,6 +450,36 @@ describe('DappRouter — signatures', () => {
     await settle();
     expect(late.replyTo(lateId)).toMatchObject({ error: { code: 4900 } });
     expect(router.next()!.queued).toBe(MAX_PENDING - 1);
+  });
+
+  it('caps what one site keeps waiting, across its subdomains', async () => {
+    const { router } = setup();
+    const ids: [ReturnType<typeof fakePort>, string][] = [];
+    for (const sub of ['a', 'b', 'c']) {
+      const page = fakePort({ origin: `https://${sub}.evil.example`, frameId: 0 });
+      router.attach(page.port);
+      ids.push([page, page.send('connect')]);
+    }
+    await settle();
+    const busy = ids.filter(([page, id]) => 'error' in (page.replyTo(id) ?? {}));
+    expect(busy).toHaveLength(3 - MAX_PENDING_PER_SITE);
+    expect(router.next()!.queued).toBe(MAX_PENDING_PER_SITE - 1);
+  });
+
+  it('caps the requests one page has in flight at once', async () => {
+    const { router } = setup();
+    const page = fakePort();
+    router.attach(page.port);
+    const ids = Array.from({ length: MAX_IN_FLIGHT_PER_PAGE + 4 }, () => page.send('connected'));
+    await settle();
+    const busy = ids.filter((id) => 'error' in (page.replyTo(id) ?? {}));
+    expect(busy).toHaveLength(4);
+    expect(page.replyTo(ids[0])).toEqual({ id: ids[0], result: false });
+
+    // Once answered, the page may ask again.
+    const later = page.send('connected');
+    await settle();
+    expect(page.replyTo(later)).toEqual({ id: later, result: false });
   });
 
   it('answers a repeated connect together with the waiting one', async () => {

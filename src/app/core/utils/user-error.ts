@@ -1,3 +1,5 @@
+import { OperationFailedError } from '../services/massa-provider';
+
 /**
  * Turns any thrown error into a short message fit for the screen.
  *
@@ -7,6 +9,8 @@
  * "readonly call failed: VM Error in ReadOnlyExecutionTarget::FunctionCall
  * … at ~lib/@massalabs/…/token.ts:197" — are mapped to a plain sentence;
  * the original goes to the console for debugging, never to the user.
+ * An operation that failed on-chain never shows its reason either, however
+ * plain it reads: a contract writes it (it could say "visit … to fix your wallet").
  */
 
 interface Rule {
@@ -56,10 +60,17 @@ const TECHNICAL =
 
 const GENERIC = "Something went wrong and the transaction wasn't completed. Please try again.";
 
+const FAILED_ON_CHAIN =
+  'The network executed this transaction and it failed — only the network fee was paid.';
+
 /** Longest a pass-through message may be; anything longer is treated as technical. */
 const MAX_PLAIN_LENGTH = 140;
 
 export function toUserMessage(err: unknown): string {
+  if (err instanceof OperationFailedError) {
+    console.error('[wallet error]', err);
+    return RULES.find((r) => r.test.test(err.reason))?.message ?? FAILED_ON_CHAIN;
+  }
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
   if (!raw) return GENERIC;
 

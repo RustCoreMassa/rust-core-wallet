@@ -49,9 +49,9 @@
       "run_at": "document_start"
     }
   ],
-  "permissions": ["storage", "alarms", "sidePanel"],
+  "permissions": ["storage", "alarms", "idle", "sidePanel"],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net https://ipfs.io https://nft.rustcoremassa.com; img-src 'self' data: https://ipfs.io https://nft.rustcoremassa.com"
+    "extension_pages": "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://ipfs.io https://nft.rustcoremassa.com; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net https://ipfs.io https://nft.rustcoremassa.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
   },
   "browser_specific_settings": {
     "gecko": {

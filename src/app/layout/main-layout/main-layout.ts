@@ -21,6 +21,7 @@ import { TokensModal } from '../../features/modals/tokens-modal/tokens-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 import { SiteConnection } from '../../core/state/site-connection';
+import { AutoLock } from '../../core/state/auto-lock';
 
 /** Massa produces a block every 0.5s; 10s keeps the UI fresh without hammering the RPC node. */
 const AUTO_REFRESH_MS = 10_000;
@@ -65,6 +66,8 @@ export class MainLayout {
     // MNS is prefetched too, so the NFT page opens with data already there.
     // Extension: connected sites follow the wallets you switch to (as in MetaMask).
     inject(SiteConnection).start();
+    // Locks after AUTO_LOCK_MS untouched, or when locked in another tab / view.
+    inject(AutoLock).start();
     void walletStore.refreshAll();
     walletStore.loadDomains().catch((err) => console.warn('Prefetching MNS domains failed', err));
     walletStore

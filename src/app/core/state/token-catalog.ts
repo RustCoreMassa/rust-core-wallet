@@ -30,8 +30,17 @@ const BUILTIN_BY_NETWORK: Readonly<Record<Network, readonly TokenMeta[]>> = {
   buildnet: [TOKEN_REGISTRY.MAS],
 };
 
-/** Symbols a custom token may not take: the built-in tokens' (an imitation's favourite). */
-const RESERVED_SYMBOLS = new Set(TOKEN_LIST.map((t) => comparable(t.symbol)));
+/**
+ * What a custom token's symbol may be made of: Latin letters, digits and . _ - $ +. Anything
+ * else can imitate another symbol — a Cyrillic "С" in "USDС" looks exactly like a C.
+ */
+const SYMBOL_CHARS = /^[A-Za-z0-9._$+-]+$/;
+
+/**
+ * Symbols a custom token may not take: the built-in tokens' — also without their bridge suffix
+ * ("USDC" for USDC.e) or with another one ("USDC.b"): an imitation's favourites.
+ */
+const RESERVED_BASES = new Set(TOKEN_LIST.map((t) => symbolBase(t.symbol)));
 
 const BUILTIN_CONTRACTS = new Set(TOKEN_LIST.map((t) => t.contract).filter(Boolean));
 
@@ -42,19 +51,33 @@ const NETWORK_LABEL: Readonly<Record<Network, string>> = {
   buildnet: 'Buildnet',
 };
 
-/** Case- and lookalike-insensitive form (NFKC folds e.g. full-width "ＵＳＤＣ"). */
-function comparable(symbol: string): string {
-  return symbol.normalize('NFKC').toUpperCase();
+/**
+ * A symbol reduced to what tells it apart: case-folded, NFKC (full-width "ＵＳＤＣ" → USDC), without
+ * a bridge suffix (".e", "-b"…) or punctuation. USDC.e, usdc, USDC.b and U.S.D.C all give USDC.
+ */
+function symbolBase(symbol: string): string {
+  return symbol
+    .normalize('NFKC')
+    .toUpperCase()
+    .replace(/[._-]\s*[EB]$/, '')
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 /** Checks a token's on-chain metadata; throws a user-facing message when it can't be added. */
 export function toCustomToken(contract: string, info: TokenInfo): CustomToken {
+  const fullSymbol = cleanContractText(info.symbol, Infinity);
   const symbol = cleanContractText(info.symbol, MAX_SYMBOL_LENGTH);
   const name = cleanContractText(info.name, MAX_NAME_LENGTH) || symbol;
   if (!symbol) throw new Error('This token has no symbol, so it would be hard to tell apart');
-  if (RESERVED_SYMBOLS.has(comparable(symbol))) {
+  if (RESERVED_BASES.has(symbolBase(fullSymbol))) {
     throw new Error(
       `${symbol} is the symbol of a token RustCore already lists — this contract isn't that token`,
+    );
+  }
+  if (!SYMBOL_CHARS.test(fullSymbol)) {
+    throw new Error(
+      `This token's symbol (${symbol}) uses characters that can imitate another token's — ` +
+        'RustCore only adds symbols written with Latin letters and digits',
     );
   }
   if (!Number.isInteger(info.decimals) || info.decimals < 0 || info.decimals > MAX_DECIMALS) {
@@ -65,14 +88,28 @@ export function toCustomToken(contract: string, info: TokenInfo): CustomToken {
 
 function isCustomToken(value: unknown): value is CustomToken {
   const t = value as CustomToken;
-  return (
-    !!t &&
-    typeof t.contract === 'string' &&
-    CONTRACT_ADDRESS.test(t.contract) &&
-    typeof t.symbol === 'string' &&
-    typeof t.name === 'string' &&
-    Number.isInteger(t.decimals)
-  );
+  if (
+    !t ||
+    typeof t.contract !== 'string' ||
+    !CONTRACT_ADDRESS.test(t.contract) ||
+    typeof t.symbol !== 'string' ||
+    typeof t.name !== 'string' ||
+    !Number.isInteger(t.decimals)
+  ) {
+    return false;
+  }
+  // Saved before the stricter symbol rules (or edited storage): checked again, kept only if it
+  // would be added today.
+  try {
+    toCustomToken(t.contract, {
+      name: t.name,
+      symbol: t.symbol.replace(/…$/, ''),
+      decimals: t.decimals,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** A saved icon link that doesn't pass (edited storage) is dropped; the token stays. */
@@ -88,9 +125,7 @@ function withCheckedIcon({ icon, ...token }: CustomToken): CustomToken {
 function load(store: KeyValueStore): CustomTokens {
   const empty: CustomTokens = { mainnet: [], buildnet: [] };
   const valid = (list: unknown) =>
-    (Array.isArray(list) ? list : [])
-      .filter(isCustomToken)
-      .map(withCheckedIcon);
+    (Array.isArray(list) ? list : []).filter(isCustomToken).map(withCheckedIcon);
   try {
     const saved = JSON.parse(store.getItem(STORAGE_KEY) ?? 'null') as Partial<CustomTokens> | null;
     if (!saved) return empty;

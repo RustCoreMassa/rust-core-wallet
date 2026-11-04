@@ -23,12 +23,13 @@ export async function waitExecuted(operation: Operation): Promise<OperationResul
 
 /**
  * The execution error the node reported for a failed operation, e.g.
- * `{"massa_execution_error":"…insufficient balance…"}` → the inner text.
+ * `{"massa_execution_error":"…insufficient balance…"}` → the inner text. Only the node's error
+ * event counts: any other event is the contract's own text.
  */
 async function failureReason(operation: Operation): Promise<string> {
   try {
     const events = await operation.getSpeculativeEvents();
-    const error = events.find((e) => e.context?.is_error) ?? events.at(-1);
+    const error = events.find((e) => e.context?.is_error);
     if (!error?.data) return 'rejected by the network';
     try {
       const parsed = JSON.parse(error.data) as { massa_execution_error?: string };

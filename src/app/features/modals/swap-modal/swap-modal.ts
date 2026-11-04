@@ -163,7 +163,8 @@ export class SwapModal {
 
   protected async confirm(): Promise<void> {
     const q = this.quote();
-    if (!q) return;
+    // One operation per Review: a second tap before the button turns off sends nothing.
+    if (!q || this.isSwapping()) return;
     this.error.set(null);
     this.isSwapping.set(true);
     try {

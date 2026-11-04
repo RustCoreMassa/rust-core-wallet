@@ -4,10 +4,11 @@ import { TokenId } from '../../../core/models/token.model';
 import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
-import { MIN_SEND_AMOUNT, WalletStore } from '../../../core/state/wallet-store';
+import { MIN_SEND_AMOUNT, SendPlan, WalletStore } from '../../../core/state/wallet-store';
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 import { formatDisplayAmount } from '../../../core/utils/display-amount';
+import { formatUnits, toUnits } from '../../../core/utils/token-amount';
 import { toUserMessage } from '../../../core/utils/user-error';
 import { AmountPipe } from '../../../shared/pipes/amount-pipe';
 
@@ -29,6 +30,10 @@ export class SendModal {
   protected readonly saveName = signal('');
   protected readonly error = signal<string | null>(null);
   protected readonly isSending = signal(false);
+  /** Checking the transfer with the chain before the Review step. */
+  protected readonly isReviewing = signal(false);
+  /** The transfer the Review step shows — what Confirm sends. */
+  private readonly plan = signal<SendPlan | null>(null);
 
   /** MAS is always offered; an MRC-20 only when this wallet actually holds some. */
   protected readonly tokens = computed(() => {
@@ -94,21 +99,23 @@ export class SendModal {
   protected readonly step = signal<'form' | 'confirm'>('form');
 
   protected readonly confirmRows = computed<ConfirmRow[]>(() => {
-    const token = this.token();
+    const plan = this.plan();
+    if (!plan) return [];
     const meta = this.tokenMeta();
     const symbol = meta.symbol;
-    const amount = this.amount() ?? 0;
+    const amount = plan.amount;
     const wallet = this.store.activeWallet();
-    const price = this.store.prices()[token];
-    const fee = this.networkFee;
+    const price = this.store.prices()[plan.token];
     const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 9 });
-    const recipient = this.store.walletList().find((w) => w.address === this.address().trim());
+    const recipient = this.store.walletList().find((w) => w.address === plan.toAddress);
+    // Everything paid in MAS on top of the amount: the fee, and a token's storage deposit.
+    const masUnits = toUnits(this.networkFee, MAS_DECIMALS) + plan.storageUnits;
 
     return [
       { label: 'From', value: `${wallet.name} · ${shortAddress(wallet.address)}` },
       {
         label: recipient ? `To (${recipient.name})` : 'To',
-        value: this.address().trim(),
+        value: plan.toAddress,
         mono: true,
       },
       {
@@ -121,43 +128,62 @@ export class SendModal {
       },
       // A custom token's symbol proves nothing — its contract does.
       ...(meta.custom ? [{ label: 'Token contract', value: meta.contract, mono: true }] : []),
-      { label: 'Network fee', value: `${fee} MAS` },
+      { label: 'Network fee', value: `${this.networkFee} MAS` },
+      ...(plan.storageUnits > 0n
+        ? [
+            {
+              label: 'Token storage',
+              value: `${formatUnits(plan.storageUnits, MAS_DECIMALS)} MAS — the recipient's first ${symbol}`,
+            },
+          ]
+        : []),
       {
         label: 'Total',
         value:
-          token === 'MAS' ? `${fmt(amount + fee)} MAS` : `${fmt(amount)} ${symbol} + ${fee} MAS`,
+          plan.token === 'MAS'
+            ? `${formatUnits(toUnits(amount, MAS_DECIMALS) + masUnits, MAS_DECIMALS)} MAS`
+            : `${fmt(amount)} ${symbol} + ${formatUnits(masUnits, MAS_DECIMALS)} MAS`,
         strong: true,
       },
-      { label: 'Network', value: this.store.network() === 'mainnet' ? 'Mainnet' : 'Buildnet' },
+      { label: 'Network', value: plan.network === 'mainnet' ? 'Mainnet' : 'Buildnet' },
     ];
   });
 
-  /** Runs every pre-flight check, then shows the confirmation step. */
-  protected review(): void {
+  /** Runs every pre-flight check (and reads a token's storage cost), then shows the Review step. */
+  protected async review(): Promise<void> {
+    if (this.isReviewing()) return;
     this.error.set(null);
+    this.isReviewing.set(true);
     try {
-      this.store.validateSend(this.token(), this.address().trim(), this.amount() ?? 0);
+      this.plan.set(
+        await this.store.prepareSend(this.token(), this.address().trim(), this.amount() ?? 0),
+      );
       this.step.set('confirm');
     } catch (err) {
       this.error.set(toUserMessage(err));
+    } finally {
+      this.isReviewing.set(false);
     }
   }
 
   protected async confirm(): Promise<void> {
-    const address = this.address().trim();
-    const amount = this.amount() ?? 0;
+    const plan = this.plan();
+    // One send per Review: a second tap before the button turns off sends nothing.
+    if (!plan || this.isSending()) return;
     this.error.set(null);
     this.isSending.set(true);
     try {
-      const result = await this.store.send(this.token(), address, amount);
+      const result = await this.store.send(plan);
 
       if (this.saveChecked()) {
-        const name = this.saveName().trim() || address;
-        this.store.saveAddress(name, address);
+        const name = this.saveName().trim() || plan.toAddress;
+        await this.store
+          .saveAddress(name, plan.toAddress)
+          .catch(() => this.toast.show("Sent — but the address couldn't be saved"));
       }
 
       this.toast.show(
-        (result.internal ? 'Sent to your wallet: ' : 'Sent ') + `${amount} ${this.symbol()}`,
+        (result.internal ? 'Sent to your wallet: ' : 'Sent ') + `${plan.amount} ${this.symbol()}`,
       );
       this.reset();
       this.modal.close();
@@ -168,14 +194,22 @@ export class SendModal {
     }
   }
 
+  protected backToForm(): void {
+    this.plan.set(null);
+    this.step.set('form');
+  }
+
   private reset(): void {
     this.address.set('');
     this.amount.set(null);
     this.saveChecked.set(false);
     this.saveName.set('');
+    this.plan.set(null);
     this.step.set('form');
   }
 }
+
+const MAS_DECIMALS = 9;
 
 function shortAddress(address: string): string {
   return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;

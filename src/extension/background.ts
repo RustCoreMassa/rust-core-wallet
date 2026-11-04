@@ -10,11 +10,30 @@ import { DappRouter } from './dapp/router';
 import { SiteTabs } from './dapp/site-tabs';
 import { AUTO_LOCK_ALARM, SESSION_KEY_ITEM } from './session-constants';
 
+/** Ends the unlocked session: every open view of the wallet locks (ChromeSessionKeyStore.watch). */
+function endSession(): void {
+  chrome.storage.session.remove(SESSION_KEY_ITEM).catch(() => {});
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === AUTO_LOCK_ALARM) {
-    chrome.storage.session.remove(SESSION_KEY_ITEM).catch(() => {});
-  }
+  if (alarm.name === AUTO_LOCK_ALARM) endSession();
 });
+
+// The computer locks (screen lock, lid closed): so does the wallet. Not every browser reports it
+// (Firefox for Android has no idle API at all).
+chrome.idle?.onStateChanged.addListener((state) => {
+  if (state === 'locked') endSession();
+});
+
+// Only the extension's own pages read its storage. Web pages never can, but content scripts run
+// inside them, so a page that broke out of its sandbox could otherwise read the encrypted vault
+// (to guess the password offline) or write itself a connection. content.js never uses storage.
+// Chromium applies it to `local` too; where a browser doesn't, nothing changes.
+if (typeof chrome.storage.local.setAccessLevel === 'function') {
+  chrome.storage.local
+    .setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+    .catch((err) => console.warn('Restricting storage access failed', err));
+}
 
 // ------------------------------------------------------------------ dApp connections
 

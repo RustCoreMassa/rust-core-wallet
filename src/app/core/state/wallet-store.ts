@@ -1,6 +1,5 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MnsDomain } from '../models/nft.model';
-import { SavedAddress } from '../models/saved-address.model';
 import {
   CustomToken,
   TOKEN_REGISTRY,
@@ -26,6 +25,7 @@ import {
   ContractCallParams,
   MASSA_PROVIDER,
   NETWORK_FEE_MAS,
+  NETWORK_FEE_UNITS,
   ROLL_PRICE_MAS,
   SignedMessage,
 } from '../services/massa-provider';
@@ -112,7 +112,7 @@ const MASSA_ADDRESS = /^A[US][1-9A-HJ-NP-Za-km-z]{40,60}$/;
 export const MIN_SEND_AMOUNT = 0.01;
 
 const MAS_DECIMALS = TOKEN_REGISTRY.MAS.decimals;
-const FEE_UNITS = toUnits(NETWORK_FEE_MAS, MAS_DECIMALS);
+const FEE_UNITS = NETWORK_FEE_UNITS;
 const ROLL_PRICE_UNITS = toUnits(ROLL_PRICE_MAS, MAS_DECIMALS);
 /** The gas a call may set, as the network allows it (massa-web3 MIN_GAS_CALL / MAX_GAS_CALL). */
 const MIN_GAS_CALL = 2_100_000n;
@@ -120,6 +120,19 @@ const MAX_GAS_CALL = 4_294_167_295n;
 
 /** A dApp's contract call, before the wallet settles its fee. */
 export type DappCall = Omit<ContractCallParams, 'fee'> & { readonly fee?: bigint };
+
+/** A transfer checked against the chain, ready for the Review step. */
+export interface SendPlan {
+  readonly token: TokenId;
+  readonly toAddress: string;
+  readonly amount: number;
+  readonly network: Network;
+  /**
+   * nanoMAS an MRC-20 transfer sends for the recipient's balance entry — 0 when the recipient
+   * already holds the token (and always for MAS). Shown in the Review step, sent as is.
+   */
+  readonly storageUnits: bigint;
+}
 
 /** A .massa name checked and priced on-chain, ready for the Review step. */
 export interface DomainRegistration {
@@ -213,7 +226,6 @@ export class WalletStore {
 
   private readonly _walletsByNetwork = signal<WalletsByNetwork>(emptyWallets());
   private readonly _activeWalletId = signal<string>('');
-  private readonly _addressBook = signal<SavedAddress[]>([]);
   private readonly _prices = signal<TokenPrices>({});
   private pricesFetchedAt = 0;
   private readonly _totalRolls = signal<Partial<Record<Network, number>>>({});
@@ -232,7 +244,8 @@ export class WalletStore {
   readonly network = this.networkStore.network;
   readonly wallets = computed(() => this._walletsByNetwork()[this.network()]);
   readonly activeWalletId = this._activeWalletId.asReadonly();
-  readonly addressBook = this._addressBook.asReadonly();
+  /** Saved recipient addresses — kept in the encrypted vault (AuthStore), not in the cache. */
+  readonly addressBook = this.auth.addressBook;
   readonly prices = this._prices.asReadonly();
 
   readonly walletList = computed(() => Object.values(this.wallets()));
@@ -282,7 +295,7 @@ export class WalletStore {
 
   readonly knownAddresses = computed(() => {
     const walletAddresses = this.walletList().map((w) => w.address);
-    const savedAddresses = this._addressBook().map((entry) => entry.address);
+    const savedAddresses = this.addressBook().map((entry) => entry.address);
     return new Set([...walletAddresses, ...savedAddresses]);
   });
 
@@ -293,7 +306,6 @@ export class WalletStore {
       const snapshot = {
         wallets: this._walletsByNetwork(),
         activeWalletId: this._activeWalletId(),
-        addressBook: this._addressBook(),
         prices: this._prices(),
       };
       if (!this.auth.isUnlocked() || !snapshot.activeWalletId) return;
@@ -348,7 +360,6 @@ export class WalletStore {
       buildnet: keep(snapshot.wallets.buildnet),
     });
     if (accountIds.has(snapshot.activeWalletId)) this._activeWalletId.set(snapshot.activeWalletId);
-    this._addressBook.set([...snapshot.addressBook]);
     this._prices.set(snapshot.prices);
   }
 
@@ -389,12 +400,14 @@ export class WalletStore {
     }
   }
 
-  /** Drops every wallet, history entry, saved address and custom token — used on log out. */
+  /**
+   * Drops every wallet, history entry and custom token — used on log out. (Saved addresses live
+   * in the vault, which AuthStore.logout deletes.)
+   */
   reset(): void {
     this._walletsByNetwork.set(emptyWallets());
     this.catalog.clear();
     this._activeWalletId.set('');
-    this._addressBook.set([]);
     this._refreshingIds.set(new Set());
     this.historyFetchedAt.clear();
     this.domainsFetchedAt.clear();
@@ -523,8 +536,9 @@ export class WalletStore {
     });
   }
 
-  saveAddress(name: string, address: string): void {
-    this._addressBook.update((book) => [...book, { name, address }]);
+  /** Saves a recipient address in the encrypted vault (survives the session). */
+  saveAddress(name: string, address: string): Promise<void> {
+    return this.auth.saveAddress(name, address);
   }
 
   /** Periodic refresh of the active wallet (driven by MainLayout); skipped while one is in flight. */
@@ -752,10 +766,45 @@ export class WalletStore {
    * nothing locally (the chain is re-read anyway in case it went through).
    */
 
-  async send(token: TokenId, toAddress: string, amount: number): Promise<{ internal: boolean }> {
+  /**
+   * Checks a transfer like `validateSend`, then reads what the chain will charge on top of the
+   * fee: an MRC-20 transfer to a recipient who never held the token pays for its balance entry.
+   * The Review step shows it; `send` sends exactly that.
+   */
+  async prepareSend(token: TokenId, toAddress: string, amount: number): Promise<SendPlan> {
     const network = this.network();
-    const wallet = this.activeWallet();
     this.validateSend(token, toAddress, amount);
+    const meta = this.tokenMeta(token);
+    const storageUnits = meta.isErc20
+      ? await this.provider.getTokenStorageCost(meta.contract, toAddress)
+      : 0n;
+    const plan: SendPlan = { token, toAddress, amount, network, storageUnits };
+    this.validatePlan(plan);
+    return plan;
+  }
+
+  /** The MAS a prepared transfer needs on top of the amount: the fee and any storage. */
+  private validatePlan(plan: SendPlan): void {
+    if (plan.network !== this.network()) {
+      throw new Error('The network changed — review the transfer again');
+    }
+    this.validateSend(plan.token, plan.toAddress, plan.amount);
+    if (plan.storageUnits > 0n) {
+      const needed = FEE_UNITS + plan.storageUnits;
+      assertMasUnits(
+        this.activeWallet(),
+        needed,
+        `You need ${formatUnits(needed, MAS_DECIMALS)} MAS for the network fee and the ` +
+          "recipient's token storage",
+      );
+    }
+  }
+
+  /** Sends a transfer prepared by `prepareSend`, with exactly the fee and storage it showed. */
+  async send(plan: SendPlan): Promise<{ internal: boolean }> {
+    const { token, toAddress, amount, network, storageUnits } = plan;
+    const wallet = this.activeWallet();
+    this.validatePlan(plan);
     const meta = this.tokenMeta(token);
     const units = this.spendableUnits(token, amount);
     const targetId = this.walletList().find(
@@ -766,8 +815,15 @@ export class WalletStore {
     const privateKey = this.privateKeyFor(wallet.id);
     const { operationId } = await this.afterWrite(touched, network, () =>
       meta.isErc20
-        ? this.provider.transferToken(privateKey, meta.contract, toAddress, units)
-        : this.provider.transferMas(privateKey, toAddress, units),
+        ? this.provider.transferToken(
+            privateKey,
+            meta.contract,
+            toAddress,
+            units,
+            FEE_UNITS,
+            storageUnits,
+          )
+        : this.provider.transferMas(privateKey, toAddress, units, FEE_UNITS),
     );
 
     const details = { token, amount, from: wallet.address, to: toAddress, operationId };
@@ -793,7 +849,7 @@ export class WalletStore {
     this.validateBuyRolls(rollCount);
 
     const { operationId } = await this.afterWrite([wallet.id], network, () =>
-      this.provider.buyRolls(this.privateKeyFor(wallet.id), BigInt(rollCount)),
+      this.provider.buyRolls(this.privateKeyFor(wallet.id), BigInt(rollCount), FEE_UNITS),
     );
     this.addHistory(
       wallet.id,
@@ -816,7 +872,7 @@ export class WalletStore {
     this.validateSellRolls(rollCount);
 
     const { operationId } = await this.afterWrite([wallet.id], network, () =>
-      this.provider.sellRolls(this.privateKeyFor(wallet.id), BigInt(rollCount)),
+      this.provider.sellRolls(this.privateKeyFor(wallet.id), BigInt(rollCount), FEE_UNITS),
     );
     this.addHistory(
       wallet.id,

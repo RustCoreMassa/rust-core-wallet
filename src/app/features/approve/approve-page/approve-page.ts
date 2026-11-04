@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, InjectionToken, computed, inject, signal } from '@angular/core';
 import { ApprovalResult, ApprovalView } from '../../../../extension/dapp/approval';
 import { DappRequest, WalletNetwork, parseRequest } from '../../../../extension/dapp/protocol';
 import { VaultAccount } from '../../../core/models/vault.model';
@@ -9,6 +9,7 @@ import {
   ROLL_PRICE_MAS,
 } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
+import { AutoLock } from '../../../core/state/auto-lock';
 import { DappCall, WalletStore, dappFee } from '../../../core/state/wallet-store';
 import { CallDescription, describeCall } from '../../../core/utils/describe-call';
 import { formatUnits, toUnits } from '../../../core/utils/token-amount';
@@ -19,6 +20,27 @@ type Phase = 'loading' | 'review' | 'busy' | 'notice';
 
 const MAS = 9;
 const ROLL_UNITS = toUnits(ROLL_PRICE_MAS, MAS);
+
+/** When Approve may answer: after the window has been in front, untouched, for `delayMs`. */
+export interface ApproveArming {
+  readonly delayMs: number;
+  /** The window is visible and has the focus. */
+  inFront(): boolean;
+}
+
+/**
+ * Against click- and tap-jacking: a site can make its request pop up the approval window right
+ * under a click the user is about to make ("click here, fast, several times"). Approve stays off
+ * until the window has been in front for a second without being clicked or typed in — every
+ * press before that starts the second again, and a press that began before it never approves.
+ */
+export const APPROVE_ARMING = new InjectionToken<ApproveArming>('APPROVE_ARMING', {
+  providedIn: 'root',
+  factory: () => ({
+    delayMs: 1000,
+    inFront: () => document.visibilityState === 'visible' && document.hasFocus(),
+  }),
+});
 
 const TITLES: Record<DappRequest['method'], string> = {
   connect: 'Connect to this site?',
@@ -51,6 +73,13 @@ export class ApprovePage {
   private readonly approvals: DappApprovals = inject(DAPP_APPROVALS)!;
   private readonly auth = inject(AuthStore);
   private readonly store = inject(WalletStore);
+  private readonly arming = inject(APPROVE_ARMING);
+
+  /** Approve may answer now (APPROVE_ARMING). */
+  protected readonly armed = signal(false);
+  private armTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The press (pointer or key) now under way began while Approve was armed. */
+  private pressArmed = true;
 
   protected readonly view = signal<ApprovalView | null>(null);
   protected readonly request = signal<DappRequest | null>(null);
@@ -210,6 +239,9 @@ export class ApprovePage {
 
   constructor() {
     inject(DestroyRef).onDestroy(this.approvals.keepAlive());
+    // Locked elsewhere or left alone: back to the lock screen, then to this request.
+    inject(AutoLock).start('/login?next=approve');
+    this.watchAttention();
     for (const a of this.auth.accounts()) this.store.ensureWallet(a.id, a.name, a.address);
     void this.showNext();
   }
@@ -226,6 +258,7 @@ export class ApprovePage {
     const view = this.view();
     const request = this.request();
     if (!view || !request || !this.ready() || this.blocker() || this.checking()) return;
+    if (!this.armed() || !this.pressArmed) return;
     if (this.phase() !== 'review') return;
     this.phase.set('busy');
     this.error.set(null);
@@ -274,6 +307,7 @@ export class ApprovePage {
 
   /** Shows the next waiting request, or closes the window when there is none. */
   private async showNext(): Promise<void> {
+    this.disarm();
     this.phase.set('loading');
     this.error.set(null);
     this.blocker.set(null);
@@ -304,7 +338,42 @@ export class ApprovePage {
     const known = this.auth.accounts().some((a) => a.id === active);
     this.chosenIds.set(new Set([known ? active : (this.auth.accounts()[0]?.id ?? '')]));
     this.phase.set('review');
+    this.rearm();
     await this.check(request);
+  }
+
+  /** Approve waits for the window to be in front, untouched, for a while (APPROVE_ARMING). */
+  private watchAttention(): void {
+    const rearm = () => this.rearm();
+    const disarm = () => this.disarm();
+    const onPress = () => {
+      this.pressArmed = this.armed();
+      if (!this.armed()) this.rearm();
+    };
+    window.addEventListener('focus', rearm);
+    window.addEventListener('blur', disarm);
+    document.addEventListener('visibilitychange', rearm);
+    document.addEventListener('pointerdown', onPress, true);
+    document.addEventListener('keydown', onPress, true);
+    inject(DestroyRef).onDestroy(() => {
+      this.disarm();
+      window.removeEventListener('focus', rearm);
+      window.removeEventListener('blur', disarm);
+      document.removeEventListener('visibilitychange', rearm);
+      document.removeEventListener('pointerdown', onPress, true);
+      document.removeEventListener('keydown', onPress, true);
+    });
+  }
+
+  private rearm(): void {
+    this.disarm();
+    if (this.phase() !== 'review' || !this.arming.inFront()) return;
+    this.armTimer = setTimeout(() => this.armed.set(true), this.arming.delayMs);
+  }
+
+  private disarm(): void {
+    clearTimeout(this.armTimer);
+    this.armed.set(false);
   }
 
   /**

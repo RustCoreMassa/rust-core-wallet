@@ -1,3 +1,5 @@
+import { SavedAddress } from './saved-address.model';
+
 /** One account held inside the encrypted vault. */
 export interface VaultAccount {
   readonly id: string;
@@ -9,6 +11,8 @@ export interface VaultAccount {
 /** Decrypted shape of the vault payload — never written to storage as-is. */
 export interface VaultPayload {
   readonly accounts: VaultAccount[];
+  /** Saved recipient addresses (Send); absent in vaults from before 1.8.0. */
+  readonly addressBook?: SavedAddress[];
 }
 
 /**

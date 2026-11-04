@@ -154,6 +154,7 @@ if (extension) {
   const worker = {
     chrome: {
       alarms: { onAlarm: event('alarms') },
+      idle: { onStateChanged: event('idle') },
       runtime: {
         id: 'smoke',
         getURL: (p) => `chrome-extension://smoke/${p}`,
@@ -171,7 +172,7 @@ if (extension) {
     console.log(`BOOT FAILED: background.js failed to start — ${e.constructor.name}: ${e.message}`);
     process.exit(1);
   }
-  const expected = ['alarms', 'connect', 'message', 'storage', 'tabs'];
+  const expected = ['alarms', 'idle', 'connect', 'message', 'storage', 'tabs'];
   if (!expected.every((name) => listening.has(name))) {
     console.log(`BOOT FAILED: background.js listens to ${[...listening]}, expected ${expected}`);
     process.exit(1);

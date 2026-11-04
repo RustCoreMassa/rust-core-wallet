@@ -7,6 +7,54 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **Copying a private key from Settings → wallet now asks for your PIN or password**, like
+  revealing it under *Backup private key* always did. Before, two taps on an unlocked phone (or
+  at a computer while the extension was unlocked) were enough to take the key. Found in an
+  internal audit.
+- **The wallet locks itself after 15 minutes without use.** On the web it never locked by itself;
+  in the browser extension a popup, side panel or tab left open kept it unlocked indefinitely.
+  The extension also locks when the computer locks, and locking it anywhere — another tab, the
+  popup, the side panel, the review window — now locks every open view, which kept their keys
+  before.
+- Browser extension: the review window's **Approve button works only once the window has been in
+  front for a second without being clicked**, and a click that began before never approves — a
+  site could pop the window up under a click the user was about to make.
+- **The fee on the review screen is the fee the transaction pays.** Sends, rolls and swaps left
+  the fee to the Massa node's own minimum, which only happened to equal the 0.01 MAS shown. A
+  token transfer to someone who never held that token also pays a small storage deposit
+  (≈ 0.01 MAS); it's now shown, checked against your MAS and sent exactly as shown.
+- A transaction that fails on-chain no longer shows the network's error text (a contract writes
+  it, and could make it say anything): a known cause in plain words, or a fixed sentence.
+- Tokens you add by contract must have a symbol in Latin letters and digits, and can't take a
+  listed token's symbol without its bridge suffix or with another one (USDC, USDC.b…): a
+  Cyrillic "С" made "USDС" look exactly like USDC. Saved tokens that break these rules are
+  dropped.
+- Browser extension: unlimited token allowances are spelled out on any token, not only the ones
+  RustCore lists; a site can have at most two requests waiting across its subdomains, and at
+  most 16 in flight; only the extension's own pages may read its storage, where the browser
+  supports it.
+- Setting up a wallet in a second tab or extension view can no longer overwrite the one created
+  in the first (and the private key it held); importing a key already in the wallet is refused.
+- The extension's move from PIN to password can no longer be skipped by reopening the popup.
+- A stricter Content Security Policy (nothing loads unless listed), no Referer sent to any
+  server, the wallet refuses to run inside another site's frame, and IPFS media load only by
+  content hash (never through a name another server resolves).
+- The release workflow runs the dependencies' code (install, tests, build) only with a read-only
+  token and no credentials in the checkout; publishing is a separate job. Updated Angular
+  (22.2.4) and the build and test tools: `npm audit` reports no known vulnerabilities.
+
+### Added
+
+- `scripts/verify-deployment.mjs`: checks that the site served by a gateway is exactly a
+  release (every file against its `SHA256SUMS`) — see docs/RELEASING.md.
+
+### Fixed
+
+- Saved addresses (*Save this address for future use*) are kept in the encrypted wallet and
+  survive closing the app; they used to vanish with the session.
+
 ## [1.7.0] — 2026-11-04
 
 ### Security

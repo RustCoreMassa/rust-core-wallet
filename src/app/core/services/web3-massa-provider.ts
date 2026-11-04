@@ -5,6 +5,7 @@ import {
   JsonRpcPublicProvider,
   MNS,
   MRC20,
+  MRC20BalanceCreationCost,
   Mas,
   U8,
   Web3Provider,
@@ -21,7 +22,7 @@ import {
   ContractCallParams,
   GeneratedAccount,
   MassaProvider,
-  NETWORK_FEE_MAS,
+  NETWORK_FEE_UNITS,
   OperationResult,
   ROLL_PRICE_MAS,
   SignedMessage,
@@ -76,7 +77,7 @@ export class Web3MassaProvider implements MassaProvider {
     privateKey: string,
     toAddress: string,
     amount: bigint,
-    fee?: bigint,
+    fee: bigint,
   ): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
     return waitExecuted(await provider.transfer(toAddress, amount, { fee }));
@@ -113,15 +114,32 @@ export class Web3MassaProvider implements MassaProvider {
     };
   }
 
+  getTokenStorageCost(contractAddress: string, toAddress: string): Promise<bigint> {
+    return MRC20BalanceCreationCost(this.publicProvider(), contractAddress, toAddress);
+  }
+
+  /**
+   * MRC20.transfer's call, with the fee and coins the Review step showed: the wrapper itself
+   * would take the node's minimal fee, and re-read the storage cost when `coins` is 0.
+   */
   async transferToken(
     privateKey: string,
     contractAddress: string,
     toAddress: string,
     amount: bigint,
+    fee: bigint,
+    coins: bigint,
   ): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
-    const token = new MRC20(provider, contractAddress);
-    return waitExecuted(await token.transfer(toAddress, amount));
+    return waitExecuted(
+      await provider.callSC({
+        target: contractAddress,
+        func: 'transfer',
+        parameter: new Args().addString(toAddress).addU256(amount),
+        coins,
+        fee,
+      }),
+    );
   }
 
   async getStaking(address: string): Promise<StakingInfo> {
@@ -164,12 +182,12 @@ export class Web3MassaProvider implements MassaProvider {
     }
   }
 
-  async buyRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult> {
+  async buyRolls(privateKey: string, rollCount: bigint, fee: bigint): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
     return waitExecuted(await provider.buyRolls(rollCount, { fee }));
   }
 
-  async sellRolls(privateKey: string, rollCount: bigint, fee?: bigint): Promise<OperationResult> {
+  async sellRolls(privateKey: string, rollCount: bigint, fee: bigint): Promise<OperationResult> {
     const provider = await this.providerFor(privateKey);
     return waitExecuted(await provider.sellRolls(rollCount, { fee }));
   }
@@ -228,7 +246,7 @@ export class Web3MassaProvider implements MassaProvider {
       func: 'dnsAlloc',
       parameter: new Args().addString(name).addString(target).serialize(),
       coins,
-      fee: Mas.fromString(String(NETWORK_FEE_MAS)),
+      fee: NETWORK_FEE_UNITS,
     };
   }
 

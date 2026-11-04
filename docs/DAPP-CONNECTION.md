@@ -121,7 +121,9 @@ The existing `background.ts` grows into the bridge's centre (still no Angular in
   stored in clear (they're public on-chain) so a connected site can be answered while the wallet
   is locked; the list is shown and revocable in Settings → Connected sites.
 - **Requests needing the user** (`connect`, signatures) go into a queue, at most one pending per
-  origin and a small global cap; extras are rejected with "busy". The exception is a second
+  origin, two per site (`siteOf`: the host's last two labels, so subdomains count together) and a
+  small global cap; extras are rejected with "busy". A page may also have at most 16 requests in
+  flight at once (status reads included). The exception is a second
   `connect` from a site whose `connect` is already waiting (the same page again, or another tab of
   the site): it joins the waiting one and gets the same answer. Each opens (or reuses) the
   approval window; closing it rejects the request (`windows.onRemoved`).
@@ -159,7 +161,7 @@ What the review shows per request:
 | `connect` | origin, which accounts to share (ticked; the active wallet comes ticked), network |
 | `transfer` | recipient, amount, fee |
 | `buyRolls` / `sellRolls` | roll count, MAS cost/return, fee |
-| `callSC` | contract, function, coins sent, fee, max gas, raw parameter size/hex; a **simulation** (`readSC` with the user as caller, same coins) — if it fails, the error is shown and Approve is disabled. Known calls are decoded: MRC-20 `transfer`, `increaseAllowance` / `approve` of tokens in `TOKEN_REGISTRY` (amount in the token's units, spender; a warning for huge allowances), Dusa router swaps |
+| `callSC` | contract, function, coins sent, fee, max gas, raw parameter size/hex; a **simulation** (`readSC` with the user as caller, same coins) — if it fails, the error is shown and Approve is disabled. Known calls are decoded: MRC-20 `transfer`, `increaseAllowance` / `approve` of tokens in `TOKEN_REGISTRY` (amount in the token's units, spender; a warning for huge allowances), `increaseAllowance` on any other contract (amount in smallest units, same warnings), Dusa router swaps, MRC-721 `setApprovalForAll` |
 | `sign` | the message as text if it's printable UTF-8, else hex; a warning that signing can authorize things |
 
 ## Protocol v1
@@ -258,12 +260,19 @@ unless the operator is RustCore Launchpad.
   sites (no probing which wallet a visitor has beyond "RustCore is installed").
 - Every signature is approved individually. No "remember", no batch approval, no blind signing of
   bytecode in v1.
-- The approval window is an extension page — dApps can't frame or script it.
+- The approval window is an extension page — dApps can't frame or script it. Its Approve button
+  answers only once the window has been in front for a second without a press (each press before
+  that restarts the second; a press that began before it never approves), so a site can't pop it
+  up under a click the user is about to make (`APPROVE_ARMING`).
+- A failed operation never shows the node's or the contract's text, only a known cause or a fixed
+  sentence: a contract chooses its abort message.
 - Requests expire (e.g. 10 minutes) and are rejected if the site disconnects or the tab closes.
 - Network: requests are signed on the wallet's current network; if a dApp asks for a specific
   chain id and it differs, the request is rejected (no silent switch).
 - The vault, the password and the session key stay where they are today; the background still only
-  ends sessions (auto-lock) and never decrypts anything.
+  ends sessions (the auto-lock alarm, and the computer locking) and never decrypts anything. It
+  restricts `chrome.storage.local` to the extension's own pages (`setAccessLevel`), where the
+  browser supports it: content scripts never need storage.
 
 ## Scope: the browser extension only
 
