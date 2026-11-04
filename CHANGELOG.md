@@ -7,6 +7,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **Browser extension: a site could get a signature that moves your funds** through a "sign this
+  message" request. A Massa transaction is signed over its own bytes with the same function as a
+  message, so a site asking you to sign exactly those bytes would have received a valid
+  signature for a transfer of its choosing. Such messages are now refused — by the extension's
+  background and, finally, by the signing key itself. Found in an internal audit; no known abuse.
+- After 5 wrong PINs or passwords in a row the wallet makes you wait (30 s, doubling with each
+  new mistake, at most an hour), also for the PIN asked before revealing a key, removing a wallet
+  or logging out. The count survives reloading the page.
+- The wallet's encryption key is now derived with 600 000 PBKDF2 iterations (was 300 000, below
+  OWASP's recommendation); existing wallets move over at their next unlock, with the same PIN
+  and the same private keys. A second window (another tab, the extension's side panel) can no
+  longer save over a wallet another window re-encrypted — it asks to unlock again instead.
+  Note: once moved, a wallet can't be opened by versions before 1.7.0.
+- Private key fields are hidden and kept out of keyboard suggestions, spell check (which can send
+  text to a server) and autofill; a copied private key is wiped from the clipboard after 60 s.
+- Browser extension: a site can't set a network fee above 1 MAS, and a raised fee is spelled out
+  on the review screen; `setApprovalForAll` on an NFT collection (how NFT drainers empty
+  wallets) is decoded, with a warning unless it's for RustCore Launchpad; invisible and
+  right-to-left characters in a message to sign are shown instead of disguising it, and a
+  message that isn't readable text gets a warning.
+- The release workflow pins its GitHub Actions to exact commits.
+
 ### Added
 
 - **NFT gallery** on the NFTs page: the NFTs your wallet holds, with their picture, description

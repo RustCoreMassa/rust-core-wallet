@@ -126,7 +126,11 @@ export class ApprovePage {
     });
     // What the operation pays: the site's fee, if it set one above the wallet's own.
     const paid = 'fee' in request ? dappFee(request.fee) : dappFee();
-    const fee = { label: 'Network fee', value: `${formatUnits(paid, MAS)} MAS` };
+    const fee = {
+      label: 'Network fee',
+      value: `${formatUnits(paid, MAS)} MAS`,
+      strong: paid > dappFee(),
+    };
     switch (request.method) {
       case 'transfer':
         rows.push(
@@ -176,6 +180,15 @@ export class ApprovePage {
       }
     }
     return rows;
+  });
+
+  /** The site set a network fee above the wallet's own 0.01 MAS: said out loud, not just a row. */
+  protected readonly feeWarning = computed(() => {
+    const request = this.request();
+    if (!request || !('fee' in request) || request.fee === undefined) return null;
+    const fee = dappFee(request.fee);
+    if (fee <= dappFee()) return null;
+    return `This site set a network fee of ${formatUnits(fee, MAS)} MAS — the wallet's own is ${formatUnits(dappFee(), MAS)} MAS. The fee is paid even if the operation fails.`;
   });
 
   /** For `sign`: the message as text when it reads as text, otherwise as hex. */
@@ -389,16 +402,30 @@ function short(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-/** Text if the bytes are readable UTF-8 (no control characters but tabs and newlines), else hex. */
-export function describeBytes(data: Uint8Array): { text: string; hex: boolean } {
+/** Invisible characters (zero-width, bidi overrides, soft hyphen…) and odd line separators. */
+const HIDDEN_CHARS = /[\p{Cf}\u2028\u2029]/gu;
+
+/**
+ * Text if the bytes are readable UTF-8 (no control characters but tabs and newlines), else hex.
+ * Invisible characters, which could make a message read differently from what it says (a
+ * right-to-left override reverses what follows), are shown as ⟨U+202E⟩ and flagged.
+ */
+export function describeBytes(data: Uint8Array): { text: string; hex: boolean; hidden: boolean } {
   try {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(data);
-    if (!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) return { text, hex: false };
+    if (!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) {
+      const shown = text.replace(
+        HIDDEN_CHARS,
+        (c) => `⟨U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}⟩`,
+      );
+      return { text: shown, hex: false, hidden: shown !== text };
+    }
   } catch {
     // not UTF-8
   }
   return {
     text: `0x${Array.from(data, (b) => b.toString(16).padStart(2, '0')).join('')}`,
     hex: true,
+    hidden: false,
   };
 }

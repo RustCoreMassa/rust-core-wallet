@@ -107,7 +107,11 @@
     <input
       id="import-key-input"
       class="num-input"
-      type="text"
+      type="password"
+      autocomplete="off"
+      autocapitalize="off"
+      autocorrect="off"
+      spellcheck="false"
       placeholder="S1..."
       [ngModel]="importKeyValue()"
       (ngModelChange)="importKeyValue.set($event)"

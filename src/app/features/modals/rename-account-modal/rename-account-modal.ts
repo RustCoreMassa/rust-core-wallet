@@ -10,6 +10,7 @@ import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
 import { toUserMessage } from '../../../core/utils/user-error';
+import { copySecret } from '../../../core/utils/secret-clipboard';
 
 /**
  * `edit` → rename; `remove-warn` → explain what removal means; `remove-confirm` → confirm with
@@ -85,9 +86,8 @@ export class RenameAccountModal {
   protected copyPrivateKey(): void {
     const account = this.account();
     if (!account) return;
-    navigator.clipboard
-      .writeText(account.privateKey)
-      .then(() => this.toast.show('Private key copied — keep it secret'))
+    copySecret(account.privateKey)
+      .then(() => this.toast.show('Private key copied — the clipboard is emptied in 60 s'))
       .catch(() => this.toast.show('Could not copy — copy manually'));
   }
 

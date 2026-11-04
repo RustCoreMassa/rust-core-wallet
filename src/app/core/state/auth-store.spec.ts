@@ -1,9 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { VaultAccount } from '../models/vault.model';
-import { exportVaultKey, importVaultKey } from '../services/crypto-vault';
+import {
+  CryptoVault,
+  LEGACY_PBKDF2_ITERATIONS,
+  PBKDF2_ITERATIONS,
+  exportVaultKey,
+  importVaultKey,
+} from '../services/crypto-vault';
 import { SESSION_KEY_STORE, SessionKeyStore } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
-import { AuthStore } from './auth-store';
+import { AuthStore, FREE_ATTEMPTS, TooManyAttemptsError, unlockWaitMs } from './auth-store';
 
 const main: VaultAccount = {
   id: 'main',
@@ -212,5 +218,168 @@ describe('AuthStore with a session kept outside the page', () => {
     sessionKeys.raw = stale;
     expect(await reopen().resume()).toBe(false);
     expect(sessionKeys.raw).toBeNull();
+  });
+});
+
+describe('AuthStore — wrong-secret throttling', () => {
+  let auth: AuthStore;
+  let now: number;
+
+  beforeEach(() => {
+    localStorage.clear();
+    now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    TestBed.configureTestingModule({});
+    auth = TestBed.inject(AuthStore);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('waits 30 s after 5 wrong secrets, doubling up to an hour', () => {
+    expect([0, 4, 5, 6, 7, 10, 12, 30].map(unlockWaitMs)).toEqual([
+      0, 0, 30_000, 60_000, 120_000, 960_000, 3_600_000, 3_600_000,
+    ]);
+    expect(FREE_ATTEMPTS).toBe(5);
+  });
+
+  it('refuses to even check the secret while the user must wait, then lets them retry', async () => {
+    await auth.register('123456', [main]);
+    auth.lock();
+    for (let i = 0; i < FREE_ATTEMPTS; i++) expect(await auth.unlock('000000')).toBe(false);
+
+    // Even the right PIN isn't tried during the wait.
+    await expect(auth.unlock('123456')).rejects.toBeInstanceOf(TooManyAttemptsError);
+    await expect(auth.unlock('123456')).rejects.toThrow('try again in 30 s');
+    expect(auth.isUnlocked()).toBe(false);
+
+    now += 30_000;
+    expect(await auth.unlock('000000')).toBe(false); // 6th failure: 1 min
+    await expect(auth.unlock('123456')).rejects.toThrow('try again in 1 min');
+    now += 59_000;
+    await expect(auth.unlock('123456')).rejects.toThrow('try again in 1 s');
+    now += 1_000;
+    expect(await auth.unlock('123456')).toBe(true);
+    expect(auth.waitBeforeNextTry()).toBe(0); // a right secret starts the count over
+  });
+
+  it('counts step-up checks (reveal key, remove wallet, log out) too', async () => {
+    await auth.register('123456', [main]);
+    for (let i = 0; i < FREE_ATTEMPTS; i++) expect(await auth.verifySecret('000000')).toBe(false);
+    await expect(auth.verifySecret('123456')).rejects.toBeInstanceOf(TooManyAttemptsError);
+  });
+
+  it('keeps counting across a reload, and forgets on log out', async () => {
+    await auth.register('123456', [main]);
+    auth.lock();
+    for (let i = 0; i < FREE_ATTEMPTS; i++) await auth.unlock('000000');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const reloaded = TestBed.inject(AuthStore);
+    await expect(reloaded.unlock('123456')).rejects.toBeInstanceOf(TooManyAttemptsError);
+
+    reloaded.logout();
+    expect(reloaded.waitBeforeNextTry()).toBe(0);
+  });
+});
+
+describe('AuthStore — vault key strength', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({});
+  });
+
+  /** A vault as versions before 1.7.0 wrote it: 300 000 iterations, no `iterations` field. */
+  async function legacyVault(pin: string, accounts: VaultAccount[]): Promise<void> {
+    const crypto = TestBed.inject(CryptoVault);
+    const salt = btoa(
+      String.fromCharCode(...globalThis.crypto.getRandomValues(new Uint8Array(16))),
+    );
+    const key = await crypto.deriveExistingKey(pin, salt, LEGACY_PBKDF2_ITERATIONS);
+    const { iv, ciphertext } = await crypto.encrypt(JSON.stringify({ accounts }), key);
+    TestBed.inject(VaultStorage).save({ salt, iv, ciphertext });
+  }
+
+  it('creates new vaults with 600 000 iterations', async () => {
+    await TestBed.inject(AuthStore).register('123456', [main]);
+    expect(TestBed.inject(VaultStorage).load()?.iterations).toBe(PBKDF2_ITERATIONS);
+    expect(PBKDF2_ITERATIONS).toBe(600_000);
+  });
+
+  it('moves an older vault to 600 000 iterations at its next unlock, same PIN', async () => {
+    await legacyVault('123456', [main]);
+    const before = TestBed.inject(VaultStorage).load()!;
+    const auth = TestBed.inject(AuthStore);
+
+    expect(await auth.unlock('123456')).toBe(true);
+    const after = TestBed.inject(VaultStorage).load()!;
+    expect(after.iterations).toBe(PBKDF2_ITERATIONS);
+    expect(after.ciphertext).not.toBe(before.ciphertext);
+    // Same salt, on purpose: see the next test.
+    expect(after.salt).toBe(before.salt);
+
+    // Still the same wallets and PIN, and changes keep the new strength.
+    await auth.saveAccounts([main, second]);
+    expect(TestBed.inject(VaultStorage).load()?.iterations).toBe(PBKDF2_ITERATIONS);
+    auth.lock();
+    expect(await auth.unlock('123456')).toBe(true);
+    expect(auth.accounts()).toEqual([main, second]);
+    expect(await auth.verifySecret('123456')).toBe(true);
+  });
+
+  it('keeps an older vault usable while it is not moved yet (account changes, step-up checks)', async () => {
+    await legacyVault('123456', [main]);
+    const auth = TestBed.inject(AuthStore);
+    expect(await auth.verifySecret('123456')).toBe(true);
+    expect(TestBed.inject(VaultStorage).load()?.iterations).toBeUndefined();
+  });
+
+  it('survives a window still running an older version saving over a strengthened vault', async () => {
+    await legacyVault('123456', [main]);
+    expect(await TestBed.inject(AuthStore).unlock('123456')).toBe(true); // strengthened
+
+    // What versions before 1.7.0 do on "add wallet": their 300 000-iteration key, the stored
+    // salt, no iteration count.
+    const storage = TestBed.inject(VaultStorage);
+    const crypto = TestBed.inject(CryptoVault);
+    const { salt } = storage.load()!;
+    const oldKey = await crypto.deriveExistingKey('123456', salt, LEGACY_PBKDF2_ITERATIONS);
+    const written = await crypto.encrypt(JSON.stringify({ accounts: [main, second] }), oldKey);
+    storage.save({ salt, ...written });
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const reloaded = TestBed.inject(AuthStore);
+    expect(await reloaded.unlock('123456')).toBe(true);
+    expect(reloaded.accounts()).toEqual([main, second]);
+    expect(TestBed.inject(VaultStorage).load()?.iterations).toBe(PBKDF2_ITERATIONS);
+  });
+
+  it('never overwrites a vault another window re-encrypted meanwhile', async () => {
+    const first = TestBed.inject(AuthStore);
+    await first.register('123456', [main]);
+    const second_ = TestBed.runInInjectionContext(() => new AuthStore());
+    expect(await second_.unlock('123456')).toBe(true);
+
+    // The first window moves the vault to a new secret (the extension's PIN → password step).
+    await first.changeSecret('correct horse battery');
+
+    await expect(second_.saveAccounts([main, second])).rejects.toThrow(
+      'The wallet was changed in another window',
+    );
+    first.lock();
+    expect(await first.unlock('correct horse battery')).toBe(true);
+    expect(first.accounts()).toEqual([main]);
+  });
+
+  it('refuses a vault whose iteration count was tampered with', async () => {
+    const auth = TestBed.inject(AuthStore);
+    await auth.register('123456', [main]);
+    auth.lock();
+    const storage = TestBed.inject(VaultStorage);
+    for (const iterations of [1_000, 100_000_000]) {
+      storage.save({ ...storage.load()!, iterations });
+      expect(await auth.unlock('123456')).toBe(false);
+    }
   });
 });

@@ -140,7 +140,10 @@ export interface MassaProvider {
   ): Promise<OperationResult>;
 
   // ---- dApps ------------------------------------------------------------------
-  /** Signs `data` with the key's account, exactly as massa-web3's `Provider.sign` does. */
+  /**
+   * Signs `data` with the key's account, as massa-web3's `Provider.sign` does — but refuses
+   * (RefusedSignError) bytes shaped like a Massa operation of that account (utils/sign-guard.ts).
+   */
   signMessage(privateKey: string, data: Uint8Array): Promise<SignedMessage>;
   /** Runs `call` read-only as `caller` would — what would happen, without sending anything. */
   simulateCall(caller: string, call: ContractCallParams): Promise<CallSimulation>;

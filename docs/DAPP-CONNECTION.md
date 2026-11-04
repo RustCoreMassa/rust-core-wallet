@@ -185,7 +185,7 @@ Params (amounts in smallest units, as decimal strings; `?` = optional):
 | Method | Params |
 |---|---|
 | `connect`, `disconnect`, `connected`, `account`, `accounts`, `network` | none (`undefined`, `null` or `{}`) |
-| `sign` | `data` (base64, ≤ 16 KB), `from?` |
+| `sign` | `data` (base64, ≤ 16 KB, never a Massa operation — see below), `from?` |
 | `transfer` | `to`, `amount`, `fee?`, `from?` |
 | `buyRolls`, `sellRolls` | `rolls`, `fee?`, `from?` |
 | `callSC` | `target`, `func`, `parameter?` (base64), `coins?`, `fee?`, `maxGas?`, `from?` |
@@ -214,7 +214,20 @@ unsupported method, `4900` wallet busy, `-32602` invalid params, `-32603` intern
 
 The dApp chooses `fee`/`maxGas` hints, but the wallet enforces its own minimum fee (0.01 MAS) and
 caps: a lower `fee` is raised to 0.01 MAS, a higher one is paid as asked and reserved from the
-balance like the wallet's own. The review shows what will actually be sent.
+balance like the wallet's own — up to **1 MAS** (`MAX_FEE_UNITS`); above it the request is refused
+with `-32602`. A raised fee is spelled out on the review screen, not just listed. The review shows
+what will actually be sent.
+
+**`sign` never signs a Massa operation.** A node checks an operation's (or endorsement's, or block
+header's) signature against `chainId (8 bytes, big-endian) ‖ public key ‖ content`, and massa-web3
+signs messages with the same function on the raw bytes — so signing those bytes would hand the
+site a valid signature for a transfer of its choosing. `data` starting with the mainnet or
+buildnet chain id is refused with `-32602` by the background; data carrying the signer's public
+key at byte 8 (any chain id) is refused by the wallet's key itself (`utils/sign-guard.ts`), and
+the site gets no answer but the user's rejection. Text or binary messages that aren't shown as
+readable text get a warning; invisible and bidi characters are shown as `⟨U+202E⟩`.
+Also, `setApprovalForAll` on any NFT collection is decoded on the review screen, with a warning
+unless the operator is RustCore Launchpad.
 
 ## Manifest changes
 

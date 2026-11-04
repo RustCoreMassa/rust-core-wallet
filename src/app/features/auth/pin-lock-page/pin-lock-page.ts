@@ -136,7 +136,16 @@ export class PinLockPage {
 
     if (this.step() === 'unlock') {
       this.isBusy.set(true);
-      const ok = await this.authStore.unlock(secret);
+      let ok: boolean;
+      try {
+        ok = await this.authStore.unlock(secret);
+      } catch (err) {
+        // TooManyAttemptsError: its message says how long to wait.
+        this.isBusy.set(false);
+        this.error.set(toUserMessage(err));
+        this.entry()?.clear();
+        return;
+      }
       this.isBusy.set(false);
       if (!ok) {
         this.error.set(`Incorrect ${this.noun}`);

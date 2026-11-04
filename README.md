@@ -82,7 +82,7 @@ it shows a QR code to open it on your phone instead.
 
 **What stays on your phone**
 
-- Your wallet, encrypted with your PIN (PBKDF2 with 300 000 iterations, then AES-GCM, using the
+- Your wallet, encrypted with your PIN (PBKDF2 with 600 000 iterations, then AES-GCM, using the
   browser's built-in Web Crypto). Without your PIN it can't be read. The PIN itself is never
   stored.
 - While the wallet is unlocked, your keys live in memory only; locking it or closing the tab
@@ -114,6 +114,15 @@ reach any other server, even by mistake.
   address) — you confirm before anything is signed.
 - Revealing a private key, removing a wallet or logging out asks for your PIN (or the
   extension's password) again.
+- After 5 wrong PINs (or passwords) in a row, the wallet makes you wait — 30 seconds, then twice
+  as long after each new mistake, up to an hour — so nobody holding your phone can try every PIN.
+- A private key you copy is wiped from the clipboard after 60 seconds (while the wallet is open),
+  and the private key fields are hidden from the keyboard's suggestions and the browser's
+  spell check and autofill.
+- In the browser extension, a site can never get a signature that would move your funds: a
+  "message to sign" shaped like a Massa transaction is refused, a site can't set a network fee
+  above 1 MAS, and a request letting someone move all your NFTs of a collection is spelled out
+  with a warning.
 - In the browser extension, a dApp you connect sees only the wallets you chose for it, and each
   of its requests opens a review window; you can change which wallets a site sees, or disconnect
   it, in Settings → Connected sites.

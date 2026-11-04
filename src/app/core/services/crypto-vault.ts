@@ -1,6 +1,11 @@
 import { Injectable } from '@angular/core';
 
-const PBKDF2_ITERATIONS = 300_000;
+/** PBKDF2-HMAC-SHA256 iterations for new vaults: OWASP's recommendation (2023). */
+export const PBKDF2_ITERATIONS = 600_000;
+/** What vaults made before 1.7.0 used — they move to PBKDF2_ITERATIONS at their next unlock. */
+export const LEGACY_PBKDF2_ITERATIONS = 300_000;
+/** Above this a stored count can only be tampering: refused rather than derived for hours. */
+const MAX_PBKDF2_ITERATIONS = 10_000_000;
 const KEY_LENGTH_BITS = 256;
 const SALT_LENGTH_BYTES = 16;
 const IV_LENGTH_BYTES = 12;
@@ -8,6 +13,7 @@ const IV_LENGTH_BYTES = 12;
 export interface DerivedKey {
   readonly key: CryptoKey; // non-extractable unless asked for — see deriveKey
   readonly salt: string; // base64 — safe to persist alongside the ciphertext
+  readonly iterations: number; // persisted too, so the key can be derived again
 }
 
 export interface Ciphertext {
@@ -38,16 +44,30 @@ export class CryptoVault {
   /** Registration: no salt yet, so generate one. */
   async deriveNewKey(secret: string, extractable = false): Promise<DerivedKey> {
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH_BYTES));
-    return { key: await this.deriveKey(secret, salt, extractable), salt: toBase64(salt) };
+    return {
+      key: await this.deriveKey(secret, salt, extractable, PBKDF2_ITERATIONS),
+      salt: toBase64(salt),
+      iterations: PBKDF2_ITERATIONS,
+    };
   }
 
-  /** Unlock: re-derive using the salt that was stored alongside the vault. */
+  /**
+   * Unlock: re-derive using the salt and iteration count stored alongside the vault —
+   * `iterations` undefined means a vault from before 1.7.0 (LEGACY_PBKDF2_ITERATIONS). Required on
+   * purpose: deriving with the wrong count gives a key that silently fails to open the vault.
+   */
   async deriveExistingKey(
     secret: string,
     saltBase64: string,
+    iterations: number | undefined,
     extractable = false,
   ): Promise<CryptoKey> {
-    return this.deriveKey(secret, fromBase64(saltBase64), extractable);
+    return this.deriveKey(
+      secret,
+      fromBase64(saltBase64),
+      extractable,
+      iterations ?? LEGACY_PBKDF2_ITERATIONS,
+    );
   }
 
   async encrypt(plaintext: string, key: CryptoKey): Promise<Ciphertext> {
@@ -84,7 +104,16 @@ export class CryptoVault {
     secret: string,
     salt: Uint8Array,
     extractable: boolean,
+    iterations: number,
   ): Promise<CryptoKey> {
+    if (
+      !Number.isInteger(iterations) ||
+      iterations < LEGACY_PBKDF2_ITERATIONS ||
+      iterations > MAX_PBKDF2_ITERATIONS
+    ) {
+      // A tampered vault mustn't make the wallet derive a weak key, nor hang it for hours.
+      throw new Error('Unsupported vault');
+    }
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(secret.normalize('NFC')),
@@ -97,7 +126,7 @@ export class CryptoVault {
       {
         name: 'PBKDF2',
         salt: salt as BufferSource,
-        iterations: PBKDF2_ITERATIONS,
+        iterations,
         hash: 'SHA-256',
       },
       keyMaterial,
