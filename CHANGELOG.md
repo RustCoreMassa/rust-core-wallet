@@ -7,6 +7,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **NFT gallery** on the NFTs page: the NFTs your wallet holds, with their picture, description
+  and traits, and a details screen with the collection's contract. Only collections listed on
+  RustCore Launchpad **and verified by its team** are shown (read from its registry on the
+  blockchain), so spam, fake or "claim your reward" NFTs sent to your wallet never appear. At
+  most 200 NFTs per collection and 500 in all are read. Works on Mainnet and Buildnet.
+- NFT descriptions and pictures load only from `ipfs.io` (for `ipfs://` links) and
+  `nft.rustcoremassa.com` (RustCore's Core Keepers NFTs); an NFT stored elsewhere shows only
+  what's on the blockchain (collection name, symbol, number). Every request goes out without
+  cookies or referrer, with a timeout and a size limit, over https only, and a redirect can't
+  lead elsewhere.
+- **Content Security Policy for the web app**, the same as the browser extension's: the browser
+  runs only the wallet's own scripts and connects or loads images only from the servers in the
+  README's list.
+
+### Changed
+
+- Custom token icons: only `ipfs://` links (or links on `nft.rustcoremassa.com`) are accepted,
+  on the web and in the extension — the Content Security Policy blocks images from other
+  servers. An icon saved before from another server shows the token's symbol instead.
+- Pages scroll without showing a scrollbar (scrolling works as before).
+
 ## [1.6.0] — 2026-10-21
 
 ### Added

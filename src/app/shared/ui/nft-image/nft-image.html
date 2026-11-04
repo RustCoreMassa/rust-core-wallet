@@ -1,0 +1,15 @@
+@if (loading()) {
+<div class="nft-image skeleton-block"></div>
+} @else if (showImage()) {
+<img
+  class="nft-image"
+  [src]="src()"
+  [alt]="alt()"
+  referrerpolicy="no-referrer"
+  loading="lazy"
+  decoding="async"
+  (error)="onError()"
+/>
+} @else {
+<div class="nft-image nft-badge" [style.background]="badge()">{{ symbol().slice(0, 6) }}</div>
+}

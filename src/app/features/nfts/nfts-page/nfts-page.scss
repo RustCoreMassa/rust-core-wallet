@@ -154,6 +154,41 @@ button.domain-row:hover {
   font-size: 13.5px;
 }
 
-.coming-soon svg {
+.collect-empty svg {
   margin-bottom: 6px;
+}
+
+.nft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nft-limit-note {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--gray-500);
+  text-align: center;
+}
+
+.nft-tile-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.nft-tile-skeleton .skeleton {
+  margin-left: 11px;
+  width: 6em;
+}
+
+.nft-tile-image {
+  aspect-ratio: 1;
+  background: var(--bg-elevated-2);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
 }

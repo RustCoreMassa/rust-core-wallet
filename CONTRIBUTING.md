@@ -81,8 +81,16 @@ height; and a full-screen browser tab (`?view=tab`): a centered 720 px column, w
 place of bottom sheets. What a browser offers is detected, not assumed
 (`src/extension/browser-views.ts`): no side panel where neither API exists, and on a phone
 (Firefox for Android) the popup is already full screen, so it offers no other view. The
-extension's pages may connect only to the Massa nodes and the explorer API (CSP in
-`src/extension/manifest.json`).
+extension's pages may connect only to the Massa nodes, the explorer API and the two media
+servers of `MEDIA_HOSTS` (`src/app/core/utils/media-hosts.ts`), and load images only from those
+two (CSP in `src/extension/manifest.json`; `src/csp.spec.ts` checks it against `MEDIA_HOSTS`).
+
+**Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
+(minus `frame-ancestors`, which a `<meta>` can't set): `npm run build:extension` fails if the
+two differ, and `npm run smoke` fails if the built `index.html` lacks it or has inline code
+(`script-src 'self'` would block it — hence `inlineCritical: false` in angular.json). A new
+server means changing both policies, `MEDIA_HOSTS` if it serves media, and the README's list.
+Remote media links always go through `mediaUrl()`.
 
 **dApp connections** (extension only; design in `docs/DAPP-CONNECTION.md`). To try them, load the
 extension, run `npm run test-dapp` and open http://127.0.0.1:4300 (the extension's scripts run

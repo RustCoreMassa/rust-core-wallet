@@ -240,6 +240,12 @@ input[type='number']::-webkit-inner-spin-button {
   position: relative;
   overflow-y: auto;
   padding-bottom: 8px;
+  /* Pages scroll without a visible bar (touch, wheel and keys still work). */
+  scrollbar-width: none;
+}
+
+.view-area::-webkit-scrollbar {
+  display: none;
 }
 
 .view-header {

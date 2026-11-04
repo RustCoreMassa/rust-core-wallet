@@ -51,7 +51,7 @@
   ],
   "permissions": ["storage", "alarms", "sidePanel"],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net"
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net https://ipfs.io https://nft.rustcoremassa.com; img-src 'self' data: https://ipfs.io https://nft.rustcoremassa.com"
   },
   "browser_specific_settings": {
     "gecko": {

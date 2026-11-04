@@ -59,18 +59,50 @@
   <div class="section-head">
     <div>
       <div class="section-title">NFTs</div>
-      <div class="section-sub">Collectibles</div>
+      <div class="section-sub">Verified collections on RustCore Launchpad</div>
     </div>
+    @if (nfts(); as nfts) {
+    <span class="count-pill">{{ nfts.length }}</span>
+    }
   </div>
 
-  <div class="collect-empty coming-soon">
+  @if (nfts(); as nfts) {
+  @if (nfts.length > 0) {
+  <div class="nft-grid">
+    @for (item of nfts; track item.key) {
+    <app-nft-card [nft]="item.nft" [network]="store.network()" (opened)="openNft(item.nft)" />
+    }
+  </div>
+  @if (partial()) {
+  <div class="nft-limit-note">Showing the first {{ nfts.length }} NFTs this wallet holds.</div>
+  }
+  } @else {
+  <div class="collect-empty">
     <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
       <rect x="3" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
       <rect x="14" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
       <rect x="3" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
       <rect x="14" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
     </svg>
-    <div class="collect-empty-title">Coming soon</div>
-    <div class="collect-empty-sub">NFTs held by this wallet will show up here.</div>
+    <div class="collect-empty-title">No NFTs yet</div>
+    <div class="collect-empty-sub">
+      NFTs this wallet holds in verified collections on RustCore Launchpad will show up here.
+    </div>
   </div>
+  }
+  } @else if (nftsError()) {
+  <div class="collect-empty">
+    <div class="collect-empty-title">Couldn't load NFTs</div>
+    <div class="collect-empty-sub">Check your connection — we'll retry when you come back.</div>
+  </div>
+  } @else {
+  <div class="nft-grid">
+    @for (tile of skeletonTiles; track tile) {
+    <div class="nft-tile-skeleton">
+      <div class="nft-tile-image"></div>
+      <span class="skeleton"></span>
+    </div>
+    }
+  </div>
+  }
 </section>

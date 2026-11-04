@@ -7,6 +7,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Self-custodial wallet for the Massa blockchain.">
   <meta name="theme-color" content="#07070a">
+  <!-- Same policy as the browser extension (src/extension/manifest.json, minus frame-ancestors,
+       which a <meta> can't set); csp.spec.ts keeps them equal. Remote media: media-hosts.ts. -->
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; connect-src 'self' https://mainnet.massa.net https://buildnet.massa.net https://explorer-api.massa.net https://ipfs.io https://nft.rustcoremassa.com; img-src 'self' data: https://ipfs.io https://nft.rustcoremassa.com">
 
   <!-- Installable app (PWA) -->
   <link rel="manifest" href="manifest.webmanifest">

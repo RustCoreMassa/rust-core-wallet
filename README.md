@@ -52,14 +52,15 @@ built on four principles:
 | 🥩 **Stake** | Buy and sell rolls, see whether your wallet is staking, your produced and missed slots, the current APR and your estimated daily reward. |
 | 🧾 **History** | Every transaction of your wallet, with full details and a link to the Massa explorer. |
 | 🌐 **Domains** | See the `.massa` names your wallet owns, and register new ones — the wallet checks the name is free and shows its price before you confirm. |
+| 🖼️ **NFTs** | See the NFTs your wallet holds — picture, description and traits — in the collections RustCore Launchpad lists and has verified ([why only those](#faq)). |
 | 💲 **Prices** | Token values in USD, read directly from the Dusa exchange. |
 | 📲 **Install it** | Add it to your home screen on Android or iPhone and it opens full screen, like a native app. |
 
 Built-in tokens: MAS, PUR, DUSA, USDC.e, WETH.e, DAI.e, WBTC.e, WETH.b, USDT.b on Massa Mainnet;
 MAS on Buildnet, the test network. **Any other MRC-20 token** can be added by its contract address
 (*Settings → Custom tokens*): the wallet reads its name, symbol and decimals from the contract,
-then shows its balance and lets you send it. You can give it an icon from an `https://` or
-`ipfs://` link.
+then shows its balance and lets you send it. You can give it an icon from an `ipfs://` link (or
+a link on `nft.rustcoremassa.com`) — the wallet loads images from no other server.
 
 ## Getting started
 
@@ -98,10 +99,14 @@ it shows a QR code to open it on your phone instead.
 | The DeWeb gateway you open the wallet from | Delivers the wallet itself, read from the Massa blockchain. |
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa's public nodes: balances, rolls, tokens, prices and swaps, and the transactions you confirm. |
 | `explorer-api.massa.net` | Your transaction history. |
-| Icon links you set for custom tokens (only if you set one) | Loads that icon whenever the token is shown — from the address you entered, or `ipfs.io` for an `ipfs://` link. That server can see your IP address. |
+| `ipfs.io` / `nft.rustcoremassa.com` (only for NFTs your wallet holds, and icons you set) | The public IPFS gateway (for `ipfs://` links) and RustCore's server for its Core Keepers NFTs: NFT descriptions, traits and pictures, collection logos, and custom token icons. That server can see your IP address. |
 
-That's all: no RustCore servers, no analytics, no tracking. Links to `explorer.massa.net` and
-`docs.massa.net` open only when you tap them.
+That's all: no analytics, no tracking, and no RustCore server behind the wallet (the only one
+it may reach is `nft.rustcoremassa.com`, for Core Keepers NFTs you hold or an icon you set
+there). Links to `explorer.massa.net` and `docs.massa.net` open only when you tap them. The
+wallet enforces this list itself: its Content Security Policy — the same on the web and in the
+browser extension — lets the browser connect and load images only there, so the wallet can't
+reach any other server, even by mistake.
 
 **Built-in safeguards**
 
@@ -156,6 +161,15 @@ Mainnet). Registering a `.massa` name costs the fee set by the Massa Name System
 or more characters, up to 10,000 MAS for 2 — plus a 0.1 MAS storage deposit whose unused part
 comes back.
 
+**I own an NFT but the wallet doesn't show it.** The wallet shows NFTs only from collections
+listed on RustCore Launchpad **and verified by its team**, read from the Launchpad's registry on
+the blockchain. Anyone can create a collection and send its NFTs to any address — often with a
+fake name or a "claim your reward" scam in the description — so a wallet that showed everything
+would show those too. NFTs of other collections are still yours, on the blockchain: they just
+aren't shown. A picture or description stored anywhere but IPFS or RustCore's server isn't
+loaded either; the NFT then shows its collection's name and number. The wallet reads at most
+200 NFTs per collection and 500 in all.
+
 **I used the wallet at wrustcore.deweb.half-red.net — where is it now?** The wallet moved to
 Massa's official gateway, [wrustcore.massa.network](https://wrustcore.massa.network). It's the
 same app, but your browser keeps a wallet only at the address where it was created, so it doesn't
@@ -180,7 +194,7 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Published on DeWeb (`wrustcore.massa`)
 - [x] Import custom tokens from Settings
 - [x] Register new `.massa` domains from the NFTs page
-- [ ] NFT gallery
+- [x] NFT gallery (verified collections on RustCore Launchpad)
 - [ ] Independent security audit
 - [ ] Translations
 

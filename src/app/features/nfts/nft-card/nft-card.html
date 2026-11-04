@@ -1,0 +1,20 @@
+<button class="nft-card" type="button" (click)="opened.emit()">
+  <app-nft-image
+    [src]="image()"
+    [symbol]="nft().collection.symbol"
+    [alt]="title()"
+    [loading]="loading()"
+  />
+  <span class="nft-card-body">
+    <span class="nft-card-title">{{ title() }}</span>
+    <span class="nft-card-sub">
+      <span class="nft-card-collection">{{ nft().collection.name }}</span>
+      @if (nft().collection.verified) {
+      <svg class="verified" width="12" height="12" viewBox="0 0 24 24" aria-label="Verified">
+        <circle cx="12" cy="12" r="10" fill="currentColor" />
+        <path d="M7.5 12.5l3 3 6-6.5" stroke="#07070a" stroke-width="2.4" fill="none" />
+      </svg>
+      }
+    </span>
+  </span>
+</button>
