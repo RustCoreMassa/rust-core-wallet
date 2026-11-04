@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-11-04
+
 ### Security
 
 - **Copying a private key from Settings → wallet now asks for your PIN or password**, like
@@ -350,6 +352,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.7.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.1
 [1.7.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.0
 [1.6.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.6.0
 [1.5.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.2
