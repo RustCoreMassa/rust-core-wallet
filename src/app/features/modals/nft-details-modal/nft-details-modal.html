@@ -1,0 +1,76 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">NFT</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  @if (payload(); as p) {
+  <app-nft-image
+    class="nft-hero"
+    [src]="image()"
+    [symbol]="p.nft.collection.symbol"
+    [alt]="title()"
+    [loading]="loading()"
+  />
+
+  <div class="nft-title">{{ title() }}</div>
+  <div class="nft-collection">
+    {{ p.nft.collection.name }}
+    @if (p.nft.collection.verified) {
+    <span class="verified-pill">Verified</span>
+    }
+  </div>
+
+  @if (metadata(); as metadata) {
+  @if (metadata.description) {
+  <p class="nft-description">{{ metadata.description }}</p>
+  }
+  @if (metadata.attributes.length > 0) {
+  <div class="field-label">Traits</div>
+  <div class="nft-traits">
+    @for (attribute of metadata.attributes; track $index) {
+    <div class="nft-trait">
+      <div class="nft-trait-name">{{ attribute.trait }}</div>
+      <div class="nft-trait-value">{{ attribute.value }}</div>
+    </div>
+    }
+  </div>
+  }
+  }
+
+  <dl class="nft-fields">
+    <div class="nft-field">
+      <dt>Token ID</dt>
+      <dd>#{{ p.nft.id }}</dd>
+    </div>
+    <div class="nft-field">
+      <dt>Collection</dt>
+      <dd>
+        {{ p.nft.collection.name }}
+        @if (p.nft.collection.symbol) {
+        <span class="muted">({{ p.nft.collection.symbol }})</span>
+        }
+      </dd>
+    </div>
+    <div class="nft-field">
+      <dt>Standard</dt>
+      <dd>MRC-721</dd>
+    </div>
+    <div class="nft-field">
+      <dt>Listed on</dt>
+      <dd>RustCore Launchpad</dd>
+    </div>
+  </dl>
+
+  <div class="field-label">Collection contract</div>
+  <button class="addr-box nft-copy" type="button" (click)="copy(p.nft.collection.address, 'Address')">
+    {{ p.nft.collection.address }}
+  </button>
+
+  @if (explorerUrl(); as url) {
+  <a class="btn btn-red nft-explorer" [href]="url" target="_blank" rel="noopener noreferrer">
+    View collection on explorer ↗
+  </a>
+  }
+  }
+</div>

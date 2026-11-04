@@ -12,6 +12,7 @@ export type ModalId =
   | 'logout'
   | 'tx-details'
   | 'domain-details'
+  | 'nft-details'
   | 'connected-sites'
   | 'tokens'
   | 'register-domain'

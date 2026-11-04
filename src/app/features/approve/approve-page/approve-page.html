@@ -20,6 +20,10 @@
 
     <h1 class="approve-title">{{ title() }}</h1>
 
+    @if (feeWarning(); as warning) {
+    <div class="approve-warning">{{ warning }}</div>
+    }
+
     @if (callInfo(); as info) {
     @if (info.summary) {
     <div class="approve-summary">{{ info.summary }}</div>
@@ -48,6 +52,18 @@
     @if (message(); as m) {
     <div class="field-label">Message</div>
     <pre class="approve-message" [class.hex]="m.hex">{{ m.text }}</pre>
+    @if (m.hidden) {
+    <div class="approve-warning">
+      This message hides invisible characters (shown as ⟨U+…⟩) that can make text read differently
+      from what it says. Sign it only if you trust this site.
+    </div>
+    }
+    @if (m.hex) {
+    <div class="approve-warning">
+      This message isn't text, so you can't read what you're signing. Sign it only if you trust
+      this site.
+    </div>
+    }
     }
 
     @if (checking()) {

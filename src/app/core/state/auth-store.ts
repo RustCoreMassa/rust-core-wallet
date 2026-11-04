@@ -1,8 +1,46 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { VaultAccount, VaultPayload } from '../models/vault.model';
-import { Ciphertext, CryptoVault } from '../services/crypto-vault';
+import { VaultAccount, VaultEnvelope, VaultPayload } from '../models/vault.model';
+import { LOCAL_STORE } from '../platform/app-storage';
+import { Ciphertext, CryptoVault, PBKDF2_ITERATIONS } from '../services/crypto-vault';
 import { SESSION_KEY_STORE } from '../services/session-key-store';
 import { VaultStorage } from '../services/vault-storage';
+
+/** Where wrong-secret attempts are counted (survives reloads, so reopening doesn't reset it). */
+const FAILURES_KEY = 'massa-wallet:unlock-failures';
+/** Wrong secrets allowed before the wallet makes the user wait. */
+export const FREE_ATTEMPTS = 5;
+const FIRST_WAIT_MS = 30_000;
+const MAX_WAIT_MS = 60 * 60_000;
+
+/**
+ * How long after the last wrong secret the next try is allowed: nothing for the first
+ * FREE_ATTEMPTS, then 30 s, doubling with every further one, at most an hour — so trying every
+ * 6-digit PIN on the device itself would take a century.
+ */
+export function unlockWaitMs(failures: number): number {
+  if (failures < FREE_ATTEMPTS) return 0;
+  return Math.min(FIRST_WAIT_MS * 2 ** (failures - FREE_ATTEMPTS), MAX_WAIT_MS);
+}
+
+/** Thrown instead of checking a secret while the wallet makes the user wait. */
+export class TooManyAttemptsError extends Error {
+  constructor(readonly waitMs: number) {
+    super(`Too many wrong attempts — try again in ${formatWait(waitMs)}`);
+    this.name = 'TooManyAttemptsError';
+  }
+}
+
+function formatWait(ms: number): string {
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds < 60) return `${seconds} s`;
+  return `${Math.ceil(seconds / 60)} min`;
+}
+
+interface Failures {
+  readonly count: number;
+  /** ms epoch of the last wrong secret. */
+  readonly at: number;
+}
 
 /**
  * Owns the vault lifecycle, gated by the unlock secret (the web app's PIN
@@ -32,6 +70,7 @@ export class AuthStore {
   private readonly cryptoVault = inject(CryptoVault);
   private readonly vaultStorage = inject(VaultStorage);
   private readonly sessionKeys = inject(SESSION_KEY_STORE);
+  private readonly store = inject(LOCAL_STORE);
 
   private readonly _isUnlocked = signal(false);
   private readonly _accounts = signal<VaultAccount[]>([]);
@@ -47,11 +86,15 @@ export class AuthStore {
 
   /** First-time setup: encrypts `accounts` under a fresh secret and unlocks. */
   async register(secret: string, accounts: VaultAccount[]): Promise<void> {
-    const { key, salt } = await this.cryptoVault.deriveNewKey(secret, this.sessionKeys.keepsKey);
+    const { key, salt, iterations } = await this.cryptoVault.deriveNewKey(
+      secret,
+      this.sessionKeys.keepsKey,
+    );
     const payload: VaultPayload = { accounts };
     const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
 
-    this.vaultStorage.save({ salt, iv, ciphertext });
+    this.vaultStorage.save({ salt, iterations, iv, ciphertext });
+    this.clearFailures();
     this.sessionKey = key;
     this._accounts.set(accounts);
     this._isUnlocked.set(true);
@@ -59,25 +102,90 @@ export class AuthStore {
     await this.keepSession(key);
   }
 
-  /** Returns false on a wrong secret instead of throwing — callers just check the result. */
+  /**
+   * Returns false on a wrong secret instead of throwing — callers just check the result. Throws
+   * TooManyAttemptsError, without checking the secret, while the user must wait.
+   */
   async unlock(secret: string): Promise<boolean> {
     const envelope = this.vaultStorage.load();
     if (!envelope) return false;
+    this.assertMayTry();
 
     let key: CryptoKey;
     try {
       key = await this.cryptoVault.deriveExistingKey(
         secret,
         envelope.salt,
+        envelope.iterations,
         this.sessionKeys.keepsKey,
       );
       await this.open(key);
     } catch {
       // Wrong secret (AES-GCM auth tag mismatch) or a corrupted vault.
+      this.recordFailure();
       return false;
+    }
+    this.clearFailures();
+    if (envelope.iterations !== PBKDF2_ITERATIONS) {
+      // A vault from before 1.7.0: re-encrypt it with today's stronger key while we have the
+      // secret. Best effort — the session goes on under the old key if it fails.
+      try {
+        await this.strengthen(secret, envelope.salt);
+        return true;
+      } catch (err) {
+        console.warn('Strengthening the vault failed', err);
+      }
     }
     await this.keepSession(key);
     return true;
+  }
+
+  /**
+   * Re-encrypts a vault from before 1.7.0 with PBKDF2_ITERATIONS, **keeping its salt**: a window
+   * still running an older version that saves over it then writes a valid older vault (its own
+   * key, that salt, no iteration count), which the next unlock strengthens again — never one that
+   * no secret opens.
+   */
+  private async strengthen(secret: string, salt: string): Promise<void> {
+    await this.currentVault();
+    const key = await this.cryptoVault.deriveExistingKey(
+      secret,
+      salt,
+      PBKDF2_ITERATIONS,
+      this.sessionKeys.keepsKey,
+    );
+    const payload: VaultPayload = { accounts: this._accounts() };
+    const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
+    this.vaultStorage.save({ salt, iterations: PBKDF2_ITERATIONS, iv, ciphertext });
+    this.sessionKey = key;
+    await this.keepSession(key);
+  }
+
+  /**
+   * The stored vault, checked to still open with this session's key before anything overwrites
+   * it. Another window (a second tab, the extension's side panel) may have re-encrypted it
+   * meanwhile — a new secret, a stronger key: writing over it with this older key would leave a
+   * vault no secret opens. Then nothing is written and the user unlocks again.
+   */
+  private async currentVault(): Promise<VaultEnvelope> {
+    if (!this.sessionKey) throw new Error('Vault is locked');
+    const envelope = this.vaultStorage.load();
+    if (!envelope) throw new Error('No vault to update');
+    try {
+      await this.cryptoVault.decrypt(envelope, this.sessionKey);
+    } catch {
+      throw new Error(
+        'The wallet was changed in another window. Lock it and unlock it again, then retry.',
+      );
+    }
+    return envelope;
+  }
+
+  /** How long the user must still wait before the next try; 0 when they may try now. */
+  waitBeforeNextTry(): number {
+    const failures = this.failures();
+    if (!failures) return 0;
+    return Math.max(0, failures.at + unlockWaitMs(failures.count) - Date.now());
   }
 
   /**
@@ -114,6 +222,7 @@ export class AuthStore {
   logout(): void {
     this.lock();
     this.vaultStorage.clear();
+    this.clearFailures();
     this._hasVault.set(false);
   }
 
@@ -126,13 +235,46 @@ export class AuthStore {
   async verifySecret(secret: string): Promise<boolean> {
     const envelope = this.vaultStorage.load();
     if (!envelope) return false;
+    // Counted like unlock: whoever holds an unlocked phone mustn't guess the PIN to see the keys.
+    this.assertMayTry();
     try {
-      const key = await this.cryptoVault.deriveExistingKey(secret, envelope.salt);
+      const key = await this.cryptoVault.deriveExistingKey(
+        secret,
+        envelope.salt,
+        envelope.iterations,
+      );
       await this.cryptoVault.decrypt(envelope, key);
-      return true;
     } catch {
+      this.recordFailure();
       return false;
     }
+    this.clearFailures();
+    return true;
+  }
+
+  // ---- wrong-secret throttling ---------------------------------------------
+
+  private assertMayTry(): void {
+    const wait = this.waitBeforeNextTry();
+    if (wait > 0) throw new TooManyAttemptsError(wait);
+  }
+
+  private failures(): Failures | null {
+    try {
+      const saved = JSON.parse(this.store.getItem(FAILURES_KEY) ?? 'null') as Failures | null;
+      return saved && Number.isInteger(saved.count) && Number.isFinite(saved.at) ? saved : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private recordFailure(): void {
+    const count = (this.failures()?.count ?? 0) + 1;
+    this.store.setItem(FAILURES_KEY, JSON.stringify({ count, at: Date.now() } satisfies Failures));
+  }
+
+  private clearFailures(): void {
+    this.store.removeItem(FAILURES_KEY);
   }
 
   /** Throws when `key` doesn't decrypt the stored vault; state changes only on success. */
@@ -159,29 +301,35 @@ export class AuthStore {
    * key (the wallet cache) just stops decrypting and is rebuilt.
    */
   async changeSecret(secret: string): Promise<void> {
-    if (!this.sessionKey) throw new Error('Vault is locked');
-    const { key, salt } = await this.cryptoVault.deriveNewKey(secret, this.sessionKeys.keepsKey);
+    await this.currentVault();
+    const { key, salt, iterations } = await this.cryptoVault.deriveNewKey(
+      secret,
+      this.sessionKeys.keepsKey,
+    );
     const payload: VaultPayload = { accounts: this._accounts() };
     const { iv, ciphertext } = await this.cryptoVault.encrypt(JSON.stringify(payload), key);
 
-    this.vaultStorage.save({ salt, iv, ciphertext });
+    this.vaultStorage.save({ salt, iterations, iv, ciphertext });
     this.sessionKey = key;
     await this.keepSession(key);
   }
 
   /** Persists an updated account list under the already-derived session key. */
   async saveAccounts(accounts: VaultAccount[]): Promise<void> {
-    if (!this.sessionKey) throw new Error('Vault is locked');
-    const envelope = this.vaultStorage.load();
-    if (!envelope) throw new Error('No vault to update');
-
+    const envelope = await this.currentVault();
     const payload: VaultPayload = { accounts };
     const { iv, ciphertext } = await this.cryptoVault.encrypt(
       JSON.stringify(payload),
-      this.sessionKey,
+      this.sessionKey!,
     );
 
-    this.vaultStorage.save({ salt: envelope.salt, iv, ciphertext });
+    // Same key, so same salt and iteration count: dropping either would lock the user out.
+    this.vaultStorage.save({
+      salt: envelope.salt,
+      iterations: envelope.iterations,
+      iv,
+      ciphertext,
+    });
     this._accounts.set(accounts);
   }
 

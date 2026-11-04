@@ -18,6 +18,8 @@ export interface VaultPayload {
  */
 export interface VaultEnvelope {
   readonly salt: string; // base64, PBKDF2 salt
+  /** PBKDF2 iterations the key was derived with; absent = 300 000 (vaults made before 1.7.0). */
+  readonly iterations?: number;
   readonly iv: string; // base64, AES-GCM nonce
   readonly ciphertext: string; // base64, AES-GCM output (payload + auth tag)
 }

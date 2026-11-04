@@ -8,6 +8,8 @@ import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { avatarColorsFor } from '../../../shared/ui/avatar-colors';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
+import { toUserMessage } from '../../../core/utils/user-error';
+import { copySecret } from '../../../core/utils/secret-clipboard';
 
 type Step = 'confirm-secret' | 'reveal';
 
@@ -64,6 +66,10 @@ export class BackupPhraseModal {
         this.error.set(`Incorrect ${this.secretName}`);
         this.entry()?.clear();
       }
+    } catch (err) {
+      // TooManyAttemptsError: its message says how long to wait.
+      this.error.set(toUserMessage(err));
+      this.entry()?.clear();
     } finally {
       this.isBusy.set(false);
     }
@@ -72,9 +78,8 @@ export class BackupPhraseModal {
   protected copyPrivateKey(): void {
     const account = this.selectedAccount();
     if (!account) return;
-    navigator.clipboard
-      .writeText(account.privateKey)
-      .then(() => this.toast.show('Private key copied — keep it secret'))
+    copySecret(account.privateKey)
+      .then(() => this.toast.show('Private key copied — the clipboard is emptied in 60 s'))
       .catch(() => this.toast.show('Could not copy — copy manually'));
   }
 }

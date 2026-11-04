@@ -14,6 +14,7 @@ import { BackupPhraseModal } from '../../features/modals/backup-phrase-modal/bac
 import { LogoutModal } from '../../features/modals/logout-modal/logout-modal';
 import { TxDetailsModal } from '../../features/modals/tx-details-modal/tx-details-modal';
 import { DomainDetailsModal } from '../../features/modals/domain-details-modal/domain-details-modal';
+import { NftDetailsModal } from '../../features/modals/nft-details-modal/nft-details-modal';
 import { ConnectedSitesModal } from '../../features/modals/connected-sites-modal/connected-sites-modal';
 import { RegisterDomainModal } from '../../features/modals/register-domain-modal/register-domain-modal';
 import { TokensModal } from '../../features/modals/tokens-modal/tokens-modal';
@@ -41,6 +42,7 @@ const AUTO_REFRESH_MS = 10_000;
     LogoutModal,
     TxDetailsModal,
     DomainDetailsModal,
+    NftDetailsModal,
     ConnectedSitesModal,
     TokensModal,
     RegisterDomainModal,

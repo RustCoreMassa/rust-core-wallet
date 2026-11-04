@@ -5,6 +5,7 @@ import { Modal } from '../../../core/services/modal';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletDataEraser } from '../../../core/state/wallet-data-eraser';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
+import { toUserMessage } from '../../../core/utils/user-error';
 
 type Step = 'warn' | 'confirm-secret';
 
@@ -48,6 +49,9 @@ export class LogoutModal {
         return;
       }
       await this.logOut();
+    } catch (err) {
+      this.error.set(toUserMessage(err));
+      this.entry()?.clear();
     } finally {
       this.isBusy.set(false);
     }

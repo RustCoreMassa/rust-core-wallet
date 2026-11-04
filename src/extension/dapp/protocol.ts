@@ -1,8 +1,9 @@
 // Protocol v1 between web pages (dApps) and the extension — see docs/DAPP-CONNECTION.md.
 //
 // Shared by inpage.js, content.js, the background worker and the approval view, so it imports
-// nothing (no Angular, no massa-web3). Everything a page sends is untrusted: `parseRequest`
+// nothing but the import-free sign-guard (no Angular, no massa-web3). Everything a page sends is untrusted: `parseRequest`
 // turns it into a typed request or throws a DappError, before anything is shown to the user.
+import { REFUSED_SIGN_MESSAGE, startsWithChainId } from '../../app/core/utils/sign-guard';
 
 /** Marks our messages among everything else posted on a page's window. */
 export const CHANNEL = 'rustcore:v1';
@@ -13,6 +14,12 @@ export const MAX_MESSAGE_CHARS = 256 * 1024;
 export const MAX_PARAMETER_BYTES = 64 * 1024;
 /** Largest message a dApp may ask to sign, in bytes. */
 export const MAX_SIGN_BYTES = 16 * 1024;
+/**
+ * Highest network fee a site may set, in nanoMAS (1 MAS — a hundred times the wallet's own
+ * 0.01 MAS). Above it a request is refused: a fee is paid even when the operation fails, and goes
+ * to whoever produces the block, so a site could otherwise drain an account through it.
+ */
+export const MAX_FEE_UNITS = 1_000_000_000n;
 /** Longest smart-contract function name. */
 export const MAX_FUNCTION_CHARS = 256;
 
@@ -268,6 +275,8 @@ export function parseRequest(method: string, params: unknown): DappRequest {
       const p = record(params, ['data', 'from']);
       const data = bytes(p['data'], 'data', MAX_SIGN_BYTES);
       if (data.length === 0) throw invalid('data must not be empty');
+      // A Massa operation in disguise: its signature could move the user's funds.
+      if (startsWithChainId(data)) throw invalid(REFUSED_SIGN_MESSAGE);
       return { method: m, data, ...optionalFrom(p) };
     }
     case 'transfer': {
@@ -357,7 +366,10 @@ function record(params: unknown, allowed: readonly string[]): Record<string, unk
 
 /** The fee a site set, in nanoMAS; the wallet raises it to its own minimum later. */
 function optionalFee(p: Record<string, unknown>): { fee?: bigint } {
-  return p['fee'] === undefined ? {} : { fee: units(p['fee'], 'fee') };
+  if (p['fee'] === undefined) return {};
+  const fee = units(p['fee'], 'fee');
+  if (fee > MAX_FEE_UNITS) throw invalid('fee is above 1 MAS, the most the wallet accepts');
+  return { fee };
 }
 
 /** The account a site asks to sign with; the router checks the site may use it. */

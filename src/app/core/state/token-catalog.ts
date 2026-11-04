@@ -9,6 +9,7 @@ import {
 } from '../models/token.model';
 import { KeyValueStore, LOCAL_STORE } from '../platform/app-storage';
 import { MASSA_PROVIDER, TokenInfo } from '../services/massa-provider';
+import { cleanContractText } from '../utils/contract-text';
 import { parseIconLink } from '../utils/token-icon';
 import { Network, NetworkStore } from './network-store';
 
@@ -46,26 +47,10 @@ function comparable(symbol: string): string {
   return symbol.normalize('NFKC').toUpperCase();
 }
 
-/**
- * A contract's own text, made safe to show: control and invisible
- * characters (zero-width spaces, right-to-left overrides…) removed —
- * they can make one symbol look like another — whitespace collapsed,
- * length capped.
- */
-export function cleanTokenText(text: string, maxLength: number): string {
-  const clean = text
-    .normalize('NFC')
-    .replace(/[\p{C}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const chars = [...clean];
-  return chars.length > maxLength ? `${chars.slice(0, maxLength - 1).join('')}…` : clean;
-}
-
 /** Checks a token's on-chain metadata; throws a user-facing message when it can't be added. */
 export function toCustomToken(contract: string, info: TokenInfo): CustomToken {
-  const symbol = cleanTokenText(info.symbol, MAX_SYMBOL_LENGTH);
-  const name = cleanTokenText(info.name, MAX_NAME_LENGTH) || symbol;
+  const symbol = cleanContractText(info.symbol, MAX_SYMBOL_LENGTH);
+  const name = cleanContractText(info.name, MAX_NAME_LENGTH) || symbol;
   if (!symbol) throw new Error('This token has no symbol, so it would be hard to tell apart');
   if (RESERVED_SYMBOLS.has(comparable(symbol))) {
     throw new Error(

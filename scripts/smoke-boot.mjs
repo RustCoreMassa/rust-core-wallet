@@ -12,6 +12,17 @@ const args = process.argv.slice(2);
 const extension = args.includes('--extension');
 const dir = resolve(args.find((a) => !a.startsWith('--')) ?? 'dist/rust-core-wallet/browser');
 const html = readFileSync(join(dir, 'index.html'), 'utf8');
+// Both builds ship a CSP with script-src 'self': inline code (e.g. Angular's critical-CSS
+// loader, onload="…") would silently never run in a real browser — jsdom doesn't enforce CSP.
+const inlineCode = html.match(/<script(?![^>]*\bsrc=)[^>]*>|\son[a-z]+\s*=/i);
+if (inlineCode) {
+  console.error(`BOOT FAILED — index.html has inline code its CSP blocks: ${inlineCode[0]}`);
+  process.exit(1);
+}
+if (!/<meta http-equiv="Content-Security-Policy"/.test(html)) {
+  console.error('BOOT FAILED — index.html has no Content-Security-Policy');
+  process.exit(1);
+}
 const dom = new JSDOM(html, { url: 'https://wallet.test/', pretendToBeVisual: true });
 const win = dom.window;
 // Pose as a phone (touch-first), so the app boots past its desktop gate.

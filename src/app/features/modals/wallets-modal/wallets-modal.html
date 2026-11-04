@@ -70,7 +70,11 @@
   <input
     id="wallets-import-key"
     class="num-input"
-    type="text"
+    type="password"
+    autocomplete="off"
+    autocapitalize="off"
+    autocorrect="off"
+    spellcheck="false"
     placeholder="S1..."
     [ngModel]="importKey()"
     (ngModelChange)="importKey.set($event)"

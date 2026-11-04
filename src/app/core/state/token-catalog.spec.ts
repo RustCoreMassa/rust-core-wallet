@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { TOKEN_REGISTRY } from '../models/token.model';
 import { MASSA_PROVIDER, TokenInfo } from '../services/massa-provider';
 import { NetworkStore } from './network-store';
-import { TokenCatalog, cleanTokenText, toCustomToken } from './token-catalog';
+import { cleanContractText } from '../utils/contract-text';
+import { TokenCatalog, toCustomToken } from './token-catalog';
 
 const TOKEN = 'AS12FW5Rs5YN2zdpEnqwj4iHUUPt9R4Eqjq2qtpJFNKW3mn33RuLU';
 const OTHER = 'AS1MYYTKxPSbPFDWm48yxQLq2sDsJdUEHsjo9GmJw7dtQUxhpnu1';
@@ -26,8 +27,8 @@ describe('toCustomToken', () => {
   });
 
   it('strips invisible and control characters from what it shows', () => {
-    expect(cleanTokenText('W​M‮A\u0000S', 16)).toBe('WMAS');
-    expect(cleanTokenText('  Wrapped \n  Massa ', 40)).toBe('Wrapped Massa');
+    expect(cleanContractText('W​M‮A\u0000S', 16)).toBe('WMAS');
+    expect(cleanContractText('  Wrapped \n  Massa ', 40)).toBe('Wrapped Massa');
   });
 
   it('caps long names and symbols', () => {

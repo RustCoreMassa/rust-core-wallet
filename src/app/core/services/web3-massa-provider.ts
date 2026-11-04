@@ -13,6 +13,7 @@ import {
   strToBytes,
 } from '@massalabs/massa-web3';
 import { MnsDomain } from '../models/nft.model';
+import { RefusedSignError, isRefusedMessage } from '../utils/sign-guard';
 import { NetworkStore } from '../state/network-store';
 import { waitExecuted } from './operation-execution';
 import {
@@ -240,6 +241,9 @@ export class Web3MassaProvider implements MassaProvider {
   async signMessage(privateKey: string, data: Uint8Array): Promise<SignedMessage> {
     // What JsonRpcProvider.sign does, without opening a provider for it.
     const account = await Account.fromPrivateKey(privateKey);
+    // The last line of defence: bytes with a Massa operation's layout would make the
+    // signature valid for that operation (utils/sign-guard.ts).
+    if (isRefusedMessage(data, account.publicKey.toBytes())) throw new RefusedSignError();
     const signature = await account.sign(data);
     return { publicKey: account.publicKey.toString(), signature: signature.toString() };
   }

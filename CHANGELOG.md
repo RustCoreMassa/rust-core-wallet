@@ -7,6 +7,55 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-11-04
+
+### Security
+
+- **Browser extension: a site could get a signature that moves your funds** through a "sign this
+  message" request. A Massa transaction is signed over its own bytes with the same function as a
+  message, so a site asking you to sign exactly those bytes would have received a valid
+  signature for a transfer of its choosing. Such messages are now refused — by the extension's
+  background and, finally, by the signing key itself. Found in an internal audit; no known abuse.
+- After 5 wrong PINs or passwords in a row the wallet makes you wait (30 s, doubling with each
+  new mistake, at most an hour), also for the PIN asked before revealing a key, removing a wallet
+  or logging out. The count survives reloading the page.
+- The wallet's encryption key is now derived with 600 000 PBKDF2 iterations (was 300 000, below
+  OWASP's recommendation); existing wallets move over at their next unlock, with the same PIN
+  and the same private keys. A second window (another tab, the extension's side panel) can no
+  longer save over a wallet another window re-encrypted — it asks to unlock again instead.
+  Note: once moved, a wallet can't be opened by versions before 1.7.0.
+- Private key fields are hidden and kept out of keyboard suggestions, spell check (which can send
+  text to a server) and autofill; a copied private key is wiped from the clipboard after 60 s.
+- Browser extension: a site can't set a network fee above 1 MAS, and a raised fee is spelled out
+  on the review screen; `setApprovalForAll` on an NFT collection (how NFT drainers empty
+  wallets) is decoded, with a warning unless it's for RustCore Launchpad; invisible and
+  right-to-left characters in a message to sign are shown instead of disguising it, and a
+  message that isn't readable text gets a warning.
+- The release workflow pins its GitHub Actions to exact commits.
+
+### Added
+
+- **NFT gallery** on the NFTs page: the NFTs your wallet holds, with their picture, description
+  and traits, and a details screen with the collection's contract. Only collections listed on
+  RustCore Launchpad **and verified by its team** are shown (read from its registry on the
+  blockchain), so spam, fake or "claim your reward" NFTs sent to your wallet never appear. At
+  most 200 NFTs per collection and 500 in all are read. Works on Mainnet and Buildnet.
+- NFT descriptions and pictures load only from `ipfs.io` (for `ipfs://` links) and
+  `nft.rustcoremassa.com` (RustCore's Core Keepers NFTs); an NFT stored elsewhere shows only
+  what's on the blockchain (collection name, symbol, number). Every request goes out without
+  cookies or referrer, with a timeout and a size limit, over https only, and a redirect can't
+  lead elsewhere.
+- **Content Security Policy for the web app**, the same as the browser extension's: the browser
+  runs only the wallet's own scripts and connects or loads images only from the servers in the
+  README's list.
+
+### Changed
+
+- Custom token icons: only `ipfs://` links (or links on `nft.rustcoremassa.com`) are accepted,
+  on the web and in the extension — the Content Security Policy blocks images from other
+  servers. An icon saved before from another server shows the token's symbol instead.
+- Pages scroll without showing a scrollbar (scrolling works as before).
+
 ## [1.6.0] — 2026-10-21
 
 ### Added
@@ -253,6 +302,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.7.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.0
 [1.6.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.6.0
 [1.5.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.2
 [1.5.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.5.1

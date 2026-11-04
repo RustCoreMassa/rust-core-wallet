@@ -51,6 +51,28 @@ if (inline) {
   process.exit(1);
 }
 
+// The web app's CSP (<meta> in src/index.html) must be the extension's (manifest.json), minus
+// frame-ancestors, which a <meta> can't set. The same index.html ships in the extension, where both
+// policies apply. Remote media hosts: src/app/core/utils/media-hosts.ts (csp.spec.ts).
+const cspOf = (text) =>
+  text
+    .split(';')
+    .map((part) => part.trim().replace(/\s+/g, ' '))
+    .filter((part) => part && !part.startsWith('frame-ancestors'))
+    .join('; ');
+const webCsp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(
+  readFileSync('src/index.html', 'utf8'),
+)?.[1];
+const extensionCsp = JSON.parse(readFileSync('src/extension/manifest.json', 'utf8'))
+  .content_security_policy.extension_pages;
+if (!webCsp || cspOf(webCsp) !== cspOf(extensionCsp)) {
+  console.error(
+    "src/index.html's Content-Security-Policy differs from src/extension/manifest.json's:\n" +
+      `  web:       ${webCsp && cspOf(webCsp)}\n  extension: ${cspOf(extensionCsp)}`,
+  );
+  process.exit(1);
+}
+
 // massa-web3's unused gRPC client (protoc-generated code, plus google-protobuf and grpc-web,
 // both minified on npm) must stay out: AMO reviewers can't read it. scripts/trim-massa-web3.mjs
 // (postinstall) lets the bundler drop it.

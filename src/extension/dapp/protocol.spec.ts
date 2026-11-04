@@ -117,6 +117,19 @@ describe('parseRequest', () => {
     }
   });
 
+  it('refuses a fee above 1 MAS (MAX_FEE_UNITS)', () => {
+    expect(parseRequest('transfer', { to: USER, amount: '1', fee: '1000000000' })).toMatchObject({
+      fee: 1_000_000_000n,
+    });
+    for (const method of ['transfer', 'buyRolls', 'sellRolls'] as const) {
+      const params =
+        method === 'transfer'
+          ? { to: USER, amount: '1', fee: '1000000001' }
+          : { rolls: '1', fee: '1000000001' };
+      expect(codeOf(method, params)).toBe(DappErrorCode.InvalidParams);
+    }
+  });
+
   it('takes an optional fee on transfers and rolls, in exact units', () => {
     expect(parseRequest('transfer', { to: USER, amount: '5', fee: '20000000' })).toEqual({
       method: 'transfer',
@@ -235,6 +248,20 @@ describe('parseRequest', () => {
     expect(codeOf('sign', { data: 'hi' })).toBe(DappErrorCode.InvalidParams); // not base64
     const huge = toBase64(new Uint8Array(MAX_SIGN_BYTES + 1));
     expect(codeOf('sign', { data: huge })).toBe(DappErrorCode.InvalidParams);
+  });
+
+  it('refuses a message that starts like a Massa operation (mainnet or buildnet chain id)', () => {
+    const chainId = (id: bigint) => {
+      const bytes = new Uint8Array(8);
+      new DataView(bytes.buffer).setBigUint64(0, id, false);
+      return [...bytes];
+    };
+    for (const id of [77658377n, 77658366n]) {
+      const data = b64([...chainId(id), 0, 1, 2, 3]);
+      expect(codeOf('sign', { data })).toBe(DappErrorCode.InvalidParams);
+      expect(() => parseRequest('sign', { data })).toThrow(/won't sign it/);
+    }
+    expect(codeOf('sign', { data: b64([...chainId(1n), 0, 1]) })).toBe('ok');
   });
 });
 

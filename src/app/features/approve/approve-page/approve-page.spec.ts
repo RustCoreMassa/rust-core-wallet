@@ -10,6 +10,7 @@ import { OperationFailedError } from '../../../core/services/massa-provider';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ApprovePage, describeBytes } from './approve-page';
+import { REFUSED_SIGN_MESSAGE, RefusedSignError } from '../../../core/utils/sign-guard';
 
 const MAIN = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
 const SAVINGS = 'AU126s93ZxbT4QUJcZYqsAxyMc3wv8nkHJYKYCtgQyEnZ8VGRM99P';
@@ -343,6 +344,54 @@ describe('ApprovePage', () => {
     });
   });
 
+  it('never shows a message shaped like a Massa operation: it is rejected at once', async () => {
+    const chainId = new Uint8Array(8);
+    new DataView(chainId.buffer).setBigUint64(0, 77658377n, false); // mainnet
+    const data = toBase64(Uint8Array.from([...chainId, 0, 1, 2, 3]));
+    const { approvals, store } = await setup([
+      view({ method: 'sign', params: { data }, address: MAIN }),
+    ]);
+    expect(approvals.reject).toHaveBeenCalledWith('ap1');
+    expect(store.dappSign).not.toHaveBeenCalled();
+    expect(approvals.close).toHaveBeenCalled();
+  });
+
+  it('does not answer the site when the key refuses to sign, and says why', async () => {
+    const data = toBase64(new TextEncoder().encode('looks harmless'));
+    const { page, approvals } = await setup(
+      [view({ method: 'sign', params: { data }, address: MAIN })],
+      (store) => store.dappSign.mockRejectedValue(new RefusedSignError()),
+    );
+    await page.approve();
+    expect(page.error()).toBe(REFUSED_SIGN_MESSAGE);
+    expect(approvals.resolve).not.toHaveBeenCalled();
+  });
+
+  it('says out loud when a site raises the network fee', async () => {
+    const { fixture } = await setup([
+      view({
+        method: 'transfer',
+        params: { to: OUTSIDER, amount: '1', fee: '500000000' },
+        address: MAIN,
+      }),
+    ]);
+    expect(fixture.nativeElement.textContent).toContain(
+      "This site set a network fee of 0.5 MAS — the wallet's own is 0.01 MAS.",
+    );
+  });
+
+  it('refuses a network fee above 1 MAS before the user sees it', async () => {
+    const { approvals, store } = await setup([
+      view({
+        method: 'transfer',
+        params: { to: OUTSIDER, amount: '1', fee: '1000000001' },
+        address: MAIN,
+      }),
+    ]);
+    expect(approvals.reject).toHaveBeenCalledWith('ap1');
+    expect(store.dappTransfer).not.toHaveBeenCalled();
+  });
+
   it('rejects, then moves on to the next request', async () => {
     const { page, approvals } = await setup([
       view({ method: 'connect' }),
@@ -360,8 +409,26 @@ describe('describeBytes', () => {
     expect(describeBytes(new TextEncoder().encode('Hello\nworld'))).toEqual({
       text: 'Hello\nworld',
       hex: false,
+      hidden: false,
     });
-    expect(describeBytes(Uint8Array.from([0, 1, 255]))).toEqual({ text: '0x0001ff', hex: true });
-    expect(describeBytes(Uint8Array.from([0xc3, 0x28]))).toEqual({ text: '0xc328', hex: true });
+    expect(describeBytes(Uint8Array.from([0, 1, 255]))).toEqual({
+      text: '0x0001ff',
+      hex: true,
+      hidden: false,
+    });
+    expect(describeBytes(Uint8Array.from([0xc3, 0x28]))).toEqual({
+      text: '0xc328',
+      hex: true,
+      hidden: false,
+    });
+  });
+
+  it('shows invisible and bidi characters instead of letting them disguise the text', () => {
+    const disguised = 'Pay \u202Eexe.ssaM\u202C to\u200B me';
+    expect(describeBytes(new TextEncoder().encode(disguised))).toEqual({
+      text: 'Pay ⟨U+202E⟩exe.ssaM⟨U+202C⟩ to⟨U+200B⟩ me',
+      hex: false,
+      hidden: true,
+    });
   });
 });

@@ -2,6 +2,7 @@ import { Args, ArrayTypes } from '@massalabs/massa-web3';
 import { TOKEN_REGISTRY } from '../models/token.model';
 import { DUSA } from '../services/dusa-contracts';
 import { describeCall } from './describe-call';
+import { LAUNCHPAD_CONTRACTS } from '../services/launchpad-registry';
 
 const OWNER = 'AU12K8ag8RQEBhFLtT6ixoMvv4ZsG2DNzKq3tbB1vssWM3LMZYskz';
 const OTHER = 'AU126s93ZxbT4QUJcZYqsAxyMc3wv8nkHJYKYCtgQyEnZ8VGRM99P';
@@ -158,5 +159,48 @@ describe('describeCall — unknown calls', () => {
     const d = describeCall(call(USDC, 'mint', new Args()), OWNER, 'mainnet');
     expect(d.contract).toBe('USDC.e token');
     expect(d.summary).toBeNull();
+  });
+});
+
+describe('describeCall — NFT operator approvals', () => {
+  const approval = (operator: string, approved: boolean) =>
+    call(UNKNOWN_CONTRACT, 'setApprovalForAll', new Args().addString(operator).addBool(approved));
+
+  it('warns that an unknown operator could take every NFT of the collection', () => {
+    for (const network of ['mainnet', 'buildnet'] as const) {
+      const d = describeCall(approval(OTHER, true), OWNER, network);
+      expect(d.contract).toBe('NFT collection');
+      expect(d.summary).toBe('Let ' + OTHER + ' move every NFT you hold in this collection');
+      expect(d.rows).toEqual([{ label: 'Operator', value: OTHER, mono: true }]);
+      expect(d.warnings.join(' ')).toMatch(/could take every NFT .* NFT drainers/);
+    }
+  });
+
+  it('names RustCore Launchpad, on its own network only', () => {
+    const mainnet = describeCall(approval(LAUNCHPAD_CONTRACTS.mainnet, true), OWNER, 'mainnet');
+    expect(mainnet.summary).toBe(
+      'Let RustCore Launchpad move every NFT you hold in this collection',
+    );
+    expect(mainnet.warnings).toEqual([
+      'RustCore Launchpad needs this to sell your NFTs from this collection on its marketplace.',
+    ]);
+    const elsewhere = describeCall(approval(LAUNCHPAD_CONTRACTS.mainnet, true), OWNER, 'buildnet');
+    expect(elsewhere.warnings.join(' ')).toMatch(/NFT drainers/);
+  });
+
+  it('reads a revocation without a warning', () => {
+    const d = describeCall(approval(OTHER, false), OWNER, 'mainnet');
+    expect(d.summary).toBe(`Take back ${OTHER}'s control of your NFTs in this collection`);
+    expect(d.warnings).toEqual([]);
+  });
+
+  it('falls back to "unknown call" when the parameters are not an operator approval', () => {
+    const d = describeCall(
+      call(UNKNOWN_CONTRACT, 'setApprovalForAll', new Args().addString(OTHER)),
+      OWNER,
+      'mainnet',
+    );
+    expect(d.summary).toBeNull();
+    expect(d.warnings.join(' ')).toMatch(/can't read what this call does/);
   });
 });

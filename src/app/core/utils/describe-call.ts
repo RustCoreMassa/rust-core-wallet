@@ -1,14 +1,16 @@
 import { Args, ArrayTypes } from '@massalabs/massa-web3';
 import { TOKEN_LIST, TokenMeta } from '../models/token.model';
 import { DUSA } from '../services/dusa-contracts';
+import { LAUNCHPAD_CONTRACTS } from '../services/launchpad-registry';
 import { formatUnits } from './token-amount';
 
 /**
  * Reads a smart-contract call a dApp asks to sign, so the approval window can say what it does
  * in words. Only calls the wallet knows for sure are decoded — MRC-20 transfers and allowances
  * on the supported tokens, and swaps on Dusa's V2 router, with exactly the argument layouts
- * massa-web3's MRC20 wrapper and the Dusa SDK use — and only when the parameters decode
- * completely. Anything else is shown as an unknown call, with a warning.
+ * massa-web3's MRC20 wrapper and the Dusa SDK use — operator approvals on any NFT collection
+ * (MRC-721 `setApprovalForAll`, the classic way to empty a wallet's NFTs) — and only when the
+ * parameters decode completely. Anything else is shown as an unknown call, with a warning.
  */
 
 export interface ContractCall {
@@ -60,6 +62,10 @@ export function describeCall(
   }
   if (known && call.target === DUSA.v2Router && DUSA_SWAPS.includes(call.func)) {
     const decoded = describeSwap(call, owner);
+    if (decoded) return decoded;
+  }
+  if (call.func === 'setApprovalForAll') {
+    const decoded = describeOperatorApproval(call, network);
     if (decoded) return decoded;
   }
   return {
@@ -144,6 +150,38 @@ function describeTokenCall(
     default:
       return null;
   }
+}
+
+// ------------------------------------------------------------------ NFT collections
+
+/** MRC-721 `setApprovalForAll(operator: string, approved: bool)` (sc-standards layout). */
+function describeOperatorApproval(
+  call: ContractCall,
+  network: 'mainnet' | 'buildnet',
+): CallDescription | null {
+  const args = read(call.parameter, (a) => ({ operator: address(a), approved: a.nextBool() }));
+  if (!args) return null;
+  const launchpad = LAUNCHPAD_CONTRACTS[network] === args.operator;
+  const operator = launchpad ? 'RustCore Launchpad' : args.operator;
+  const rows: CallRow[] = [{ label: 'Operator', value: args.operator, mono: true }];
+  if (!args.approved) {
+    return {
+      contract: 'NFT collection',
+      summary: `Take back ${operator}'s control of your NFTs in this collection`,
+      rows,
+      warnings: [],
+    };
+  }
+  return {
+    contract: 'NFT collection',
+    summary: `Let ${operator} move every NFT you hold in this collection`,
+    rows,
+    warnings: [
+      launchpad
+        ? 'RustCore Launchpad needs this to sell your NFTs from this collection on its marketplace.'
+        : `${args.operator} could take every NFT you hold in this collection, now and later — the way NFT drainers work. Approve only a marketplace you trust.`,
+    ],
+  };
 }
 
 // ------------------------------------------------------------------ Dusa swaps
