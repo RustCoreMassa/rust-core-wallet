@@ -1,7 +1,7 @@
 # Connecting dApps — architecture
 
-Status: **implemented** (released in 1.2.0; several accounts per site in 1.6.0 — see Progress at
-the end). wallet-provider's `RustCoreWallet` is merged
+Status: **implemented** (released in 1.2.0; several accounts per site in 1.6.0; hardened in 1.7.0
+and 1.7.1 — see Progress at the end). wallet-provider's `RustCoreWallet` is merged
 ([#366](https://github.com/massalabs/wallet-provider/pull/366)); its update for several accounts
 is the next PR. This document is for developers. It describes how Massa dApps connect to the RustCore
 Wallet browser extension and ask it to sign.
@@ -140,18 +140,22 @@ The existing `background.ts` grows into the bridge's centre (still no Angular in
 
 ### 4. Approval view — the Angular app
 
-New extension view `approve` (`index.html?view=approve&request=<id>`, `EXTENSION_VIEWS`), opened
-with `chrome.windows.create({ type: 'popup', width: 380, height: 600 })`; on Firefox for Android,
+New extension view `approve` (`index.html?view=approve`, `EXTENSION_VIEWS`), opened with
+`chrome.windows.create({ type: 'popup', width: 380, height: 600 })`; on Firefox for Android,
 which has no `windows` API, as a tab.
 
-1. Fetches the pending request from the background by id.
+1. Asks the background for the request at the head of the queue (`rustcore:approval:next`) and
+   checks its params again with `parseRequest`.
 2. If locked, asks for the password (`AuthStore.resume()` / unlock — the normal lock screen).
 3. Shows the request with `app-confirm-details`: the **origin** (large, as the browser reported
-   it), account, network, and what will happen (below).
+   it), account, network, and what will happen (below). Approve turns on only once the window
+   has been in front for a second without a press (`APPROVE_ARMING`, see Security rules).
 4. On approve: runs the same `validate*` rules as the wallet's own screens (fee reserved,
-   balances, min amounts), signs and sends with the existing `MassaProvider` code, answers the dApp
-   with the operation id as soon as the node accepted it, then waits for execution and records
-   it in the wallet's history like any other operation (`afterWrite`).
+   balances, min amounts), signs and sends with the existing `MassaProvider` code, waits for the
+   chain to execute it, records it in the wallet's history like any other operation
+   (`afterWrite`), then answers the dApp with the operation id and its network. An operation
+   that failed on-chain or isn't confirmed in time is answered too (the site follows it
+   itself), with a notice to the user.
 5. On reject / close: answers `UserRejected`.
 
 What the review shows per request:
@@ -267,8 +271,9 @@ unless the operator is RustCore Launchpad.
 - A failed operation never shows the node's or the contract's text, only a known cause or a fixed
   sentence: a contract chooses its abort message.
 - Requests expire (e.g. 10 minutes) and are rejected if the site disconnects or the tab closes.
-- Network: requests are signed on the wallet's current network; if a dApp asks for a specific
-  chain id and it differs, the request is rejected (no silent switch).
+- Network: requests are signed on the wallet's current network, which the review screen shows.
+  The protocol has no chain-id or network parameter (like any unknown key, one is refused), so a
+  dApp can never make the wallet switch.
 - The vault, the password and the session key stay where they are today; the background still only
   ends sessions (the auto-lock alarm, and the computer locking) and never decrypts anything. It
   restricts `chrome.storage.local` to the extension's own pages (`setAccessLevel`), where the
@@ -387,4 +392,12 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   test page has an `accounts` button, a `from` field and the new protocol checks.
 - [x] Older dApps don't follow wallet switches (`followsWallet`, see Decisions): Home notice
   "uses another account", Use button in Connected sites; permission changes serialized.
+- [x] Hardening after an internal audit, 1.7.0: a `sign` shaped like a Massa operation is
+  refused (protocol + the key itself, `utils/sign-guard.ts`), site fees above 1 MAS are refused
+  and a raised fee is spelled out, `setApprovalForAll` is decoded with a warning, invisible and
+  bidi characters in a message to sign are shown.
+- [x] Hardening after a second audit, 1.7.1: `APPROVE_ARMING`; at most 2 waiting requests per
+  site (`siteOf`) and 16 in flight per page; `increaseAllowance` decoded on any contract; on-chain
+  failure text never shown; `chrome.storage.local` restricted to the extension's pages; a lock in
+  any view (or the auto-lock, or the computer locking) locks the approval window too.
 - [ ] wallet-provider update for several accounts (`accounts()`, `from`, `accountsChanged`).

@@ -88,11 +88,15 @@ servers of `MEDIA_HOSTS` (`src/app/core/utils/media-hosts.ts`), and load images 
 two (CSP in `src/extension/manifest.json`; `src/csp.spec.ts` checks it against `MEDIA_HOSTS`).
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
-(minus `frame-ancestors`, which a `<meta>` can't set): `npm run build:extension` fails if the
-two differ, and `npm run smoke` fails if the built `index.html` lacks it or has inline code
-(`script-src 'self'` would block it — hence `inlineCritical: false` in angular.json). A new
-server means changing both policies, `MEDIA_HOSTS` if it serves media, and the README's list.
-Remote media links always go through `mediaUrl()`.
+(minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a
+frame instead): `npm run build:extension` fails if the two differ, and `npm run smoke` fails if
+the built `index.html` lacks it or has inline code (`script-src 'self'` would block it — hence
+`inlineCritical: false` in angular.json). It starts from `default-src 'none'`: anything not
+listed (frames, media, fonts or styles from elsewhere) is refused, so a new kind of resource needs
+its own directive. Styles allow `'unsafe-inline'` because Angular adds component styles as
+`<style>` elements. A new server means changing both policies, `MEDIA_HOSTS` if it serves media,
+and the README's list. Remote media links always go through `mediaUrl()` (IPFS: content-hash
+paths only).
 
 **dApp connections** (extension only; design in `docs/DAPP-CONNECTION.md`). To try them, load the
 extension, run `npm run test-dapp` and open http://127.0.0.1:4300 (the extension's scripts run
@@ -128,8 +132,8 @@ src/app/
 │   ├── platform/    Device detection (mobile only), install-as-app prompt, storage tokens
 │   ├── services/    Massa provider, Dusa prices & swap, explorer API,
 │   │                encrypted vault & session cache, on-chain execution tracking
-│   ├── state/       AuthStore (vault & session), WalletStore (balances, history,
-│   │                staking, swaps), history merging, NetworkStore
+│   ├── state/       AuthStore (vault, saved addresses & session), WalletStore (balances,
+│   │                history, staking, swaps), AutoLock, history merging, NetworkStore
 │   └── utils/       Exact decimal ↔ on-chain amounts, staking rewards, user-facing errors
 ├── features/        Screens: lock screen, Home, NFTs & domains, Staking, Settings, modals
 ├── layout/          App shell, navigation, auto-refresh
@@ -141,14 +145,20 @@ src/extension/       Browser extension: manifest, background worker, chrome.stor
 ### Design rules
 
 - **Private keys stay in the vault** (AuthStore). Everything else looks them up only when
-  signing and never stores them.
+  signing and never stores them. Revealing or copying a key, removing a wallet and logging out
+  ask for the PIN/password again; the wallet locks itself after 15 minutes without use
+  (`AutoLock`), and a lock anywhere locks every tab or extension view.
+- **What you review is what you sign.** Every write passes its fee explicitly
+  (`NETWORK_FEE_UNITS`, or the dApp's) — never massa-web3's default, which is whatever the node
+  reports — and any coins it sends (a token's storage deposit included) are shown first.
 - **No optimistic updates.** Writes resolve only once the chain has executed the operation; then
   the history is updated and the chain is re-read. A failed operation changes nothing on screen.
 - **Exact amounts.** Amounts are converted to on-chain units through decimal strings
   (`toUnits` / `fromUnits`), never floating-point multiplication; spends are clamped to the exact
   on-chain balance.
 - **Plain errors.** Anything shown to users goes through `toUserMessage()` — raw node or network
-  errors are never displayed.
+  errors are never displayed, nor the reason of an operation that failed on-chain (a contract
+  writes it).
 - **UI**: no native `<select>` (use the shared dropdown); colors, radii and shadows come from the
   design tokens in `src/styles.scss`.
 
@@ -157,8 +167,9 @@ src/extension/       Browser extension: manifest, background worker, chrome.stor
 `npm test` runs the unit tests (Vitest). They cover the logic where a mistake costs money or
 data: amount conversions, the encrypted vault, validation and fees, "nothing changes on
 failure", history merging, the explorer mapping, error messages, staking rewards, Dusa quote
-encoding, platform detection, and the extension's dApp bridge (protocol parsing, per-site
-permissions, the request router and its events). The blockchain and explorer are faked, so tests
+encoding, platform detection, auto-lock and the kept session, and the extension's dApp bridge
+(protocol parsing, per-site permissions, the request router and its events, the approval
+window — including when its Approve button may answer). The blockchain and explorer are faked, so tests
 run offline.
 
 Unit tests can't see problems that only exist in the bundled output, so after

@@ -29,7 +29,7 @@ A wallet holds the keys to people's money, so "trust us" is not good enough. Rus
 built on four principles:
 
 - **Your keys never leave your phone.** Private keys are encrypted on your device with your PIN
-  and are never sent anywhere — there is no RustCore server at all.
+  and are never sent anywhere — there is no RustCore server behind the wallet.
 - **Everything is verifiable.** The full source code is public, so anyone can check exactly what
   the wallet does with your data — and confirm that it takes none.
 - **What you see is what's on-chain.** Balances, rolls and history come straight from the
@@ -46,7 +46,7 @@ built on four principles:
 
 | | |
 |---|---|
-| 🔐 **Stay in control** | Your wallet is locked with a 6-digit PIN and encrypted on your phone. Create new wallets or import existing ones, and keep as many as you like. |
+| 🔐 **Stay in control** | Your wallet is locked with a 6-digit PIN, encrypted on your phone, and locks itself after 15 minutes without use. Create new wallets or import existing ones, and keep as many as you like. |
 | 💸 **Send & receive** | MAS and Massa tokens. You always see a summary — amount, fee, recipient — before confirming. Receive with a QR code. |
 | 🔄 **Swap** | Exchange tokens through the [Dusa](https://dusa.io) exchange, with a live quote and protection against price moves. |
 | 🥩 **Stake** | Buy and sell rolls, see whether your wallet is staking, your produced and missed slots, the current APR and your estimated daily reward. |
@@ -176,7 +176,8 @@ including RustCore — can recover the funds.
 
 **Is there a fee?** RustCore charges nothing. Each transaction pays the Massa network fee
 (0.01 MAS), and swaps also send a small storage deposit required by the Dusa exchange
-(0.1 MAS). The first swap of a token also pays, once, for storing its approval (0.015 MAS on
+(0.1 MAS). Sending a token to someone who has never held it also pays, once, for storing their
+balance (about 0.01 MAS) — the review screen shows it. The first swap of a token also pays, once, for storing its approval (0.015 MAS on
 Mainnet). Registering a `.massa` name costs the fee set by the Massa Name System — 1 MAS for 6
 or more characters, up to 10,000 MAS for 2 — plus a 0.1 MAS storage deposit whose unused part
 comes back.
