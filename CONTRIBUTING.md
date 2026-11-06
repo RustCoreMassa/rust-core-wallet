@@ -104,10 +104,15 @@ your team ID stays out of the repository. Don't pick the team in Xcode's *Signin
 Capabilities* tab: Xcode would write it into the committed `project.pbxproj`. The phone needs
 Developer Mode (Settings → Privacy & Security; the switch appears once Xcode has the phone as a
 run destination), and on first launch you trust your developer profile in Settings → General →
-VPN & Device Management. Swaps aren't offered in the store
-apps (`SWAP_AVAILABLE`: app stores treat in-app crypto exchange as a licensed service). Not
-done yet: the vault still lives in the web view's storage (to move to the Keychain), Face ID,
-and locking when the app goes to the background.
+VPN & Device Management. Swaps aren't offered in the store apps (`SWAP_AVAILABLE`: app stores
+treat in-app crypto exchange as a licensed service). The app's lasting storage (`LOCAL_STORE`:
+the encrypted vault, preferences) is the iOS Keychain, not the web view's localStorage, which
+iOS may clear when space runs low: `ios/App/App/NativeStorePlugin.swift` (our own plugin,
+registered in `MainViewController.swift`; readable only while the phone is unlocked, never
+synced or restored onto another phone, cleared on a fresh install because Keychain items
+outlive the app) behind `src/native/native-storage-area.ts` (loaded before Angular starts,
+writes in order in the background; items an earlier build left in localStorage move over once).
+Not done yet: Face ID, and locking when the app goes to the background.
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a

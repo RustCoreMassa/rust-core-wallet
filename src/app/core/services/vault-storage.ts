@@ -2,7 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { VaultEnvelope } from '../models/vault.model';
 import { LOCAL_STORE } from '../platform/app-storage';
 
-const STORAGE_KEY = 'massa-wallet:vault';
+/** Where the encrypted vault lives in LOCAL_STORE. */
+export const VAULT_STORAGE_KEY = 'massa-wallet:vault';
 
 /**
  * Thin wrapper around LOCAL_STORE (localStorage on the web, chrome.storage.local
@@ -21,11 +22,11 @@ export class VaultStorage {
   private readonly store = inject(LOCAL_STORE);
 
   exists(): boolean {
-    return this.store.getItem(STORAGE_KEY) !== null;
+    return this.store.getItem(VAULT_STORAGE_KEY) !== null;
   }
 
   load(): VaultEnvelope | null {
-    const raw = this.store.getItem(STORAGE_KEY);
+    const raw = this.store.getItem(VAULT_STORAGE_KEY);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as VaultEnvelope;
@@ -36,10 +37,10 @@ export class VaultStorage {
   }
 
   save(envelope: VaultEnvelope): void {
-    this.store.setItem(STORAGE_KEY, JSON.stringify(envelope));
+    this.store.setItem(VAULT_STORAGE_KEY, JSON.stringify(envelope));
   }
 
   clear(): void {
-    this.store.removeItem(STORAGE_KEY);
+    this.store.removeItem(VAULT_STORAGE_KEY);
   }
 }
