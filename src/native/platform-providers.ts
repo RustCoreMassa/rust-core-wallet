@@ -7,6 +7,8 @@ import { MOBILE_ONLY } from '../app/core/platform/device';
 import { MOVED_TO } from '../app/core/platform/gateway';
 import { Toast } from '../app/core/services/toast';
 import { VAULT_STORAGE_KEY } from '../app/core/services/vault-storage';
+import { BACKGROUND_LOCK_MS } from '../app/core/state/auto-lock';
+import { APP_BACKGROUND_LOCK_MS } from '../app/core/utils/auto-lock-time';
 import { NativeStorageArea, NativeStorePlugin } from './native-storage-area';
 
 /*
@@ -15,8 +17,10 @@ import { NativeStorageArea, NativeStorePlugin } from './native-storage-area';
  * both native shells (Capacitor: ios/, later android/), served from the files packed into the
  * app — never loaded from DeWeb or any server.
  *
- * Still at the web defaults, to be replaced before any store release:
- * - SESSION_KEY_STORE / auto-lock: the web behaviour (15 min idle, hidden time counts).
+ * Locking: the web's rules (15 min idle, a lock in one window locks the others) plus a lock when
+ * the app comes back after APP_BACKGROUND_LOCK_MS in the background; while it isn't active, the
+ * native side covers the screen (ios/App/App/SceneDelegate.swift) so the app switcher's snapshot
+ * shows no balances or addresses.
  */
 
 // 'web' when the native bundle is opened in a browser (development, `npm run smoke:native`):
@@ -44,6 +48,7 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   { provide: MOVED_TO, useValue: null },
   // No exchange in the store apps (App Store guideline 3.1.5(iii)).
   { provide: SWAP_AVAILABLE, useValue: false },
+  { provide: BACKGROUND_LOCK_MS, useValue: APP_BACKGROUND_LOCK_MS },
   ...(nativeStore
     ? [
         { provide: LOCAL_STORE, useValue: nativeStore },

@@ -112,7 +112,10 @@ registered in `MainViewController.swift`; readable only while the phone is unloc
 synced or restored onto another phone, cleared on a fresh install because Keychain items
 outlive the app) behind `src/native/native-storage-area.ts` (loaded before Angular starts,
 writes in order in the background; items an earlier build left in localStorage move over once).
-Not done yet: Face ID, and locking when the app goes to the background.
+Locking adds one rule to the web's: back after a minute or more in the background, the app
+asks for the PIN again (`BACKGROUND_LOCK_MS`, checked on Capacitor's `resume`, before the app is
+on screen); while it isn't active, `SceneDelegate.swift` covers it with the launch screen, so
+the app switcher's snapshot shows no balances. Not done yet: Face ID.
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a
