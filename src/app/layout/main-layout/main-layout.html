@@ -18,7 +18,9 @@
       <app-send-modal />
       }
       @case ('swap') {
+      @if (swapAvailable) {
       <app-swap-modal />
+      }
       }
       @case ('buy-roll') {
       <app-buy-roll-modal />

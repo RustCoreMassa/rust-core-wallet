@@ -46,6 +46,9 @@ npm start            # http://localhost:4200
 | `npm run smoke` | Boots the production build in a simulated phone browser (run after `npm run build`) |
 | `npm run build:extension` | Browser extension into `dist/extension/chromium` and `dist/extension/firefox` |
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
+| `npm run build:native` | The iOS / Android apps' web bundle into `dist/native` |
+| `npm run build:ios` | `build:native`, then copies it into the Xcode project (`ios/`) |
+| `npm run smoke:native` | Boots the apps' web bundle in a simulated phone (after `build:native`) |
 | `npm run test-dapp` | Test page for dApp connections at http://127.0.0.1:4300 (see below) |
 | `npx prettier --write .` | Format the code |
 
@@ -87,6 +90,25 @@ extension's pages may connect only to the Massa nodes, the explorer API and the 
 servers of `MEDIA_HOSTS` (`src/app/core/utils/media-hosts.ts`), and load images only from those
 two (CSP in `src/extension/manifest.json`; `src/csp.spec.ts` checks it against `MEDIA_HOSTS`).
 
+**iOS app (in progress; Android to follow).** The same code runs inside a native shell made with
+[Capacitor](https://capacitorjs.com): the Xcode project lives in `ios/`, the settings in
+`capacitor.config.json`. The app holds its own copy of the web bundle — it never loads the wallet
+from DeWeb or any server. `npm run build:ios` builds that bundle (Angular configuration
+`native`: `src/native/platform-providers.ts` replaces the web one, `src/native/native.scss` keeps
+the screen below the status bar) and copies it into the project; then open
+`ios/App/App.xcodeproj` in Xcode and run it on a simulator or a phone. Needs macOS and the full
+Xcode (the command line tools alone can't build iOS apps). To run it on your own iPhone, add
+your Apple ID in Xcode → Settings → Accounts (a free account works; the app then expires after
+7 days) and put `DEVELOPMENT_TEAM = <your team ID>` in `ios/local.xcconfig` — git-ignored, so
+your team ID stays out of the repository. Don't pick the team in Xcode's *Signing &
+Capabilities* tab: Xcode would write it into the committed `project.pbxproj`. The phone needs
+Developer Mode (Settings → Privacy & Security; the switch appears once Xcode has the phone as a
+run destination), and on first launch you trust your developer profile in Settings → General →
+VPN & Device Management. Swaps aren't offered in the store
+apps (`SWAP_AVAILABLE`: app stores treat in-app crypto exchange as a licensed service). Not
+done yet: the vault still lives in the web view's storage (to move to the Keychain), Face ID,
+and locking when the app goes to the background.
+
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a
 frame instead): `npm run build:extension` fails if the two differ, and `npm run smoke` fails if
@@ -124,6 +146,7 @@ chain, verify them with read-only calls or simulations first, and test with smal
 | History | Massa explorer API |
 | QR codes | [`ng-qrcode`](https://github.com/mnahkies/ng-qrcode) |
 | Hosting | [DeWeb](https://docs.massa.net/docs/deweb/home) — static files stored on the Massa blockchain |
+| Native apps | [Capacitor](https://capacitorjs.com) — the same web bundle inside an iOS app (Android to follow) |
 
 ```
 src/app/
@@ -138,8 +161,10 @@ src/app/
 ├── features/        Screens: lock screen, Home, NFTs & domains, Staking, Settings, modals
 ├── layout/          App shell, navigation, auto-refresh
 ├── shared/          Reusable UI: dropdown, confirmation step, install banner, rows, unlock entry
-└── platform-providers.ts   Web-app specifics (replaced in the extension build)
+└── platform-providers.ts   Web-app specifics (replaced in the extension and native builds)
 src/extension/       Browser extension: manifest, background worker, chrome.storage adapters
+src/native/          iOS / Android apps: platform providers, status-bar spacing
+ios/                 Xcode project (Capacitor)
 ```
 
 ### Design rules

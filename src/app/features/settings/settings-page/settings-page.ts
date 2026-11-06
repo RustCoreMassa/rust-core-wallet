@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
-import { APP_PLATFORM, EXTENSION_VIEWS } from '../../../core/platform/app-platform';
+import { APP_PLATFORM, AppPlatform, EXTENSION_VIEWS } from '../../../core/platform/app-platform';
 import { APP_VERSION } from '../../../core/platform/app-version';
 import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { SITE_ACCESS } from '../../../core/platform/site-access';
@@ -13,6 +13,14 @@ import { TokenCatalog } from '../../../core/state/token-catalog';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { AVATAR_COLORS } from '../../../shared/ui/avatar-colors';
+
+/** After the version number at the bottom of Settings: which build this is. */
+const PLATFORM_SUFFIX: Record<AppPlatform, string> = {
+  web: '',
+  extension: ' · browser extension',
+  ios: ' · iOS app',
+  android: ' · Android app',
+};
 
 @Component({
   selector: 'app-settings-page',
@@ -47,9 +55,7 @@ export class SettingsPage {
   });
 
   /** For information only, at the bottom: which build is running. */
-  protected readonly versionLabel = `RustCore Wallet ${APP_VERSION}${
-    inject(APP_PLATFORM) === 'extension' ? ' · browser extension' : ''
-  }`;
+  protected readonly versionLabel = `RustCore Wallet ${APP_VERSION}${PLATFORM_SUFFIX[inject(APP_PLATFORM)]}`;
 
   protected readonly walletsCountLabel = computed(() => {
     const count = this.authStore.accounts().length;

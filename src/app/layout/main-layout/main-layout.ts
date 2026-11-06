@@ -1,5 +1,6 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { SWAP_AVAILABLE } from '../../core/platform/app-platform';
 import { Modal } from '../../core/services/modal';
 import { BottomNav } from '../../shared/ui/bottom-nav/bottom-nav';
 import { ToastHost } from '../../shared/ui/toast-host/toast-host';
@@ -53,6 +54,8 @@ const AUTO_REFRESH_MS = 10_000;
 })
 export class MainLayout {
   protected readonly modal = inject(Modal);
+  /** The iOS / Android apps ship without swaps (see SWAP_AVAILABLE). */
+  protected readonly swapAvailable = inject(SWAP_AVAILABLE);
 
   constructor() {
     const authStore = inject(AuthStore);

@@ -1,0 +1,7 @@
+{
+  "appId": "com.rustcoremassa.wallet",
+  "appName": "RustCore Wallet",
+  "webDir": "dist/native/browser",
+  "backgroundColor": "#07070a",
+  "loggingBehavior": "debug"
+}

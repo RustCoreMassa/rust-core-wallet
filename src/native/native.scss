@@ -1,0 +1,7 @@
+/* iOS / Android apps only (angular.json → "native" → styles).
+   The web view fills the whole screen, status bar and notch included (viewport-fit=cover):
+   keep the shell's content below them. The bottom inset is already handled (bottom nav,
+   modals). */
+.app-screen {
+  padding-top: env(safe-area-inset-top);
+}

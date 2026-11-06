@@ -1,7 +1,20 @@
 import { InjectionToken } from '@angular/core';
 
-/** Which build is running: the web app (DeWeb) or the browser extension's popup. */
-export type AppPlatform = 'web' | 'extension';
+/**
+ * Which build is running: the web app (DeWeb), the browser extension's popup, or the
+ * iOS / Android app (one web bundle inside both native shells — see src/native).
+ */
+export type AppPlatform = 'web' | 'extension' | 'ios' | 'android';
+
+/**
+ * Whether this build offers token swaps (Dusa). Off in the iOS / Android apps: the app stores
+ * treat in-app crypto exchange as a licensed service (App Store guideline 3.1.5(iii)), so the
+ * store builds ship without it. A build-time choice — never switched remotely.
+ */
+export const SWAP_AVAILABLE = new InjectionToken<boolean>('SWAP_AVAILABLE', {
+  providedIn: 'root',
+  factory: () => true,
+});
 
 export const APP_PLATFORM = new InjectionToken<AppPlatform>('APP_PLATFORM', {
   providedIn: 'root',

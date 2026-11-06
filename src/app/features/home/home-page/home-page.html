@@ -66,6 +66,7 @@
     </div>
     <div class="action-label">Send</div>
   </button>
+  @if (swapAvailable) {
   <button class="action" type="button" (click)="modal.open('swap')">
     <div class="action-btn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -74,6 +75,7 @@
     </div>
     <div class="action-label">Swap</div>
   </button>
+  }
 </div>
 
 <div class="tabs">

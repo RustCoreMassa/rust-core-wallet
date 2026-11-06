@@ -1,0 +1,6 @@
+CAPACITOR_DEBUG = true
+
+// Signing for running on your own iPhone: DEVELOPMENT_TEAM = <your team ID> in ios/local.xcconfig
+// (git-ignored — the team ID belongs to a personal Apple account). Never set the team in Xcode's
+// Signing & Capabilities tab: Xcode would write it into project.pbxproj, which is committed.
+#include? "local.xcconfig"

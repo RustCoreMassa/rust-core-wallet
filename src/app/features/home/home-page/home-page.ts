@@ -1,6 +1,7 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { TokenMeta } from '../../../core/models/token.model';
+import { SWAP_AVAILABLE } from '../../../core/platform/app-platform';
 import { LOCAL_STORE } from '../../../core/platform/app-storage';
 import { Modal } from '../../../core/services/modal';
 import { WalletStore } from '../../../core/state/wallet-store';
@@ -34,6 +35,8 @@ const showAllTokens = signal(false);
 export class HomePage {
   protected readonly store = inject(WalletStore);
   protected readonly modal = inject(Modal);
+  /** The iOS / Android apps ship without swaps (see SWAP_AVAILABLE). */
+  protected readonly swapAvailable = inject(SWAP_AVAILABLE);
 
   protected readonly activeTab = signal<HomeTab>('tokens');
 
