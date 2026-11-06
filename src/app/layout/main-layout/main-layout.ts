@@ -19,6 +19,7 @@ import { NftDetailsModal } from '../../features/modals/nft-details-modal/nft-det
 import { ConnectedSitesModal } from '../../features/modals/connected-sites-modal/connected-sites-modal';
 import { RegisterDomainModal } from '../../features/modals/register-domain-modal/register-domain-modal';
 import { TokensModal } from '../../features/modals/tokens-modal/tokens-modal';
+import { BiometricUnlockModal } from '../../features/modals/biometric-unlock-modal/biometric-unlock-modal';
 import { WalletStore } from '../../core/state/wallet-store';
 import { AuthStore } from '../../core/state/auth-store';
 import { SiteConnection } from '../../core/state/site-connection';
@@ -48,6 +49,7 @@ const AUTO_REFRESH_MS = 10_000;
     ConnectedSitesModal,
     TokensModal,
     RegisterDomainModal,
+    BiometricUnlockModal,
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss',

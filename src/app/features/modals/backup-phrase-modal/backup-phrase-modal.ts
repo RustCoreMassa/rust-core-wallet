@@ -9,7 +9,7 @@ import { avatarColorsFor } from '../../../shared/ui/avatar-colors';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
 import { toUserMessage } from '../../../core/utils/user-error';
-import { copySecret } from '../../../core/utils/secret-clipboard';
+import { SECRET_CLIPBOARD } from '../../../core/platform/secret-clipboard';
 
 type Step = 'confirm-secret' | 'reveal';
 
@@ -24,6 +24,7 @@ export class BackupPhraseModal {
   private readonly authStore = inject(AuthStore);
   private readonly walletStore = inject(WalletStore);
   private readonly toast = inject(Toast);
+  private readonly secretClipboard = inject(SECRET_CLIPBOARD);
 
   protected readonly accounts = this.authStore.accounts;
   protected readonly secretName = secretNoun(inject(UNLOCK_SECRET));
@@ -78,7 +79,8 @@ export class BackupPhraseModal {
   protected copyPrivateKey(): void {
     const account = this.selectedAccount();
     if (!account) return;
-    copySecret(account.privateKey)
+    this.secretClipboard
+      .copy(account.privateKey)
       .then(() => this.toast.show('Private key copied — the clipboard is emptied in 60 s'))
       .catch(() => this.toast.show('Could not copy — copy manually'));
   }

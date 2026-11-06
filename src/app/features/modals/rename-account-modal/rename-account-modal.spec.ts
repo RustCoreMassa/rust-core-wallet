@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { VaultAccount } from '../../../core/models/vault.model';
+import { SECRET_CLIPBOARD } from '../../../core/platform/secret-clipboard';
 import { Modal } from '../../../core/services/modal';
 import { AuthStore } from '../../../core/state/auth-store';
 import { WalletStore } from '../../../core/state/wallet-store';
@@ -26,7 +27,7 @@ describe('RenameAccountModal — the private key', () => {
   let writeText: ReturnType<typeof vi.fn>;
   let verifySecret: ReturnType<typeof vi.fn>;
 
-  function open(): Page {
+  function open(secretCopy?: (secret: string) => Promise<void>): Page {
     writeText = vi.fn(async () => undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     verifySecret = vi.fn(async (secret: string) => secret === '123456');
@@ -38,6 +39,7 @@ describe('RenameAccountModal — the private key', () => {
           useValue: { accounts: signal([account, { ...account, id: 'b' }]), verifySecret },
         },
         { provide: WalletStore, useValue: {} },
+        ...(secretCopy ? [{ provide: SECRET_CLIPBOARD, useValue: { copy: secretCopy } }] : []),
       ],
     });
     TestBed.inject(Modal).open('rename-account', account);
@@ -76,6 +78,16 @@ describe('RenameAccountModal — the private key', () => {
     await flush();
     expect(writeText).toHaveBeenCalledTimes(2);
     expect(verifySecret).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies through the platform's secret clipboard (the apps: system expiry, this device only)", async () => {
+    const copy = vi.fn(async () => undefined);
+    const page = open(copy);
+    page.copyPrivateKey();
+    await page.confirmKeySecret('123456');
+    await flush();
+    expect(copy).toHaveBeenCalledWith('S1secretkey');
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('cancels back to the step it came from', () => {

@@ -1,0 +1,17 @@
+<div class="modal">
+  <div class="modal-head">
+    <div class="modal-title">Unlock with {{ label }}</div>
+    <button class="modal-close" type="button" (click)="modal.close()">✕</button>
+  </div>
+
+  <div class="hint" style="margin-bottom:16px;">
+    Enter your {{ secretName }} to turn on {{ label }}. Showing or copying a private key, removing a
+    wallet and logging out will still ask for your {{ secretName }}.
+  </div>
+
+  @if (error()) {
+  <div class="error-text" style="margin-bottom:12px;">{{ error() }}</div>
+  }
+
+  <app-secret-entry compact submitLabel="Turn on" [busy]="isBusy()" (submitted)="confirmSecret($event)" />
+</div>

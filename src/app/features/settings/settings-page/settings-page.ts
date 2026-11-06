@@ -1,7 +1,8 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
 import { APP_PLATFORM, AppPlatform, EXTENSION_VIEWS } from '../../../core/platform/app-platform';
+import { BIOMETRIC_UNLOCK, biometryName } from '../../../core/platform/biometric-unlock';
 import { APP_VERSION } from '../../../core/platform/app-version';
 import { CONNECTED_SITES } from '../../../core/platform/connected-sites';
 import { SITE_ACCESS } from '../../../core/platform/site-access';
@@ -34,6 +35,10 @@ export class SettingsPage {
   protected readonly authStore = inject(AuthStore);
   private readonly toast = inject(Toast);
   private readonly router = inject(Router);
+  /** The apps: unlocking with Face ID / Touch ID. */
+  protected readonly biometric = inject(BIOMETRIC_UNLOCK);
+  /** "Face ID" / "Touch ID" when the phone offers it — the row shows only then. */
+  protected readonly biometryLabel = signal<string | null>(null);
   /** Extension only: switch between popup, side panel and full-screen tab. */
   protected readonly views = inject(EXTENSION_VIEWS);
   /** Extension only: sites connected through the dApp bridge. */
@@ -41,6 +46,12 @@ export class SettingsPage {
 
   private readonly siteAccess = inject(SITE_ACCESS);
   protected readonly secretName = secretNoun(inject(UNLOCK_SECRET));
+
+  constructor() {
+    void this.biometric?.available().then((kind) => {
+      this.biometryLabel.set(kind ? biometryName(kind) : null);
+    });
+  }
 
   private readonly customTokens = inject(TokenCatalog).custom;
   protected readonly customTokensLabel = computed(() => {
@@ -78,6 +89,18 @@ export class SettingsPage {
 
   protected openRename(account: VaultAccount): void {
     this.modal.open('rename-account', account);
+  }
+
+  /** On: asks for the PIN first (modal). Off: at once — it only takes a convenience away. */
+  protected async toggleBiometric(label: string): Promise<void> {
+    const biometric = this.biometric;
+    if (!biometric) return;
+    if (!biometric.enabled()) {
+      this.modal.open('biometric-unlock', label);
+      return;
+    }
+    await biometric.disable();
+    this.toast.show(`${label} unlock is off`);
   }
 
   protected lockWallet(): void {

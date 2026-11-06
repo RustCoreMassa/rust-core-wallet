@@ -14,6 +14,12 @@
   <app-secret-entry submitLabel="Unlock" [busy]="isBusy()" (submitted)="onSecret($event)" />
   }
 
+  @if (step() === 'unlock' && biometryLabel()) {
+  <button class="btn btn-ghost biometric-unlock" type="button" [disabled]="isBusy()" (click)="unlockWithBiometrics()">
+    Unlock with {{ biometryLabel() }}
+  </button>
+  }
+
   @if (step() === 'unlock') {
   <button class="forgot-link" type="button" [disabled]="isBusy()" (click)="showForgot()">
     Forgot your {{ noun }}?

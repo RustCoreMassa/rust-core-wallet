@@ -10,7 +10,7 @@ import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { SecretEntry } from '../../../shared/ui/secret-entry/secret-entry';
 import { toUserMessage } from '../../../core/utils/user-error';
-import { copySecret } from '../../../core/utils/secret-clipboard';
+import { SECRET_CLIPBOARD } from '../../../core/platform/secret-clipboard';
 
 /**
  * `edit` → rename; `remove-warn` → explain what removal means; `remove-confirm` → confirm with
@@ -30,6 +30,7 @@ export class RenameAccountModal {
   private readonly authStore = inject(AuthStore);
   private readonly walletStore = inject(WalletStore);
   private readonly toast = inject(Toast);
+  private readonly secretClipboard = inject(SECRET_CLIPBOARD);
   /** Extension only: sites connected to a removed account are disconnected with it. */
   private readonly connectedSites = inject(CONNECTED_SITES);
 
@@ -135,7 +136,8 @@ export class RenameAccountModal {
   private copyKeyNow(onFailure = 'Could not copy — copy manually'): void {
     const account = this.account();
     if (!account || !this.keyUnlocked()) return;
-    copySecret(account.privateKey)
+    this.secretClipboard
+      .copy(account.privateKey)
       .then(() => this.toast.show('Private key copied — the clipboard is emptied in 60 s'))
       .catch(() => this.toast.show(onFailure));
   }

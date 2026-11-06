@@ -18,6 +18,8 @@
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		7C1A2B3D4E5F60718293A4B3 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4B4 /* MainViewController.swift */; };
 		7C1A2B3D4E5F60718293A4B1 /* NativeStorePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4B2 /* NativeStorePlugin.swift */; };
+		7C1A2B3D4E5F60718293A4B5 /* SecretClipboardPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4B6 /* SecretClipboardPlugin.swift */; };
+		7C1A2B3D4E5F60718293A4B7 /* BiometricUnlockPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4B8 /* BiometricUnlockPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,8 @@
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		7C1A2B3D4E5F60718293A4B4 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		7C1A2B3D4E5F60718293A4B2 /* NativeStorePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeStorePlugin.swift; sourceTree = "<group>"; };
+		7C1A2B3D4E5F60718293A4B6 /* SecretClipboardPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretClipboardPlugin.swift; sourceTree = "<group>"; };
+		7C1A2B3D4E5F60718293A4B8 /* BiometricUnlockPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricUnlockPlugin.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -71,6 +75,8 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				7C1A2B3D4E5F60718293A4B4 /* MainViewController.swift */,
 				7C1A2B3D4E5F60718293A4B2 /* NativeStorePlugin.swift */,
+				7C1A2B3D4E5F60718293A4B6 /* SecretClipboardPlugin.swift */,
+				7C1A2B3D4E5F60718293A4B8 /* BiometricUnlockPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -168,6 +174,8 @@
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				7C1A2B3D4E5F60718293A4B3 /* MainViewController.swift in Sources */,
 				7C1A2B3D4E5F60718293A4B1 /* NativeStorePlugin.swift in Sources */,
+				7C1A2B3D4E5F60718293A4B5 /* SecretClipboardPlugin.swift in Sources */,
+				7C1A2B3D4E5F60718293A4B7 /* BiometricUnlockPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -3,12 +3,16 @@ import { RouterFeatures } from '@angular/router';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { APP_PLATFORM, SWAP_AVAILABLE } from '../app/core/platform/app-platform';
 import { LOCAL_STORE } from '../app/core/platform/app-storage';
+import { BIOMETRIC_UNLOCK } from '../app/core/platform/biometric-unlock';
 import { MOBILE_ONLY } from '../app/core/platform/device';
 import { MOVED_TO } from '../app/core/platform/gateway';
+import { SECRET_CLIPBOARD } from '../app/core/platform/secret-clipboard';
 import { Toast } from '../app/core/services/toast';
 import { VAULT_STORAGE_KEY } from '../app/core/services/vault-storage';
 import { BACKGROUND_LOCK_MS } from '../app/core/state/auto-lock';
 import { APP_BACKGROUND_LOCK_MS } from '../app/core/utils/auto-lock-time';
+import { CLIPBOARD_CLEAR_MS } from '../app/core/utils/secret-clipboard';
+import { BiometricUnlockPlugin, NativeBiometricUnlock } from './native-biometric-unlock';
 import { NativeStorageArea, NativeStorePlugin } from './native-storage-area';
 
 /*
@@ -33,6 +37,11 @@ const nativeStore = Capacitor.isNativePlatform()
   ? new NativeStorageArea(registerPlugin<NativeStorePlugin>('NativeStore'), localStorage)
   : null;
 
+/** ios/App/App/SecretClipboardPlugin.swift: the system clears the copy, on this device only. */
+interface SecretClipboardPlugin {
+  copy(options: { text: string; seconds: number }): Promise<void>;
+}
+
 /** Long enough to still be on screen after the lock page has moved on to Home. */
 const WRITE_ERROR_TOAST_MS = 10_000;
 
@@ -52,6 +61,25 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   ...(nativeStore
     ? [
         { provide: LOCAL_STORE, useValue: nativeStore },
+        // Face ID / Touch ID instead of typing the PIN (ios/App/App/BiometricUnlockPlugin.swift).
+        {
+          provide: BIOMETRIC_UNLOCK,
+          useFactory: () =>
+            new NativeBiometricUnlock(
+              registerPlugin<BiometricUnlockPlugin>('BiometricUnlock'),
+              nativeStore,
+            ),
+        },
+        {
+          provide: SECRET_CLIPBOARD,
+          useFactory: () => {
+            const plugin = registerPlugin<SecretClipboardPlugin>('SecretClipboard');
+            return {
+              copy: (secret: string) =>
+                plugin.copy({ text: secret, seconds: CLIPBOARD_CLEAR_MS / 1000 }),
+            };
+          },
+        },
         // The app reads storage synchronously; the native store is async — load it first.
         provideAppInitializer(async () => {
           const toast = inject(Toast);

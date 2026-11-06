@@ -2,6 +2,11 @@ import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { VaultAccount } from '../../../core/models/vault.model';
+import {
+  BIOMETRIC_UNLOCK,
+  BiometryChangedError,
+  biometryName,
+} from '../../../core/platform/biometric-unlock';
 import { UNLOCK_SECRET, UnlockSecret, secretNoun } from '../../../core/platform/unlock-secret';
 import { MASSA_PROVIDER } from '../../../core/services/massa-provider';
 import { AuthStore, VaultExistsError } from '../../../core/state/auth-store';
@@ -38,6 +43,9 @@ type Step =
  * A forgotten secret can't be recovered (it is the vault's key), so
  * `forgot` offers the only way out: erase this device's wallets, as log
  * out does, and start over by importing the private keys.
+ *
+ * In the iOS / Android apps, with biometric unlock turned on (Settings), the page asks for
+ * Face ID / Touch ID as soon as it opens; the PIN pad stays as the fallback.
  */
 @Component({
   selector: 'app-pin-lock-page',
@@ -51,6 +59,7 @@ export class PinLockPage {
   private readonly eraser = inject(WalletDataEraser);
   private readonly provider = inject(MASSA_PROVIDER);
   private readonly router = inject(Router);
+  private readonly biometric = inject(BIOMETRIC_UNLOCK);
   /** Where to go once unlocked: the extension's approval window returns to its request. */
   private readonly destination =
     inject(ActivatedRoute).snapshot.queryParamMap.get('next') === 'approve' ? '/approve' : '/home';
@@ -69,8 +78,15 @@ export class PinLockPage {
   protected readonly eraseAccepted = signal(false);
   protected readonly minPasswordLength = MIN_PASSWORD_LENGTH;
 
+  /** "Face ID" / "Touch ID" while unlocking with it is on and the phone offers it. */
+  protected readonly biometryLabel = signal<string | null>(null);
+
   private firstSecret = '';
   private readonly entry = viewChild(SecretEntry);
+
+  constructor() {
+    if (this.step() === 'unlock' && this.biometric?.enabled()) void this.offerBiometrics();
+  }
 
   /** PIN pad or password field: unlocking, or creating a PIN. */
   protected readonly showEntry = computed(
@@ -135,33 +151,7 @@ export class PinLockPage {
     this.error.set(null);
 
     if (this.step() === 'unlock') {
-      this.isBusy.set(true);
-      // A vault that must move to a password first opens for this page only: closing the popup
-      // before choosing the password must not leave a session that skips the step.
-      const upgrade = needsPasswordUpgrade(this.kind, secret);
-      let ok: boolean;
-      try {
-        ok = await this.authStore.unlock(secret, { keepSession: !upgrade });
-      } catch (err) {
-        // TooManyAttemptsError: its message says how long to wait.
-        this.isBusy.set(false);
-        this.error.set(toUserMessage(err));
-        this.entry()?.clear();
-        return;
-      }
-      this.isBusy.set(false);
-      if (!ok) {
-        this.error.set(`Incorrect ${this.noun}`);
-        this.entry()?.clear();
-        return;
-      }
-      // Paint last-known balances/history instantly; the shell refreshes them.
-      await this.walletStore.restoreCache();
-      if (upgrade) {
-        this.step.set('upgrade');
-        return;
-      }
-      await this.router.navigateByUrl(this.destination);
+      await this.unlockWith(secret);
       return;
     }
 
@@ -182,6 +172,79 @@ export class PinLockPage {
         this.step.set('create');
       }
     }
+  }
+
+  /** Face ID / Touch ID in place of the PIN pad — asked at once when the page opens. */
+  protected async unlockWithBiometrics(): Promise<void> {
+    const biometric = this.biometric;
+    const label = this.biometryLabel();
+    if (!biometric || !label || this.isBusy() || this.step() !== 'unlock') return;
+    this.error.set(null);
+    this.isBusy.set(true);
+    let secret: string | null;
+    try {
+      secret = await biometric.readSecret();
+    } catch (err) {
+      if (err instanceof BiometryChangedError) {
+        this.biometryLabel.set(null);
+        this.error.set(
+          `${label} changed on this phone — enter your ${this.noun}. You can turn ${label} on again in Settings.`,
+        );
+      } else {
+        this.error.set(`${label} didn't work — enter your ${this.noun}`);
+      }
+      return;
+    } finally {
+      this.isBusy.set(false);
+    }
+    // Cancelled: the PIN pad is right there.
+    if (secret !== null) await this.unlockWith(secret, label);
+  }
+
+  private async offerBiometrics(): Promise<void> {
+    const kind = await this.biometric?.available();
+    // Not offered now (Face ID turned off for the app in iOS settings, say): the PIN pad only.
+    if (!kind || this.step() !== 'unlock') return;
+    this.biometryLabel.set(biometryName(kind));
+    await this.unlockWithBiometrics();
+  }
+
+  /** `viaBiometrics`: the label of the biometrics the secret came from. */
+  private async unlockWith(secret: string, viaBiometrics: string | null = null): Promise<void> {
+    this.isBusy.set(true);
+    // A vault that must move to a password first opens for this page only: closing the popup
+    // before choosing the password must not leave a session that skips the step.
+    const upgrade = needsPasswordUpgrade(this.kind, secret);
+    let ok: boolean;
+    try {
+      ok = await this.authStore.unlock(secret, { keepSession: !upgrade });
+    } catch (err) {
+      // TooManyAttemptsError: its message says how long to wait.
+      this.isBusy.set(false);
+      this.error.set(toUserMessage(err));
+      this.entry()?.clear();
+      return;
+    }
+    this.isBusy.set(false);
+    if (!ok) {
+      if (viaBiometrics) {
+        // The kept PIN no longer opens this vault: never try it again.
+        await this.biometric?.disable();
+        this.biometryLabel.set(null);
+        this.error.set(`${viaBiometrics} was turned off — enter your ${this.noun}`);
+      } else {
+        this.error.set(`Incorrect ${this.noun}`);
+      }
+      this.entry()?.clear();
+      return;
+    }
+    // Paint last-known balances/history instantly; the shell refreshes them.
+    await this.walletStore.restoreCache();
+    if (upgrade) {
+      this.step.set('upgrade');
+      return;
+    }
+    await this.router.navigateByUrl(this.destination);
   }
 
   protected showForgot(): void {

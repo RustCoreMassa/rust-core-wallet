@@ -8,7 +8,8 @@ import Security
 ///
 /// Items can be read only while the phone is unlocked, never leave this device (no iCloud
 /// Keychain, not restored onto another phone from a backup), and are deleted with the app: the
-/// Keychain itself outlives an uninstall, so a fresh install clears what an earlier one left.
+/// Keychain itself outlives an uninstall, so a fresh install clears what an earlier one left
+/// (all of this app's items, BiometricUnlockPlugin's too). Registered first, so that runs first.
 @objc(NativeStorePlugin)
 public class NativeStorePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "NativeStorePlugin"
@@ -26,8 +27,9 @@ public class NativeStorePlugin: CAPPlugin, CAPBridgedPlugin {
     override public func load() {
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: Self.installedFlag) {
-            // First launch of this install: whatever is left belongs to an uninstalled copy.
-            let status = SecItemDelete(Self.baseQuery() as CFDictionary)
+            // First launch of this install: whatever is left belongs to an uninstalled copy —
+            // every item of this app (this store's, and the PIN kept for Face ID).
+            let status = SecItemDelete([kSecClass as String: kSecClassGenericPassword] as CFDictionary)
             if status != errSecSuccess && status != errSecItemNotFound {
                 CAPLog.print("⚡️  NativeStore: clearing an earlier install's items failed (\(status))")
             }

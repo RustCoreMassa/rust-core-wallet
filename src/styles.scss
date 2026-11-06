@@ -202,7 +202,8 @@ input[type='number']::-webkit-inner-spin-button {
 /* ---------- toast ---------- */
 .toast-holder {
   position: fixed;
-  top: 20px;
+  /* Below the status bar / camera where the app draws under them (iOS app, installed web app). */
+  top: calc(20px + env(safe-area-inset-top));
   left: 0;
   right: 0;
   display: flex;

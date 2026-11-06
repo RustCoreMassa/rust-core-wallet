@@ -94,6 +94,16 @@
     </svg>
   </button>
 
+  @if (biometryLabel(); as label) {
+  <button class="settings-row" type="button" (click)="toggleBiometric(label)">
+    <div>
+      <div class="label">Unlock with {{ label }}</div>
+      <div class="sub">{{ biometric?.enabled() ? 'On — your ' + secretName + ' still works too' : 'Off' }}</div>
+    </div>
+    <div class="switch" [class.on]="biometric?.enabled()"></div>
+  </button>
+  }
+
   <button class="settings-row" type="button" (click)="lockWallet()">
     <div>
       <div class="label">Lock wallet</div>

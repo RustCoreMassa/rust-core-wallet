@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { BIOMETRIC_UNLOCK } from '../platform/biometric-unlock';
 import { CONNECTED_SITES, ConnectedSites } from '../platform/connected-sites';
 import { NetworkStore } from './network-store';
 import { NftStore } from './nft-store';
@@ -10,7 +11,10 @@ describe('WalletDataEraser', () => {
   let networkStore: { reset: ReturnType<typeof vi.fn> };
   let nftStore: { reset: ReturnType<typeof vi.fn> };
 
-  function setUp(connectedSites: Partial<ConnectedSites> | null): WalletDataEraser {
+  function setUp(
+    connectedSites: Partial<ConnectedSites> | null,
+    biometricUnlock: { disable(): Promise<void> } | null = null,
+  ): WalletDataEraser {
     walletStore = { reset: vi.fn() };
     networkStore = { reset: vi.fn() };
     nftStore = { reset: vi.fn() };
@@ -20,6 +24,7 @@ describe('WalletDataEraser', () => {
         { provide: NetworkStore, useValue: networkStore },
         { provide: NftStore, useValue: nftStore },
         { provide: CONNECTED_SITES, useValue: connectedSites },
+        { provide: BIOMETRIC_UNLOCK, useValue: biometricUnlock },
       ],
     });
     return TestBed.inject(WalletDataEraser);
@@ -32,6 +37,12 @@ describe('WalletDataEraser', () => {
     expect(nftStore.reset).toHaveBeenCalledOnce();
     expect(networkStore.reset).toHaveBeenCalledOnce();
     expect(sites.clear).toHaveBeenCalledOnce();
+  });
+
+  it('turns Face ID unlock off, deleting the PIN kept for it (the apps)', async () => {
+    const biometric = { disable: vi.fn(async () => {}) };
+    await setUp(null, biometric).erase();
+    expect(biometric.disable).toHaveBeenCalledOnce();
   });
 
   it('works without connected sites (the web app)', async () => {

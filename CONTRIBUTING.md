@@ -115,7 +115,13 @@ writes in order in the background; items an earlier build left in localStorage m
 Locking adds one rule to the web's: back after a minute or more in the background, the app
 asks for the PIN again (`BACKGROUND_LOCK_MS`, checked on Capacitor's `resume`, before the app is
 on screen); while it isn't active, `SceneDelegate.swift` covers it with the launch screen, so
-the app switcher's snapshot shows no balances. Not done yet: Face ID.
+the app switcher's snapshot shows no balances. Face ID / Touch ID can stand in for typing the
+PIN to unlock (Settings → Unlock with Face ID; `BIOMETRIC_UNLOCK`,
+`ios/App/App/BiometricUnlockPlugin.swift`): the PIN is kept in the Keychain behind the
+biometrics (`biometryCurrentSet` — adding a face turns it off), and showing or copying a private
+key, removing a wallet and logging out still ask for the PIN typed. A copied private key goes to
+the clipboard through `SECRET_CLIPBOARD` (`SecretClipboardPlugin.swift`): this device only (no
+Universal Clipboard) and removed by the system after 60 s, even with the app in the background.
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a

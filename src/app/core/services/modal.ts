@@ -16,6 +16,7 @@ export type ModalId =
   | 'connected-sites'
   | 'tokens'
   | 'register-domain'
+  | 'biometric-unlock'
   | null;
 
 @Injectable({ providedIn: 'root' })
