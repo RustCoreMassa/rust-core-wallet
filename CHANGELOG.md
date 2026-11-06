@@ -7,6 +7,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **iOS and Android apps — in development, not yet in the App Store or Google Play.** The same
+  wallet, with what a phone app adds: the encrypted vault in the phone's own secure storage
+  (iOS Keychain, Android Keystore) instead of browser storage, unlocking with Face ID, Touch ID
+  or a fingerprint (showing or copying a private key, removing a wallet and logging out still
+  ask for your PIN), a lock when the app comes back after a minute in the background, balances
+  hidden in the app switcher, a copied private key that stays on the phone and is removed after
+  60 seconds, scanning a recipient's QR code, and sharing your address. Token swaps are not in
+  the apps.
+
+### Fixed
+
+- Short notifications ("Address copied", …) appear below the status bar and the camera instead
+  of behind them, on phones where the wallet fills the whole screen.
+
 ## [1.7.1] — 2026-11-04
 
 ### Security
