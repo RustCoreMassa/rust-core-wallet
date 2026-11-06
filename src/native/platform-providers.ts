@@ -6,6 +6,7 @@ import { LOCAL_STORE } from '../app/core/platform/app-storage';
 import { BIOMETRIC_UNLOCK } from '../app/core/platform/biometric-unlock';
 import { MOBILE_ONLY } from '../app/core/platform/device';
 import { MOVED_TO } from '../app/core/platform/gateway';
+import { QR_SCANNER } from '../app/core/platform/qr-scanner';
 import { SECRET_CLIPBOARD } from '../app/core/platform/secret-clipboard';
 import { Toast } from '../app/core/services/toast';
 import { VAULT_STORAGE_KEY } from '../app/core/services/vault-storage';
@@ -13,6 +14,7 @@ import { BACKGROUND_LOCK_MS } from '../app/core/state/auto-lock';
 import { APP_BACKGROUND_LOCK_MS } from '../app/core/utils/auto-lock-time';
 import { CLIPBOARD_CLEAR_MS } from '../app/core/utils/secret-clipboard';
 import { BiometricUnlockPlugin, NativeBiometricUnlock } from './native-biometric-unlock';
+import { NativeQrScanner, QrScannerPlugin } from './native-qr-scanner';
 import { NativeStorageArea, NativeStorePlugin } from './native-storage-area';
 
 /*
@@ -61,6 +63,11 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   ...(nativeStore
     ? [
         { provide: LOCAL_STORE, useValue: nativeStore },
+        // Send → Scan (ios/App/App/QrScannerPlugin.swift).
+        {
+          provide: QR_SCANNER,
+          useFactory: () => new NativeQrScanner(registerPlugin<QrScannerPlugin>('QrScanner')),
+        },
         // Face ID / Touch ID instead of typing the PIN (ios/App/App/BiometricUnlockPlugin.swift).
         {
           provide: BIOMETRIC_UNLOCK,

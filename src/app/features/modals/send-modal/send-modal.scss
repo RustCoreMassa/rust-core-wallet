@@ -1,3 +1,25 @@
 :host {
   display: contents;
 }
+
+/* Recipient field with the apps' Scan button beside it. */
+.address-row {
+  display: flex;
+  gap: 8px;
+
+  .num-input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.scan-btn {
+  flex: none;
+  width: 48px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

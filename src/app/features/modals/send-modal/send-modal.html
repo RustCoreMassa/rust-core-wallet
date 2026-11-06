@@ -32,14 +32,28 @@
 </div>
 
 <label class="field-label" for="send-address">Recipient address</label>
-<input
-  id="send-address"
-  class="num-input"
-  type="text"
-  placeholder="AU..."
-  [ngModel]="address()"
-  (ngModelChange)="address.set($event)"
-/>
+<div class="address-row">
+  <input
+    id="send-address"
+    class="num-input"
+    type="text"
+    placeholder="AU..."
+    [ngModel]="address()"
+    (ngModelChange)="address.set($event)"
+  />
+  @if (scanner) {
+  <button class="scan-btn" type="button" aria-label="Scan a QR code" (click)="scanAddress()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M4 12h16"
+        stroke="#f6f6f8"
+        stroke-width="1.8"
+        stroke-linecap="round"
+      />
+    </svg>
+  </button>
+  }
+</div>
 
 @if (showSaveOption()) {
 <label class="save-row">

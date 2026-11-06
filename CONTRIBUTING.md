@@ -122,6 +122,8 @@ biometrics (`biometryCurrentSet` — adding a face turns it off), and showing or
 key, removing a wallet and logging out still ask for the PIN typed. A copied private key goes to
 the clipboard through `SECRET_CLIPBOARD` (`SecretClipboardPlugin.swift`): this device only (no
 Universal Clipboard) and removed by the system after 60 s, even with the app in the background.
+Send → Scan reads a recipient from a QR code (`QR_SCANNER`, `QrScannerPlugin.swift`, camera
+full screen); only a plain address or a `massa:` link is taken (`addressFromQr`).
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a

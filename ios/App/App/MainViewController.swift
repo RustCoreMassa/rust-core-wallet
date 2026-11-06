@@ -8,5 +8,6 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(NativeStorePlugin())
         bridge?.registerPluginInstance(SecretClipboardPlugin())
         bridge?.registerPluginInstance(BiometricUnlockPlugin())
+        bridge?.registerPluginInstance(QrScannerPlugin())
     }
 }

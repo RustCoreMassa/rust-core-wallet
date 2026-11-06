@@ -47,6 +47,7 @@ import {
 } from './history-merge';
 import { Network, NetworkStore } from './network-store';
 import { TokenCatalog } from './token-catalog';
+import { MASSA_ADDRESS } from '../utils/massa-address';
 
 /** Token prices are re-read from Dusa at most this often. */
 const PRICES_REFRESH_MS = 60_000;
@@ -100,13 +101,6 @@ function withNames(
   }
   return changed ? next : wallets;
 }
-
-/**
- * Shape check for a Massa address: `AU` (user) or `AS` (smart contract)
- * followed by base58. The chain does the real validation on send; this
- * just catches typos before the confirmation step.
- */
-const MASSA_ADDRESS = /^A[US][1-9A-HJ-NP-Za-km-z]{40,60}$/;
 
 /** Smallest amount the Send flow accepts, in any token. */
 export const MIN_SEND_AMOUNT = 0.01;

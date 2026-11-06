@@ -22,6 +22,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan a QR code to fill in the address you send to.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Unlock RustCore Wallet with Face ID instead of typing your PIN.</string>
 	<key>LSRequiresIPhoneOS</key>

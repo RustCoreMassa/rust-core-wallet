@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TokenId } from '../../../core/models/token.model';
+import { CameraDeniedError, QR_SCANNER } from '../../../core/platform/qr-scanner';
 import { NETWORK_FEE_MAS } from '../../../core/services/massa-provider';
 import { Modal } from '../../../core/services/modal';
 import { Toast } from '../../../core/services/toast';
@@ -8,6 +9,7 @@ import { MIN_SEND_AMOUNT, SendPlan, WalletStore } from '../../../core/state/wall
 import { ConfirmDetails, ConfirmRow } from '../../../shared/ui/confirm-details/confirm-details';
 import { Dropdown, DropdownOption } from '../../../shared/ui/dropdown/dropdown';
 import { formatDisplayAmount } from '../../../core/utils/display-amount';
+import { addressFromQr } from '../../../core/utils/massa-address';
 import { formatUnits, toUnits } from '../../../core/utils/token-amount';
 import { toUserMessage } from '../../../core/utils/user-error';
 import { AmountPipe } from '../../../shared/pipes/amount-pipe';
@@ -22,6 +24,8 @@ export class SendModal {
   protected readonly modal = inject(Modal);
   protected readonly store = inject(WalletStore);
   private readonly toast = inject(Toast);
+  /** The apps: Scan fills the recipient from a QR code. */
+  protected readonly scanner = inject(QR_SCANNER);
 
   protected readonly token = signal<TokenId>('MAS');
   protected readonly address = signal('');
@@ -80,6 +84,30 @@ export class SendModal {
   protected pickAddress(value: string): void {
     this.address.set(value);
     this.saveChecked.set(false);
+  }
+
+  /** Camera → recipient: a plain address or a `massa:` link; anything else is refused. */
+  protected async scanAddress(): Promise<void> {
+    if (!this.scanner) return;
+    this.error.set(null);
+    let text: string | null;
+    try {
+      text = await this.scanner.scan();
+    } catch (err) {
+      this.error.set(
+        err instanceof CameraDeniedError
+          ? 'Allow camera access for RustCore Wallet in your phone settings to scan'
+          : "Couldn't open the camera",
+      );
+      return;
+    }
+    if (text === null) return;
+    const address = addressFromQr(text);
+    if (!address) {
+      this.error.set("That QR code doesn't hold a Massa address");
+      return;
+    }
+    this.pickAddress(address);
   }
 
   protected readonly minAmount = MIN_SEND_AMOUNT;
