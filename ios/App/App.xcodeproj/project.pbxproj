@@ -21,6 +21,7 @@
 		7C1A2B3D4E5F60718293A4B5 /* SecretClipboardPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4B6 /* SecretClipboardPlugin.swift */; };
 		7C1A2B3D4E5F60718293A4B7 /* BiometricUnlockPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4B8 /* BiometricUnlockPlugin.swift */; };
 		7C1A2B3D4E5F60718293A4B9 /* QrScannerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4BA /* QrScannerPlugin.swift */; };
+		7C1A2B3D4E5F60718293A4BB /* ShareSheetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A2B3D4E5F60718293A4BC /* ShareSheetPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
 		7C1A2B3D4E5F60718293A4B6 /* SecretClipboardPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretClipboardPlugin.swift; sourceTree = "<group>"; };
 		7C1A2B3D4E5F60718293A4B8 /* BiometricUnlockPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricUnlockPlugin.swift; sourceTree = "<group>"; };
 		7C1A2B3D4E5F60718293A4BA /* QrScannerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QrScannerPlugin.swift; sourceTree = "<group>"; };
+		7C1A2B3D4E5F60718293A4BC /* ShareSheetPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheetPlugin.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -80,6 +82,7 @@
 				7C1A2B3D4E5F60718293A4B6 /* SecretClipboardPlugin.swift */,
 				7C1A2B3D4E5F60718293A4B8 /* BiometricUnlockPlugin.swift */,
 				7C1A2B3D4E5F60718293A4BA /* QrScannerPlugin.swift */,
+				7C1A2B3D4E5F60718293A4BC /* ShareSheetPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -180,6 +183,7 @@
 				7C1A2B3D4E5F60718293A4B5 /* SecretClipboardPlugin.swift in Sources */,
 				7C1A2B3D4E5F60718293A4B7 /* BiometricUnlockPlugin.swift in Sources */,
 				7C1A2B3D4E5F60718293A4B9 /* QrScannerPlugin.swift in Sources */,
+				7C1A2B3D4E5F60718293A4BB /* ShareSheetPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

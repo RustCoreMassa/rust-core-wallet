@@ -47,7 +47,7 @@ npm start            # http://localhost:4200
 | `npm run build:extension` | Browser extension into `dist/extension/chromium` and `dist/extension/firefox` |
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
 | `npm run build:native` | The iOS / Android apps' web bundle into `dist/native` |
-| `npm run build:ios` | `build:native`, then copies it into the Xcode project (`ios/`) |
+| `npm run build:ios` | `build:native`, the app version from `package.json`, then copies the bundle into the Xcode project (`ios/`) |
 | `npm run smoke:native` | Boots the apps' web bundle in a simulated phone (after `build:native`) |
 | `npm run test-dapp` | Test page for dApp connections at http://127.0.0.1:4300 (see below) |
 | `npx prettier --write .` | Format the code |
@@ -96,7 +96,10 @@ two (CSP in `src/extension/manifest.json`; `src/csp.spec.ts` checks it against `
 from DeWeb or any server. `npm run build:ios` builds that bundle (Angular configuration
 `native`: `src/native/platform-providers.ts` replaces the web one, `src/native/native.scss` keeps
 the screen below the status bar) and copies it into the project; then open
-`ios/App/App.xcodeproj` in Xcode and run it on a simulator or a phone. Needs macOS and the full
+`ios/App/App.xcodeproj` in Xcode and run it on a simulator or a phone. Capacitor's own native
+code comes through Swift Package Manager as Ionic's prebuilt framework, pinned by checksum
+(`ios/App/CapApp-SPM/Package.swift`, `Package.resolved`); its source is in
+`node_modules/@capacitor/ios`. Needs macOS and the full
 Xcode (the command line tools alone can't build iOS apps). To run it on your own iPhone, add
 your Apple ID in Xcode → Settings → Accounts (a free account works; the app then expires after
 7 days) and put `DEVELOPMENT_TEAM = <your team ID>` in `ios/local.xcconfig` — git-ignored, so
@@ -123,7 +126,10 @@ key, removing a wallet and logging out still ask for the PIN typed. A copied pri
 the clipboard through `SECRET_CLIPBOARD` (`SecretClipboardPlugin.swift`): this device only (no
 Universal Clipboard) and removed by the system after 60 s, even with the app in the background.
 Send → Scan reads a recipient from a QR code (`QR_SCANNER`, `QrScannerPlugin.swift`, camera
-full screen); only a plain address or a `massa:` link is taken (`addressFromQr`).
+full screen); only a plain address or a `massa:` link is taken (`addressFromQr`). Receive →
+Share opens the iOS share menu (`SHARE_SHEET`, `ShareSheetPlugin.swift`). The app's version
+(`MARKETING_VERSION`) follows `package.json`: `npm run build:ios` sets it
+(`scripts/sync-ios-version.mjs`).
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a

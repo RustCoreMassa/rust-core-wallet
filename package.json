@@ -8,7 +8,7 @@
     "build": "ng build",
     "build:extension": "node scripts/build-extension.mjs",
     "build:native": "ng build --configuration production,native",
-    "build:ios": "npm run build:native && cap sync ios",
+    "build:ios": "npm run build:native && node scripts/sync-ios-version.mjs && cap sync ios",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "smoke": "node --no-warnings scripts/smoke-boot.mjs",

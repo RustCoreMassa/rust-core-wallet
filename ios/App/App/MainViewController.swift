@@ -9,5 +9,6 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(SecretClipboardPlugin())
         bridge?.registerPluginInstance(BiometricUnlockPlugin())
         bridge?.registerPluginInstance(QrScannerPlugin())
+        bridge?.registerPluginInstance(ShareSheetPlugin())
     }
 }

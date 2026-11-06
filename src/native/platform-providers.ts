@@ -8,6 +8,7 @@ import { MOBILE_ONLY } from '../app/core/platform/device';
 import { MOVED_TO } from '../app/core/platform/gateway';
 import { QR_SCANNER } from '../app/core/platform/qr-scanner';
 import { SECRET_CLIPBOARD } from '../app/core/platform/secret-clipboard';
+import { SHARE_SHEET } from '../app/core/platform/share-sheet';
 import { Toast } from '../app/core/services/toast';
 import { VAULT_STORAGE_KEY } from '../app/core/services/vault-storage';
 import { BACKGROUND_LOCK_MS } from '../app/core/state/auto-lock';
@@ -63,6 +64,16 @@ export const platformProviders: (Provider | EnvironmentProviders)[] = [
   ...(nativeStore
     ? [
         { provide: LOCAL_STORE, useValue: nativeStore },
+        // Receive → Share (ios/App/App/ShareSheetPlugin.swift).
+        {
+          provide: SHARE_SHEET,
+          useFactory: () => {
+            const plugin = registerPlugin<{ share(o: { text: string }): Promise<unknown> }>(
+              'ShareSheet',
+            );
+            return { share: async (text: string) => void (await plugin.share({ text })) };
+          },
+        },
         // Send → Scan (ios/App/App/QrScannerPlugin.swift).
         {
           provide: QR_SCANNER,

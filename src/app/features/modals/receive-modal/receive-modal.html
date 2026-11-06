@@ -20,6 +20,9 @@
 
 <div class="copy-row">
   <button class="btn btn-red" type="button" (click)="copyAddress()">Copy address</button>
+  @if (shareSheet) {
+  <button class="btn btn-ghost" type="button" (click)="shareAddress()">Share</button>
+  }
 </div>
 
 <div class="hint">Only send MAS and Massa-standard tokens to this address.</div>
