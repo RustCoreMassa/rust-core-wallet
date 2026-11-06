@@ -18,6 +18,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   60 seconds, scanning a recipient's QR code, and sharing your address. Token swaps are not in
   the apps.
 
+### Changed
+
+- The release workflow uses the current versions of its GitHub Actions (checkout 7, setup-node 7,
+  upload-artifact 7, download-artifact 8), which run on Node.js 24, still pinned to exact
+  commits. The publish job now fails if the release files it receives don't match what the build
+  job uploaded.
+
 ### Fixed
 
 - Short notifications ("Address copied", …) appear below the status bar and the camera instead
