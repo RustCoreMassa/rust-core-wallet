@@ -7,7 +7,7 @@ import {
   BiometryKind,
 } from '../app/core/platform/biometric-unlock';
 
-/** The native side: ios/App/App/BiometricUnlockPlugin.swift. */
+/** The native side: ios/App/App/BiometricUnlockPlugin.swift, android/…/BiometricUnlockPlugin.java. */
 export interface BiometricUnlockPlugin {
   availability(): Promise<{ kind: BiometryKind | 'none' }>;
   save(options: { secret: string }): Promise<void>;
@@ -20,6 +20,7 @@ export interface BiometricUnlockPlugin {
 export const BIOMETRIC_UNLOCK_KEY = 'massa-wallet:biometric-unlock';
 
 const REASON = 'Unlock your wallet';
+const KINDS: readonly string[] = ['face', 'touch', 'fingerprint', 'biometric'];
 
 export class NativeBiometricUnlock implements BiometricUnlock {
   private readonly on = signal(false);
@@ -35,7 +36,7 @@ export class NativeBiometricUnlock implements BiometricUnlock {
   async available(): Promise<BiometryKind | null> {
     try {
       const { kind } = await this.plugin.availability();
-      return kind === 'face' || kind === 'touch' ? kind : null;
+      return KINDS.includes(kind as BiometryKind) ? (kind as BiometryKind) : null;
     } catch {
       return null;
     }

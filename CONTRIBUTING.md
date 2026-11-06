@@ -48,6 +48,7 @@ npm start            # http://localhost:4200
 | `npm run smoke:extension` | Boots the extension's popup with a simulated `chrome.storage` (after `build:extension`) |
 | `npm run build:native` | The iOS / Android apps' web bundle into `dist/native` |
 | `npm run build:ios` | `build:native`, the app version from `package.json`, then copies the bundle into the Xcode project (`ios/`) |
+| `npm run build:android` | `build:native`, the app version, then copies the bundle into the Android project (`android/`) |
 | `npm run smoke:native` | Boots the apps' web bundle in a simulated phone (after `build:native`) |
 | `npm run test-dapp` | Test page for dApp connections at http://127.0.0.1:4300 (see below) |
 | `npx prettier --write .` | Format the code |
@@ -90,7 +91,7 @@ extension's pages may connect only to the Massa nodes, the explorer API and the 
 servers of `MEDIA_HOSTS` (`src/app/core/utils/media-hosts.ts`), and load images only from those
 two (CSP in `src/extension/manifest.json`; `src/csp.spec.ts` checks it against `MEDIA_HOSTS`).
 
-**iOS app (in progress; Android to follow).** The same code runs inside a native shell made with
+**iOS app (in progress).** The same code runs inside a native shell made with
 [Capacitor](https://capacitorjs.com): the Xcode project lives in `ios/`, the settings in
 `capacitor.config.json`. The app holds its own copy of the web bundle — it never loads the wallet
 from DeWeb or any server. `npm run build:ios` builds that bundle (Angular configuration
@@ -127,9 +128,28 @@ the clipboard through `SECRET_CLIPBOARD` (`SecretClipboardPlugin.swift`): this d
 Universal Clipboard) and removed by the system after 60 s, even with the app in the background.
 Send → Scan reads a recipient from a QR code (`QR_SCANNER`, `QrScannerPlugin.swift`, camera
 full screen); only a plain address or a `massa:` link is taken (`addressFromQr`). Receive →
-Share opens the iOS share menu (`SHARE_SHEET`, `ShareSheetPlugin.swift`). The app's version
-(`MARKETING_VERSION`) follows `package.json`: `npm run build:ios` sets it
-(`scripts/sync-ios-version.mjs`).
+Share opens the iOS share menu (`SHARE_SHEET`, `ShareSheetPlugin.swift`). The apps' version
+follows `package.json`: `npm run build:ios` / `build:android` set it
+(`scripts/sync-app-version.mjs`; Android's `versionCode` = major·10000 + minor·100 + patch).
+
+**Android app (in progress).** The same web bundle and Capacitor project, in `android/`: needs
+Android Studio (its SDK) and JDK 21; `npm run build:android`, then open `android/` in Android
+Studio and run it on an emulator or a phone with USB debugging. Each iOS plugin has a Java
+counterpart in `android/app/src/main/java/com/rustcoremassa/wallet/` (registered in
+`MainActivity.java`), same names and answers: `NativeStorePlugin` (values AES-GCM-encrypted with
+an Android Keystore key, usable only while the phone is unlocked, in private SharedPreferences;
+backups and device transfers exclude the app's data — `res/xml/data_extraction_rules.xml`,
+`allowBackup="false"`), `BiometricUnlockPlugin` (the PIN encrypted to an RSA Keystore key whose
+private half needs a strong biometric check every time and dies when a fingerprint or face is
+added), `SecretClipboardPlugin` (marked sensitive, emptied after 60 s while the app's process
+lives), `QrScannerPlugin` (ZXing via zxing-android-embedded — open source, no Google Play
+services) and `ShareSheetPlugin`. The recent-apps screen shows no balances
+(`setRecentsScreenshotEnabled(false)`; before Android 13, `FLAG_SECURE` while in the
+background). The Gradle download is pinned by checksum (`gradle-wrapper.properties`).
+Capacitor's own logging is off in both apps (`loggingBehavior: "none"` in `capacitor.config.json`):
+in debug builds it would write every plugin call's data — a PIN being kept for biometric unlock,
+a private key being copied — to the system log. Debug the web side with Chrome's
+`chrome://inspect` (Android) or Safari's Web Inspector (iOS) instead.
 
 **Content Security Policy.** The web app has the same policy as a `<meta>` in `src/index.html`
 (minus `frame-ancestors`, which a `<meta>` can't set — `src/main.ts` refuses to start inside a
@@ -168,7 +188,7 @@ chain, verify them with read-only calls or simulations first, and test with smal
 | History | Massa explorer API |
 | QR codes | [`ng-qrcode`](https://github.com/mnahkies/ng-qrcode) |
 | Hosting | [DeWeb](https://docs.massa.net/docs/deweb/home) — static files stored on the Massa blockchain |
-| Native apps | [Capacitor](https://capacitorjs.com) — the same web bundle inside an iOS app (Android to follow) |
+| Native apps | [Capacitor](https://capacitorjs.com) — the same web bundle inside the iOS and Android apps |
 
 ```
 src/app/
@@ -187,6 +207,7 @@ src/app/
 src/extension/       Browser extension: manifest, background worker, chrome.storage adapters
 src/native/          iOS / Android apps: platform providers, status-bar spacing
 ios/                 Xcode project (Capacitor)
+android/             Android Studio project (Capacitor)
 ```
 
 ### Design rules

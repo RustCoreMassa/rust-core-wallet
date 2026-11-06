@@ -38,6 +38,19 @@ function memoryStore(initial: Record<string, string> = {}) {
 }
 
 describe('NativeBiometricUnlock', () => {
+  it("names what the phone offers, and nothing it doesn't know", async () => {
+    const { plugin } = fakePlugin();
+    const bio = new NativeBiometricUnlock(plugin, memoryStore());
+    for (const kind of ['face', 'touch', 'fingerprint', 'biometric'] as const) {
+      plugin.availability = async () => ({ kind });
+      expect(await bio.available()).toBe(kind);
+    }
+    plugin.availability = async () => ({ kind: 'none' });
+    expect(await bio.available()).toBeNull();
+    plugin.availability = async () => ({ kind: 'retina' as never });
+    expect(await bio.available()).toBeNull();
+  });
+
   it('reads whether it is on from the store', () => {
     const { plugin } = fakePlugin();
     expect(new NativeBiometricUnlock(plugin, memoryStore()).enabled()).toBe(false);

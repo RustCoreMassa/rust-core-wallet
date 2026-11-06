@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">RustCore Wallet</string>
+    <string name="title_activity_main">RustCore Wallet</string>
+    <string name="package_name">com.rustcoremassa.wallet</string>
+    <string name="custom_url_scheme">com.rustcoremassa.wallet</string>
+</resources>

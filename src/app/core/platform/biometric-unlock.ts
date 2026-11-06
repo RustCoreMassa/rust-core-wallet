@@ -1,7 +1,10 @@
 import { InjectionToken, Signal } from '@angular/core';
 
-/** What the phone unlocks with. */
-export type BiometryKind = 'face' | 'touch';
+/**
+ * What the phone unlocks with: Face ID / Touch ID (iOS); a fingerprint, or — face, iris, several —
+ * "biometrics" (Android, which doesn't say which one the user enrolled).
+ */
+export type BiometryKind = 'face' | 'touch' | 'fingerprint' | 'biometric';
 
 /** The phone's biometrics changed (a face or finger added) or the kept PIN is gone: it is off. */
 export class BiometryChangedError extends Error {
@@ -51,6 +54,13 @@ export const BIOMETRIC_UNLOCK = new InjectionToken<BiometricUnlock | null>('BIOM
   factory: () => null,
 });
 
+const NAMES: Record<BiometryKind, string> = {
+  face: 'Face ID',
+  touch: 'Touch ID',
+  fingerprint: 'Fingerprint',
+  biometric: 'Biometrics',
+};
+
 export function biometryName(kind: BiometryKind): string {
-  return kind === 'face' ? 'Face ID' : 'Touch ID';
+  return NAMES[kind];
 }

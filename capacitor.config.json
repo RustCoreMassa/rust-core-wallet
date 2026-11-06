@@ -3,5 +3,10 @@
   "appName": "RustCore Wallet",
   "webDir": "dist/native/browser",
   "backgroundColor": "#07070a",
-  "loggingBehavior": "debug"
+  "loggingBehavior": "none",
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK"
+    }
+  }
 }
