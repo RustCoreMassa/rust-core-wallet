@@ -7,6 +7,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Balances load again on mainnet.** Massa retired the explorer API the transaction history came
+  from (`explorer-api.massa.net` stopped answering in November 2026), and the wallet waited for
+  the history before showing any balance — so balances never appeared. Balances now show as soon
+  as the blockchain answers, whatever the history does, and a history request gives up after
+  15 seconds.
+- **Transaction history reads from Massa's new indexer** (`indexer-api.massa.net`, the one behind
+  the new `explorer.massa.net`). MAS that a smart contract sends you (for example a swap's
+  output) no longer shows as a separate *Receive* line: the new indexer doesn't list those in a
+  way the history can page through. The operation you sent (the swap itself) is still listed, and
+  your balance is always read from the blockchain.
+- **"View on explorer" opens the right page again**: the new explorer moved operations to
+  `/op/…` and addresses to `/address/…`; the old links led to "not found".
+
 ## [1.7.1] — 2026-11-04
 
 ### Security

@@ -234,7 +234,11 @@ export class WalletStore {
   private readonly _refreshingIds = signal<ReadonlySet<string>>(new Set());
   private readonly _loadingHistory = signal(false);
   private readonly _loadingDomains = signal(false);
-  /** Per `${network}:${id}`: when history was last read from the explorer. */
+  /**
+   * Per `${network}:${id}`: when history was last read from the explorer —
+   * or tried: a failed read waits HISTORY_REFRESH_MS too, so an explorer
+   * that hangs doesn't hold every 10 s refresh for its whole timeout.
+   */
   private readonly historyFetchedAt = new Map<string, number>();
   /** Per `${network}:${id}`: when MNS domains were last read. */
   private readonly domainsFetchedAt = new Map<string, number>();
@@ -554,7 +558,10 @@ export class WalletStore {
    * and the history from the explorer (at most every HISTORY_REFRESH_MS).
    * Each read is independent: one that fails (RPC hiccup, bad token
    * contract, explorer down) keeps its previous value instead of failing
-   * the rest.
+   * the rest. Balances are written as soon as the chain reads are done —
+   * never held back by a slow or unreachable explorer (1.7.1 waited for
+   * both, and showed no balance at all when explorer-api.massa.net went
+   * silent in November 2026).
    */
   async refresh(id: string = this._activeWalletId()): Promise<void> {
     const network = this.network();
@@ -569,7 +576,12 @@ export class WalletStore {
 
     this._refreshingIds.update((ids) => new Set(ids).add(id));
     try {
-      const [[mas, staking], tokens, [history]] = await Promise.all([
+      // Started together with the chain reads, awaited only after the
+      // balances are written. allSettled: never an unhandled rejection.
+      const historyRead = readHistory
+        ? Promise.allSettled([this.explorer.getHistory(wallet.address)]).then(([r]) => r)
+        : null;
+      const [[mas, staking], tokens] = await Promise.all([
         Promise.allSettled([
           // Candidate (not final) balance: already includes operations
           // that are executed but not yet final, so sends show up in
@@ -580,13 +592,9 @@ export class WalletStore {
         Promise.allSettled(
           tokenList.map((t) => this.provider.getTokenBalance(privateKey, t.contract)),
         ),
-        Promise.allSettled([readHistory ? this.explorer.getHistory(wallet.address) : null]),
       ]);
-      if (history.status === 'fulfilled' && history.value) {
-        this.historyFetchedAt.set(historyKey, Date.now());
-      }
 
-      const failures = [mas, staking, ...tokens, history].filter((r) => r.status === 'rejected');
+      const failures = [mas, staking, ...tokens].filter((r) => r.status === 'rejected');
       if (failures.length)
         console.warn(`Wallet refresh: ${failures.length} read(s) failed`, failures);
 
@@ -620,18 +628,29 @@ export class WalletStore {
             loaded: w.loaded || mas.status === 'fulfilled',
             rolls: staking.status === 'fulfilled' ? staking.value.rolls : w.rolls,
             staking: staking.status === 'fulfilled' ? staking.value.stats : w.staking,
-            ...(history.status === 'fulfilled' && history.value
-              ? {
-                  history: mergeHistory(w.history, history.value.records),
-                  // Polling re-reads only the newest page; once paging
-                  // exists, older pages already loaded stay as they are.
-                  historyPaging: w.historyPaging ?? advancePaging(EMPTY_PAGING, history.value),
-                }
-              : {}),
           };
         },
         network,
       );
+
+      const history = await historyRead;
+      if (history) this.historyFetchedAt.set(historyKey, Date.now());
+      if (history?.status === 'rejected') {
+        console.warn('Wallet refresh: history read failed', history.reason);
+      } else if (history) {
+        const page = history.value;
+        this.updateWallet(
+          id,
+          (w) => ({
+            ...w,
+            history: mergeHistory(w.history, page.records),
+            // Polling re-reads only the newest page; once paging
+            // exists, older pages already loaded stay as they are.
+            historyPaging: w.historyPaging ?? advancePaging(EMPTY_PAGING, page),
+          }),
+          network,
+        );
+      }
     } finally {
       this._refreshingIds.update((ids) => {
         const next = new Set(ids);

@@ -4,7 +4,7 @@ import { TOKEN_REGISTRY } from '../models/token.model';
 import { VaultAccount } from '../models/vault.model';
 import { DusaPrices } from '../services/dusa-prices';
 import { DusaSwap } from '../services/dusa-swap';
-import { ExplorerApi } from '../services/explorer-api';
+import { ExplorerApi, HistoryPage } from '../services/explorer-api';
 import { MASSA_PROVIDER, MassaProvider, OperationFailedError } from '../services/massa-provider';
 import { WalletCache } from '../services/wallet-cache';
 import { AuthStore } from './auth-store';
@@ -120,6 +120,57 @@ describe('WalletStore', () => {
 
     it('lists only tokens actually held (sparse balances)', () => {
       expect(Object.keys(store.wallets()['b'].balances)).toEqual(['MAS']);
+    });
+
+    describe('history from the explorer', () => {
+      // beforeEach's reads failed ("offline") less than 30 s ago.
+      const later = (ms: number) => vi.setSystemTime(Date.now() + ms);
+      beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }));
+      afterEach(() => vi.useRealTimers());
+
+      it('shows balances without waiting for it (explorer slow or down)', async () => {
+        later(30_000);
+        let answer!: (page: HistoryPage) => void;
+        const getHistory = vi.mocked(TestBed.inject(ExplorerApi).getHistory);
+        getHistory.mockImplementation(
+          () => new Promise<HistoryPage>((resolve) => (answer = resolve)),
+        );
+        chain.mas['S1a'] = 42_000_000_000n;
+
+        let done = false;
+        const refresh = store.refresh('a').then(() => (done = true));
+        await vi.waitFor(() => expect(store.wallets()['a'].balances.MAS).toBe(42));
+        expect(getHistory).toHaveBeenCalledWith(A);
+        expect(done).toBe(false);
+
+        answer({
+          records: [
+            {
+              id: 'Oin',
+              type: 'receive',
+              token: 'MAS',
+              amount: 1,
+              timestamp: 1,
+              operationId: 'Oin',
+            },
+          ],
+          streams: { created: { cursor: null, oldest: 1 }, received: { cursor: null, oldest: 1 } },
+        });
+        await refresh;
+        expect(store.wallets()['a'].history.map((r) => r.id)).toEqual(['Oin']);
+        expect(store.wallets()['a'].historyPaging).toBeTruthy();
+      });
+
+      it('retries a failed read after 30 s, not on every 10 s refresh', async () => {
+        const getHistory = vi.mocked(TestBed.inject(ExplorerApi).getHistory);
+        getHistory.mockClear();
+        later(10_000);
+        await store.refresh('a');
+        expect(getHistory).not.toHaveBeenCalled();
+        later(20_000);
+        await store.refresh('a');
+        expect(getHistory).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('refreshes all wallets one at a time, the active one first (no RPC burst)', async () => {

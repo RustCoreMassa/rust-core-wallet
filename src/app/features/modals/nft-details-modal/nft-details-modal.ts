@@ -7,8 +7,8 @@ import { Network } from '../../../core/state/network-store';
 import { mediaUrl } from '../../../core/utils/media-hosts';
 import { NftImage } from '../../../shared/ui/nft-image/nft-image';
 
-/** The public explorer only routes mainnet (`/mainnet/address/:hash`). */
-const EXPLORER_ADDRESS_URL = 'https://explorer.massa.net/mainnet/address/';
+/** The public explorer (explorer.massa.net) is mainnet only: `/address/:addr`. */
+const EXPLORER_ADDRESS_URL = 'https://explorer.massa.net/address/';
 
 /** What NftsPage opens the modal with. */
 export interface NftDetailsPayload {

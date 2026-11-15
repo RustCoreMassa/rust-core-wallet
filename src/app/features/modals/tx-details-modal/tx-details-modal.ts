@@ -7,8 +7,8 @@ import { TokenCatalog } from '../../../core/state/token-catalog';
 import { WalletStore } from '../../../core/state/wallet-store';
 import { HistoryRow } from '../../../shared/ui/history-row/history-row';
 
-/** The public explorer only routes mainnet (`/mainnet/operation/:hash`). */
-const EXPLORER_OPERATION_URL = 'https://explorer.massa.net/mainnet/operation/';
+/** The public explorer (explorer.massa.net) is mainnet only: `/op/:id`. */
+const EXPLORER_OPERATION_URL = 'https://explorer.massa.net/op/';
 
 const STATUS_LABEL: Record<TransactionStatus, string> = {
   pending: 'Pending',

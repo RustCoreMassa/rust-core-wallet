@@ -98,7 +98,7 @@ Nothing in the app needs changing for DeWeb:
   wallet's router takes it from there.
 - **Installing as an app works**: gateways serve the site over HTTPS, which the service worker
   requires.
-- The app talks to the Massa RPC and explorer directly, so it doesn't depend on which gateway it
+- The app talks to the Massa RPC and indexer directly, so it doesn't depend on which gateway it
   was loaded from.
 
 ## Watching the deployed site

@@ -33,12 +33,12 @@ describe('Content Security Policy', () => {
     expect(csp.get('frame-ancestors')).toEqual(["'none'"]);
   });
 
-  it('connects only to the Massa nodes, the explorer API and MEDIA_HOSTS', () => {
+  it('connects only to the Massa nodes, the indexer API and MEDIA_HOSTS', () => {
     expect(csp.get('connect-src')).toEqual([
       "'self'",
       'https://mainnet.massa.net',
       'https://buildnet.massa.net',
-      'https://explorer-api.massa.net',
+      'https://indexer-api.massa.net',
       ...media,
     ]);
   });
