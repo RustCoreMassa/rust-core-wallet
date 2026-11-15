@@ -83,7 +83,7 @@ height; and a full-screen browser tab (`?view=tab`): a centered 720 px column, w
 place of bottom sheets. What a browser offers is detected, not assumed
 (`src/extension/browser-views.ts`): no side panel where neither API exists, and on a phone
 (Firefox for Android) the popup is already full screen, so it offers no other view. The
-extension's pages may connect only to the Massa nodes, the explorer API and the two media
+extension's pages may connect only to the Massa nodes, Massa's indexer API and the two media
 servers of `MEDIA_HOSTS` (`src/app/core/utils/media-hosts.ts`), and load images only from those
 two (CSP in `src/extension/manifest.json`; `src/csp.spec.ts` checks it against `MEDIA_HOSTS`).
 
@@ -121,7 +121,7 @@ chain, verify them with read-only calls or simulations first, and test with smal
 | Blockchain | [`@massalabs/massa-web3`](https://github.com/massalabs/massa-web3) |
 | Crypto | Web Crypto API (`crypto.subtle`) — no third-party crypto library for the vault |
 | DEX | Dusa Liquidity Book contracts (quoter + router), called directly on-chain |
-| History | Massa explorer API |
+| History | Massa's indexer API (`indexer-api.massa.net`, the one behind explorer.massa.net) |
 | QR codes | [`ng-qrcode`](https://github.com/mnahkies/ng-qrcode) |
 | Hosting | [DeWeb](https://docs.massa.net/docs/deweb/home) — static files stored on the Massa blockchain |
 
@@ -166,10 +166,10 @@ src/extension/       Browser extension: manifest, background worker, chrome.stor
 
 `npm test` runs the unit tests (Vitest). They cover the logic where a mistake costs money or
 data: amount conversions, the encrypted vault, validation and fees, "nothing changes on
-failure", history merging, the explorer mapping, error messages, staking rewards, Dusa quote
+failure", history merging, the indexer mapping, error messages, staking rewards, Dusa quote
 encoding, platform detection, auto-lock and the kept session, and the extension's dApp bridge
 (protocol parsing, per-site permissions, the request router and its events, the approval
-window — including when its Approve button may answer). The blockchain and explorer are faked, so tests
+window — including when its Approve button may answer). The blockchain and indexer are faked, so tests
 run offline.
 
 Unit tests can't see problems that only exist in the bundled output, so after

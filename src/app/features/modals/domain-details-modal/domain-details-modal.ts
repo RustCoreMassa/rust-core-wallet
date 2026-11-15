@@ -6,8 +6,8 @@ import { WalletStore } from '../../../core/state/wallet-store';
 import { ShortAddressPipe } from '../../../shared/pipes/short-address-pipe';
 import { avatarColorsFor } from '../../../shared/ui/avatar-colors';
 
-/** The public explorer only routes mainnet (`/mainnet/address/:hash`). */
-const EXPLORER_ADDRESS_URL = 'https://explorer.massa.net/mainnet/address/';
+/** The public explorer (explorer.massa.net) is mainnet only: `/address/:addr`. */
+const EXPLORER_ADDRESS_URL = 'https://explorer.massa.net/address/';
 
 /** Details of one owned MNS domain — opened with the MnsDomain as payload. */
 @Component({

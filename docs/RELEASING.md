@@ -11,14 +11,14 @@ new features, patch for fixes. Every version has a section in [CHANGELOG.md](../
 
 ## Publishing a release
 
-1. Bump the version: `npm version 1.7.1 --no-git-tag-version`
+1. Bump the version: `npm version 1.7.2 --no-git-tag-version`
 2. In `CHANGELOG.md`, rename the `## [Unreleased]` section (where changes collect between
-   releases) to `## [1.7.1] — <date>` and add its link at the bottom.
+   releases) to `## [1.7.2] — <date>` and add its link at the bottom.
 3. Commit, then push a matching tag:
 
 ```bash
-git tag v1.7.1
-git push origin master v1.7.1
+git tag v1.7.2
+git push origin master v1.7.2
 ```
 
 Pushing the tag starts the [release workflow](../.github/workflows/release.yml) on GitHub
@@ -78,8 +78,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.7.1.zip -d rust-core-wallet-v1.7.1
-cd rust-core-wallet-v1.7.1
+unzip rust-core-wallet-v1.7.2.zip -d rust-core-wallet-v1.7.2
+cd rust-core-wallet-v1.7.2
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 
@@ -98,7 +98,7 @@ Nothing in the app needs changing for DeWeb:
   wallet's router takes it from there.
 - **Installing as an app works**: gateways serve the site over HTTPS, which the service worker
   requires.
-- The app talks to the Massa RPC and explorer directly, so it doesn't depend on which gateway it
+- The app talks to the Massa RPC and indexer directly, so it doesn't depend on which gateway it
   was loaded from.
 
 ## Watching the deployed site

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.7.1" src="https://img.shields.io/badge/version-1.7.1-brightgreen" />
+  <img alt="Version 1.7.2" src="https://img.shields.io/badge/version-1.7.2-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
@@ -38,7 +38,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.7.1** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.7.2** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -98,7 +98,7 @@ it shows a QR code to open it on your phone instead.
 |---|---|
 | The DeWeb gateway you open the wallet from | Delivers the wallet itself, read from the Massa blockchain. |
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa's public nodes: balances, rolls, tokens, prices and swaps, and the transactions you confirm. |
-| `explorer-api.massa.net` | Your transaction history. |
+| `indexer-api.massa.net` | Your transaction history (Massa's indexer, the one behind `explorer.massa.net`). |
 | `ipfs.io` / `nft.rustcoremassa.com` (only for NFTs your wallet holds, and icons you set) | The public IPFS gateway (for `ipfs://` links) and RustCore's server for its Core Keepers NFTs: NFT descriptions, traits and pictures, collection logos, and custom token icons. That server can see your IP address. |
 
 That's all: no analytics, no tracking, and no RustCore server behind the wallet (the only one
@@ -147,7 +147,7 @@ reach any other server, even by mistake. It also refuses to run inside another s
   one only from a contract address you got from a source you trust. They have no USD price and
   can't be swapped in the wallet. Their symbol must be written in Latin letters and digits, and
   can't be (or look like) one of the tokens RustCore lists.
-- The Massa nodes and the explorer answer the wallet for every wallet you hold, from your
+- The Massa nodes and Massa's indexer answer the wallet for every wallet you hold, from your
   connection: whoever runs them could tell those addresses belong together. Everything they see
   is public on the blockchain anyway — but not who it belongs to.
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
