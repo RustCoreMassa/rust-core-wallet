@@ -11,14 +11,14 @@ new features, patch for fixes. Every version has a section in [CHANGELOG.md](../
 
 ## Publishing a release
 
-1. Bump the version: `npm version 1.7.2 --no-git-tag-version`
+1. Bump the version: `npm version 1.7.3 --no-git-tag-version`
 2. In `CHANGELOG.md`, rename the `## [Unreleased]` section (where changes collect between
-   releases) to `## [1.7.2] — <date>` and add its link at the bottom.
+   releases) to `## [1.7.3] — <date>` and add its link at the bottom.
 3. Commit, then push a matching tag:
 
 ```bash
-git tag v1.7.2
-git push origin master v1.7.2
+git tag v1.7.3
+git push origin master v1.7.3
 ```
 
 Pushing the tag starts the [release workflow](../.github/workflows/release.yml) on GitHub
@@ -78,8 +78,8 @@ A GitHub Release can only hold files, so the release carries that folder as
 Before uploading, check every file against the release's `SHA256SUMS`, from inside the folder:
 
 ```bash
-unzip rust-core-wallet-v1.7.2.zip -d rust-core-wallet-v1.7.2
-cd rust-core-wallet-v1.7.2
+unzip rust-core-wallet-v1.7.3.zip -d rust-core-wallet-v1.7.3
+cd rust-core-wallet-v1.7.3
 shasum -a 256 -c ../SHA256SUMS --ignore-missing   # Linux: sha256sum -c ../SHA256SUMS --ignore-missing
 ```
 
@@ -157,8 +157,16 @@ What the stores ask for:
   read nothing else from the page and send nothing anywhere; every request needs
   the user's approval in the wallet's own window (docs/DAPP-CONNECTION.md). Browsers show this
   as "read and change your data on all websites", like every injected wallet's.
-- **Data**: none is collected. Firefox's manifest declares it
-  (`data_collection_permissions: none`); the Chrome Web Store asks in its Privacy tab.
+- **Data**: RustCore receives none, but the stores count everything that leaves the browser,
+  wherever it goes. The wallet sends the user's transactions to Massa's nodes and reads balances
+  and history from them and the indexer, so Firefox's manifest declares
+  `data_collection_permissions: { required: ["financialAndPaymentInfo"] }` — required, because the
+  wallet can't work without it; Firefox shows it at install. Declaring `none` got 1.7.2 disabled
+  on AMO ("Data collected mismatch", November 2026); `src/extension/manifest.spec.ts` keeps it.
+  If the wallet starts sending another kind of data, add its category from Mozilla's
+  [taxonomy](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/#taxonomy).
+  The Chrome Web Store asks the same in its Privacy tab: declare *Financial and payment
+  information* there too.
 - **Privacy policy**: the README's security & privacy section, which lists every network
   destination.
 - **Firefox source code**: AMO reviews readable code, and the bundle is minified, so each upload

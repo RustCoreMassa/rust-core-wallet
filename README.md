@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.7.2" src="https://img.shields.io/badge/version-1.7.2-brightgreen" />
+  <img alt="Version 1.7.3" src="https://img.shields.io/badge/version-1.7.3-brightgreen" />
   <img alt="Network: Massa" src="https://img.shields.io/badge/network-Massa-red" />
   <img alt="License: FSL-1.1-ALv2" src="https://img.shields.io/badge/license-FSL--1.1--ALv2-blue" />
 </p>
@@ -38,7 +38,7 @@ built on four principles:
   [DeWeb](https://docs.massa.net/docs/deweb/home), Massa's decentralized web: its files are stored
   on-chain — there is no RustCore web server to take down or tamper with.
 
-> **Version 1.7.2** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
+> **Version 1.7.3** — production release ([what's new](CHANGELOG.md)). RustCore Wallet
 > works on Massa **mainnet with real funds**. It has not had an independent security audit yet:
 > start with small amounts and always keep a backup of your private keys.
 
@@ -108,6 +108,11 @@ wallet enforces this list itself: its Content Security Policy — the same on th
 browser extension — lets the browser connect and load images only there, and load nothing else
 from anywhere (no frames, no scripts, styles or fonts from other servers), so the wallet can't
 reach any other server, even by mistake. It also refuses to run inside another site's page.
+
+When you install the browser extension, Firefox says it collects *financial and payment
+information*. Firefox counts everything that leaves the browser, wherever it goes: here, that's
+the transactions you confirm and the balances and history the wallet reads — exchanged only with
+the destinations above, because a wallet can't work without them.
 
 **Built-in safeguards**
 

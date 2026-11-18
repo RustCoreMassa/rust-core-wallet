@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.7.3] — 2026-11-18
+
+### Changed
+
+- **Firefox extension: declares the data it sends, as Mozilla requires.** Firefox counts
+  everything that leaves the browser, wherever it goes, so the extension now declares *financial
+  and payment information* — the transactions you confirm and the balances and history it reads
+  from Massa's network — and Firefox shows this when you install it. Nothing new is sent and
+  nothing goes anywhere new; 1.7.2 had declared no data and was taken down from Firefox Add-ons
+  for it.
+
 ## [1.7.2] — 2026-11-15
 
 ### Fixed
@@ -369,6 +380,7 @@ blockchain.
   app's own files.
 - Raw node and network errors are never shown to users; they get a short, plain explanation.
 
+[1.7.3]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.3
 [1.7.2]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.2
 [1.7.1]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.1
 [1.7.0]: https://github.com/RustCoreMassa/rust-core-wallet/releases/tag/v1.7.0

@@ -58,7 +58,7 @@
       "id": "rustcore-wallet@whisky098",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": ["financialAndPaymentInfo"]
       }
     },
     "gecko_android": {
