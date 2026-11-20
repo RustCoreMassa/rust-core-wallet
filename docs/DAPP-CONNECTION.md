@@ -400,4 +400,6 @@ so future native apps could reuse protocol v1 in their own dApp browser.
   site (`siteOf`) and 16 in flight per page; `increaseAllowance` decoded on any contract; on-chain
   failure text never shown; `chrome.storage.local` restricted to the extension's pages; a lock in
   any view (or the auto-lock, or the computer locking) locks the approval window too.
-- [ ] wallet-provider update for several accounts (`accounts()`, `from`, `accountsChanged`).
+- [x] wallet-provider update for several accounts (`accounts()`, `from`, `accountsChanged`) —
+  [massalabs/wallet-provider#397](https://github.com/massalabs/wallet-provider/pull/397),
+  merged 2026-11-02 (in the `3.3.2-dev` builds; not yet in a stable release).

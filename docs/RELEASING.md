@@ -137,11 +137,14 @@ Upload the zips from the GitHub Release, never a local build, so what's in each 
 what anyone can rebuild and check. Each zip has `manifest.json` at its root, as the stores
 expect. Check it against its `SHA256SUMS-*` first.
 
-| Store | Zip | Covers |
-|---|---|---|
-| [Chrome Web Store](https://chrome.google.com/webstore/devconsole) | `…-chromium-vX.Y.Z.zip` | Chrome, Brave, Opera, Vivaldi, Arc |
-| [Microsoft Edge Add-ons](https://partner.microsoft.com/dashboard/microsoftedge) | `…-chromium-vX.Y.Z.zip` | Edge |
-| [Firefox Add-ons (AMO)](https://addons.mozilla.org/developers/) | `…-firefox-vX.Y.Z.zip` | Firefox desktop and Android |
+| Store | Zip | Covers | Public listing |
+|---|---|---|---|
+| [Chrome Web Store](https://chrome.google.com/webstore/devconsole) | `…-chromium-vX.Y.Z.zip` | Chrome, Brave, Opera, Vivaldi, Arc | [rustcore-wallet](https://chromewebstore.google.com/detail/rustcore-wallet/djhcnkifdfjcbbfibopdhfkepiilhabf) |
+| [Microsoft Edge Add-ons](https://partner.microsoft.com/dashboard/microsoftedge) | `…-chromium-vX.Y.Z.zip` | Edge | not listed yet |
+| [Firefox Add-ons (AMO)](https://addons.mozilla.org/developers/) | `…-firefox-vX.Y.Z.zip` | Firefox desktop and Android | [rustcore-wallet](https://addons.mozilla.org/en-US/firefox/addon/rustcore-wallet/) |
+
+The README names the public listings as the extension's only official ones (Getting started,
+the anti-phishing note, the roadmap): when a store goes public, add it there too.
 
 What the stores ask for:
 

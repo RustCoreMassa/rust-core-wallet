@@ -64,8 +64,8 @@ a link on `nft.rustcoremassa.com`) — the wallet loads images from no other ser
 
 ## Getting started
 
-RustCore Wallet runs in your **phone's browser** — Android or iPhone, any browser. On a computer
-it shows a QR code to open it on your phone instead.
+RustCore Wallet runs in your **phone's browser** — Android or iPhone, any browser. On a computer,
+install it as a browser extension instead ([see below](#on-a-computer-the-browser-extension)).
 
 1. **Open it** on your phone: **`wrustcore.massa`** — tap
    [wrustcore.massa.network](https://wrustcore.massa.network) (Massa's official gateway) or open
@@ -77,6 +77,17 @@ it shows a QR code to open it on your phone instead.
 3. **Create your PIN**, then **create a new wallet** or **import** one with its private key.
 4. **Back up your private key right away**: *Settings → Backup private key*. Write it down and
    keep it offline — it's the only way to recover your wallet.
+
+### On a computer: the browser extension
+
+The same wallet, as a browser extension: in the toolbar popup, the browser's side panel or a full
+tab, and it connects to Massa dApps. Install it only from its official listings — it keeps itself
+up to date:
+
+- [**Chrome Web Store**](https://chromewebstore.google.com/detail/rustcore-wallet/djhcnkifdfjcbbfibopdhfkepiilhabf) — Chrome, Brave, Opera, Vivaldi and Arc
+- [**Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/rustcore-wallet/) — Firefox, on computers and on Android
+
+The extension keeps its own wallets, locked with a password: create new ones or import your keys.
 
 ## Your security & privacy
 
@@ -96,7 +107,7 @@ it shows a QR code to open it on your phone instead.
 
 | Destination | Why |
 |---|---|
-| The DeWeb gateway you open the wallet from | Delivers the wallet itself, read from the Massa blockchain. |
+| The DeWeb gateway you open the wallet from (web wallet only) | Delivers the wallet itself, read from the Massa blockchain. The browser extension brings its files with it, from its store. |
 | `mainnet.massa.net` / `buildnet.massa.net` | Massa's public nodes: balances, rolls, tokens, prices and swaps, and the transactions you confirm. |
 | `indexer-api.massa.net` | Your transaction history (Massa's indexer, the one behind `explorer.massa.net`). |
 | `ipfs.io` / `nft.rustcoremassa.com` (only for NFTs your wallet holds, and icons you set) | The public IPFS gateway (for `ipfs://` links) and RustCore's server for its Core Keepers NFTs: NFT descriptions, traits and pictures, collection logos, and custom token icons. That server can see your IP address. |
@@ -146,7 +157,8 @@ the destinations above, because a wallet can't work without them.
 - **`wrustcore.massa` is the only official address of the wallet.** A copy of the wallet on any
   other address could steal your keys — never enter your PIN or private key anywhere else, and
   never on a site someone sent you in a message. (`rustcore.massa` is the RustCore website; it
-  never asks for your key or PIN.)
+  never asks for your key or PIN.) The browser extension's only official listings are on the
+  [Chrome Web Store](https://chromewebstore.google.com/detail/rustcore-wallet/djhcnkifdfjcbbfibopdhfkepiilhabf) and [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/rustcore-wallet/).
 - **Tokens you add yourself aren't checked by RustCore.** Anyone can create a token with any name
   and symbol, so they're marked *Added by you* and their contract is shown before every send. Add
   one only from a contract address you got from a source you trust. They have no USD price and
@@ -157,7 +169,7 @@ the destinations above, because a wallet can't work without them.
   is public on the blockchain anyway — but not who it belongs to.
 - A 6-digit PIN protects against casual access. If someone got hold of your phone's stored data,
   a determined attacker could try every PIN offline — keep your phone locked and secure.
-- The browser extension (in progress) locks the wallet with a **password** instead: at least 8
+- The browser extension locks the wallet with a **password** instead: at least 8
   characters, not only digits. On a computer, stored browser data is a common target for
   malware, and a good password can't be guessed offline the way a PIN can.
 - The wallet hasn't had an independent audit yet (it's on the [roadmap](#roadmap)).
@@ -204,8 +216,8 @@ wallet (*Settings → Backup private key*), open wrustcore.massa.network, create
 the keys. If you installed the app, install it again from the new address. Your funds are on the blockchain,
 not in the app: nothing is lost as long as you have your keys.
 
-**Why doesn't it work on my computer?** It's built for phones. A browser extension for desktop is
-built and in review at the browser stores; it will be listed here once it's published.
+**Why doesn't it work on my computer?** The web wallet is built for phones. On a computer, install
+the [browser extension](#on-a-computer-the-browser-extension), for Chromium browsers or Firefox.
 
 ## Roadmap
 
@@ -234,7 +246,9 @@ built and in review at the browser stores; it will be listed here once it's publ
 - [x] Added to Massa's wallet library (`@massalabs/wallet-provider`), so dApps find RustCore
   *([merged](https://github.com/massalabs/wallet-provider/pull/366); dApps get it as they move
   to the library's next release)*
-- [ ] Chrome Web Store, Edge Add-ons and Firefox Add-ons *(in review)*
+- [x] On the [Chrome Web Store](https://chromewebstore.google.com/detail/rustcore-wallet/djhcnkifdfjcbbfibopdhfkepiilhabf) and
+  [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/rustcore-wallet/)
+- [ ] Edge Add-ons
 
 **Phase 3 — Mobile apps** *(planned)*
 - [ ] iOS and Android apps

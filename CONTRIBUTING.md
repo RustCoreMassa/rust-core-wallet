@@ -55,8 +55,8 @@ screen, so the wallet opens in any desktop browser; to see it as on a phone, tur
 device emulation (Chrome: *Toggle device toolbar*; Firefox: *Responsive Design Mode* with touch
 simulation). The restriction is the `MOBILE_ONLY` flag in `src/app/platform-providers.ts`.
 
-**Browser extension (in progress).** The same code also builds as a Manifest V3 browser
-extension, one package per browser family: `npm run build:extension` writes
+**Browser extension.** The same code also builds as a Manifest V3 browser extension (published
+on the Chrome Web Store and Firefox Add-ons — links in the README), one package per browser family: `npm run build:extension` writes
 `dist/extension/chromium` (Chrome, Edge, Brave, Opera, Vivaldi, Arc) and
 `dist/extension/firefox` (Firefox desktop and Android). They hold the same files; only
 `manifest.json` differs — `src/extension/manifest.json` has every key and the build keeps each
